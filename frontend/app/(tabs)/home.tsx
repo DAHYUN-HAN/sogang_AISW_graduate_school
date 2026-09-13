@@ -1098,18 +1098,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // Android(Fabric)는 배경색이 나중에 추가되는 뷰에서 borderRadius를 간헐적으로 놓친다.
+  // 배경색과 radius를 항상 같은 스타일 객체에 두고, radius는 크기의 절반(14)으로 고정한다.
   dayBadge: {
     width: 28,
     height: 28,
-    borderRadius: 999,
+    borderRadius: 14,
+    overflow: "hidden",
     alignItems: "center",
     justifyContent: "center",
   },
   dayBadgeActive: {
     backgroundColor: COLORS.primary,
+    borderRadius: 14,
   },
   dayBadgeMarked: {
     backgroundColor: "#E6F1FB",
+    borderRadius: 14,
   },
   dayText: {
     color: COLORS.text,

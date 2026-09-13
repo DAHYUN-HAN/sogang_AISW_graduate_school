@@ -2345,7 +2345,8 @@ const styles = StyleSheet.create({
     height: 28,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 999,
+    // Android(Fabric)에서는 크기를 크게 넘는 radius가 원으로 잘리지 않으므로 정확히 절반 값을 쓴다.
+    borderRadius: 14,
     borderWidth: 1.3,
     borderColor: COLORS.primary,
   },
