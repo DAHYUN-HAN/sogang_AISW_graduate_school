@@ -1,6 +1,6 @@
 # Four reported mobile issues — verification, 2026-09-12
 
-Follow-up: after this audit, the user authorized the comment keyboard and council-header corrections. Both source changes are recorded at the end of this document; the audit below describes the pre-fix state.
+Follow-up: after this audit, the user authorized the comment keyboard and council-header corrections. Their source changes and Android captures are recorded below. A subsequent installed-APK run also completed both the exact restart/Participation/Back sequence and the keyboard-dismissal-first long-draft sequence; see the final section. The original audit below describes the earlier state.
 
 WP5/WP9 P0 verification only. No application source was changed and no APK was built or installed.
 
@@ -48,3 +48,14 @@ Evidence directory: `outputs/qa/comment-council-captures-2026-09-12/`.
 Only the disposable local post received a comment (`Keyboard check 2026-09-12`); no production content was written. Native reply/error scenarios were not repeated in this screenshot run; their success/failure callback coverage is included in the passing source regression suite. Back and long-form scrolling were not retested in this follow-up.
 
 The initial emulator startup had a System UI ANR, and an attempted environment-override Metro launch was rejected by automatic approval review with `blocked by policy` and no additional reason. The existing normal offline Expo configuration then loaded the app successfully. Loading/error captures `00`–`01` are excluded from passing evidence.
+
+## Follow-up: exact Back and keyboard-hidden scrolling sequences
+
+Both scenarios passed on the installed Android APK in the user's follow-up recheck. This run used `kr.ac.sogang.aisw.campus`, version `0.1.0` / versionCode `4`, last updated 2026-09-11, on Pixel 7 / Android 16. It did not use Expo Go. Current HEAD `cb692f8` has identical SHA-256 values to the version-4 build for the post composer, Android Back hook/decision helper, keyboard viewport and root navigator; `outputs/qa/back-scroll-recheck-2026-09-12/source-check.json` records all five comparisons. No application code was changed, and no APK was built or installed during this recheck.
+
+| Exact scenario | Observed result | Evidence in `outputs/qa/back-scroll-recheck-2026-09-12/` |
+| --- | --- | --- |
+| Home → Android Back → launch app again → Participation → Android Back | **Passed.** First Back returned to the Pixel launcher; after reopening, Participation Back returned to the app Home without exiting. | `03-home-back-launcher.png`, `03-exit-activity.txt`, `04-reopened-home.xml`, `05-participation.png/xml`, `06-participation-back-home.png/xml`, `06-return-activity.txt`. |
+| Community → Resources → Exam Archive → + → enter 30 body lines using Enter → Android Back to hide keyboard → drag inside body | **Passed.** Keyboard changed from shown to hidden. Register was outside the viewport immediately after dismissal. One upward drag from `(360,1100)` to `(360,600)` over 600 ms, entirely inside the visible body, scrolled the form and exposed the complete Register button at `[35,1276][685,1360]`, above the content viewport bottom `1429`. The keyboard stayed hidden and all 30 lines were retained. | `12-long-draft-keyboard.png/xml`, `13-keyboard-hidden-before-drag.png/xml`, `14-inside-drag-register-visible.png/xml`; matching `12`/`13`/`14` keyboard-state text files. |
+
+The source-level Android Back and composer Back tests also passed **18/18**, zero failures/skips/cancellations. The draft was closed without submission; production posts/comments were not created, changed or deleted. Capture display was temporarily 720×1600 / density 280, equivalent logical width to the original 1080×2400 / density 420. An initial System UI ANR was dismissed with Wait before the interaction sequence; startup/error captures are not pass evidence. These are installed-APK results on one Android emulator, with physical-device and iOS coverage still separate.
