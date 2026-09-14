@@ -52,6 +52,7 @@ function layoutHarness(platform: "android" | "ios" | "web") {
     },
     "@tanstack/react-query": { QueryClient: class {}, QueryClientProvider: "QueryClientProvider" },
     "../components/NotificationBootstrap": { default: "NotificationBootstrap" },
+    "../components/StatusBarScrim": { default: "StatusBarScrim" },
     "../components/KeyboardViewport": { default: "KeyboardViewport" },
     "../stores/userStore": { useUserStore: (select: (store: typeof state) => unknown) => select(state) },
     "../utils/fonts": { APP_FONTS: {}, patchDefaultFontFamily: () => {} },
