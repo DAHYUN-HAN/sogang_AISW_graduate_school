@@ -9,15 +9,14 @@ export function enabledRefetch(enabled: boolean, refetch: Refetch): Refetch | un
 export function noticeRefreshControlRefreshing({
   boardsLoading,
   postsLoading = false,
-  boardsRefetching,
-  postsRefetching,
+  pullRefreshing,
 }: {
   boardsLoading: boolean;
   postsLoading?: boolean;
-  boardsRefetching: boolean;
-  postsRefetching: boolean;
+  /** 사용자가 목록을 당겨서 시작한 새로고침이 진행 중인지. 백그라운드 refetch는 포함하지 않는다. */
+  pullRefreshing: boolean;
 }): boolean {
-  return !boardsLoading && !postsLoading && (boardsRefetching || postsRefetching);
+  return !boardsLoading && !postsLoading && pullRefreshing;
 }
 
 export async function refreshQueries(

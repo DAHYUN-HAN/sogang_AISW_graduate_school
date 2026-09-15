@@ -17,22 +17,33 @@ function visit(node: ts.Node) {
 visit(source);
 assert.ok(expression);
 
-test("새 공지 필터의 첫 로딩은 게시판 refetch와 겹쳐도 pull 로딩을 추가하지 않는다", () => {
+test("새 공지 필터의 첫 로딩은 pull 새로고침과 겹쳐도 pull 로딩을 추가하지 않는다", () => {
   const refreshing = runInNewContext(expression!, {
     boardsLoading: false,
-    boardsRefetching: true,
-    postsQuery: { isLoading: true, isRefreshingFirstPage: false },
+    pullRefreshing: true,
+    postsQuery: { isLoading: true },
     noticeRefreshControlRefreshing,
   });
   assert.equal(refreshing, false);
 });
 
-test("이미 표시된 공지의 새로고침은 pull 로딩을 유지한다", () => {
+test("사용자가 당겨서 시작한 새로고침은 pull 로딩을 유지한다", () => {
   const refreshing = runInNewContext(expression!, {
     boardsLoading: false,
-    boardsRefetching: false,
-    postsQuery: { isLoading: false, isRefreshingFirstPage: true },
+    pullRefreshing: true,
+    postsQuery: { isLoading: false },
     noticeRefreshControlRefreshing,
   });
   assert.equal(refreshing, true);
+});
+
+test("탭 진입 시 자동으로 도는 백그라운드 refetch는 pull 로딩을 켜지 않는다", () => {
+  const refreshing = runInNewContext(expression!, {
+    boardsLoading: false,
+    pullRefreshing: false,
+    postsQuery: { isLoading: false, isRefreshingFirstPage: true },
+    boardsRefetching: true,
+    noticeRefreshControlRefreshing,
+  });
+  assert.equal(refreshing, false);
 });

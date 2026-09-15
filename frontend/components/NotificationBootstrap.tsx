@@ -176,6 +176,11 @@ export default function NotificationBootstrap() {
 
       latestSeenIdRef.current = newest.id;
       storeLatestId(newest.id);
+      // 공지(notice) 알림만 화면 팝업(토스트/웹 알림)으로 띄운다.
+      // 그 외(댓글·좋아요·일정·원우회 등)는 알림함에는 남기되 팝업은 띄우지 않는다.
+      if (newest.notification_type !== "notice") {
+        return;
+      }
       setVisibleNotification(newest);
       if (Platform.OS === "web") {
         showWebNotification("AI·SW CAMPUS", newest.message, () => { void openNotification(newest); });

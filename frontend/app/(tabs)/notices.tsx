@@ -99,6 +99,10 @@ export default function NoticesScreen() {
 function NoticesContent() {
   const insets = useSafeAreaInsets();
   const [selectedFilter, setSelectedFilter] = useState<NoticeFilter>("all");
+  // 당겨서 새로고침 표시는 사용자가 실제로 당겼을 때만 켠다.
+  // 탭 진입 시 자동으로 도는 백그라운드 refetch(isRefetching)에 연동하면
+  // Android 기본 새로고침 아이콘(흰 원)이 탭을 바꿀 때마다 잠깐 떠 보인다.
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   const { data: boardData, isLoading: boardsLoading, isError: boardsError, isRefetching: boardsRefetching, refetch: refetchBoards } = useBoardsQuery();
 
   const noticeBoards = useMemo(
@@ -204,11 +208,11 @@ function NoticesContent() {
         refreshing={noticeRefreshControlRefreshing({
           boardsLoading,
           postsLoading: postsQuery.isLoading,
-          boardsRefetching,
-          postsRefetching: postsQuery.isRefreshingFirstPage,
+          pullRefreshing,
         })}
         onRefresh={() => {
-          void refreshQueries([refetchBoards, postsQuery.refreshFirstPage]);
+          setPullRefreshing(true);
+          void refreshQueries([refetchBoards, postsQuery.refreshFirstPage]).finally(() => setPullRefreshing(false));
         }}
         onEndReached={() => {
           if (canLoadNextNoticePage(postsQuery)) {

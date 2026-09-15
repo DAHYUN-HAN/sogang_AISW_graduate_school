@@ -62,7 +62,9 @@ test("공지 목록 정리 후에도 검색과 네 필터 새로고침이 남는
 test("참여활동 상세는 PR 순서를 유지하고 활동 인증 이미지는 관리자 규칙을 사용한다", () => {
   assert.match(detail, /const visualHeroSection =/);
   assert.match(detail, /\{!isAdminParticipationGuide \? visualHeroSection : null\}/);
-  assert.match(detail, /\{isAdminParticipationGuide \? visualHeroSection : null\}/);
+  // 동아리/네트워킹은 관리자 등록 이미지를 제목과 본문 사이에 세로로 모두 나열한다.
+  assert.match(detail, /\{isAdminParticipationGuide \? participationImagesSection : null\}/);
+  assert.match(detail, /const participationImagesSection =/);
   assert.match(detail, /function ParticipationHeroImage/);
   assert.match(detail, /aspectRatio: aspect !== null && aspect < 1 \? 4 \/ 5 : 4 \/ 3/);
   assert.match(detail, /activityImageLayoutFromMetadata\(board\?\.metadata\?\.activity_image_layout\)/);

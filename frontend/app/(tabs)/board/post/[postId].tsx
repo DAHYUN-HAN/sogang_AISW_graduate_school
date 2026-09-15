@@ -52,7 +52,6 @@ import {
 } from "../../../../utils/postDetailImagePresentation";
 import { imageDimensionsFromLoadEvent } from "../../../../utils/imageDimensions";
 import { postDetailFocusDecision } from "../../../../utils/postDetailCache";
-import { participationGuideDetailAttachments } from "../../../../utils/postAttachments";
 import { participationApplicationUrl } from "../../../../utils/participationGuide";
 import { shouldShowPostAuthorBlock } from "../../../../utils/postMenu";
 import { REPORT_REASONS, getReportEntryState, getReportSubmission, type ReportReason } from "../../../../utils/reportForm";
@@ -495,7 +494,7 @@ export default function PostDetailScreen() {
   const visibleAttachments = isPhotoAlbum
     ? []
     : isAdminParticipationGuide
-      ? participationGuideDetailAttachments(post.attachments)
+      ? post.attachments.filter((attachment) => !attachment.content_type.startsWith("image/"))
     : hasVisualHero
       ? post.attachments.filter((attachment) => !attachment.content_type.startsWith("image/"))
       : post.attachments;
@@ -681,6 +680,16 @@ export default function PostDetailScreen() {
     handleCreateComment();
   };
 
+  // 동아리/네트워킹 안내: 관리자가 등록한 사진을 제목과 본문 사이에 세로로 모두 나열한다.
+  const participationImagesSection =
+    isAdminParticipationGuide && imageAttachments.length > 0 ? (
+      <View style={styles.participationImagesBlock}>
+        {imageAttachments.map((image) => (
+          <ParticipationHeroImage key={image.id} media={image} />
+        ))}
+      </View>
+    ) : null;
+
   const visualHeroSection = hasVisualHero ? (
     <View style={[
       styles.visualHeroBlock,
@@ -828,7 +837,7 @@ export default function PostDetailScreen() {
             {!isActivityCertification ? (
               <Text style={[styles.title, board?.board_type === "notice" ? styles.titleNotice : isMutualAidRequest ? styles.titleMutualAid : (isAdminParticipationGuide || isStudyRecruit || isCouncilActivity) ? styles.titleGuide : null]}>{post.title}</Text>
             ) : null}
-            {isAdminParticipationGuide ? visualHeroSection : null}
+            {isAdminParticipationGuide ? participationImagesSection : null}
             {!isAdminParticipationGuide && !isActivityCertification && !isCouncilActivity && !isCouncilActivityEntry ? (
               <Text style={[styles.meta, board?.board_type === "notice" ? styles.metaNotice : isMutualAidRequest ? styles.metaMutualAid : null]}>
                 {board?.board_type === "notice"
@@ -1788,6 +1797,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#F1F0E8",
     alignItems: "center",
     justifyContent: "center",
+  },
+  participationImagesBlock: {
+    paddingHorizontal: 20,
+    marginTop: 14,
+    marginBottom: 16,
+    gap: 12,
   },
   participationHeroBox: {
     width: "100%",
