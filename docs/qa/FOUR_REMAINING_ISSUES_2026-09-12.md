@@ -1,5 +1,7 @@
 # Four reported mobile issues — verification, 2026-09-12
 
+2026-09-13 correction: the user reports that keyboard-hidden inside-body dragging still fails on the downloaded APK. The emulator passes below do not establish resolution on that device. The report is reopened; expanded APK 8 checks and native measurements are documented in `docs/qa/LONG_POST_SCROLL_RECHECK_2026-09-13.md`.
+
 Follow-up: after this audit, the user authorized the comment keyboard and council-header corrections. Their source changes and Android captures are recorded below. A subsequent installed-APK run also completed both the exact restart/Participation/Back sequence and the keyboard-dismissal-first long-draft sequence; see the final section. The original audit below describes the earlier state.
 
 WP5/WP9 P0 verification only. No application source was changed and no APK was built or installed.
