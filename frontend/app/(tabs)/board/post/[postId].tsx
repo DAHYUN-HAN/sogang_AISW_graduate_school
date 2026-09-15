@@ -1803,8 +1803,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  // 스크롤 콘텐츠(content)가 이미 좌우 20px 여백을 가지므로 여기서는 더하지 않는다.
+  // 디자인: 이미지 폭 320(좌우 20), 제목 아래 14, 이미지 아래 16.
   participationImagesBlock: {
-    paddingHorizontal: 20,
     marginTop: 14,
     marginBottom: 16,
     gap: 12,
