@@ -6,7 +6,7 @@ import { isAxiosError } from "axios";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { BackHandler, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { BackHandler, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -132,9 +132,17 @@ function FormField({ label, required, requiredStar, optional, helper, error, chi
 // Figma: 입력 중(포커스) 상태는 1.5px #21262E 테두리
 function FormTextInput({ style, onBlur, onFocus, ...props }: ComponentProps<typeof TextInput>) {
   const [focused, setFocused] = useState(false);
-  return (
+  const inputStyle: TextStyle = StyleSheet.flatten([style, focused ? styles.inputFocused : null]);
+  const scrollableBody = props.multiline && Platform.OS === "android";
+  const iosBody = props.multiline && Platform.OS === "ios";
+  const maximumBodyHeight = 240;
+  const borderWidth = inputStyle?.borderWidth ?? 0;
+  const input = (
     <TextInput
       {...props}
+      // Android uses a nested ScrollView for boundary handoff. iOS keeps its
+      // native scrolling UITextView so text selection and caret reveal stay native.
+      scrollEnabled={scrollableBody ? false : iosBody ? true : props.scrollEnabled}
       onBlur={(event) => {
         setFocused(false);
         onBlur?.(event);
@@ -143,8 +151,38 @@ function FormTextInput({ style, onBlur, onFocus, ...props }: ComponentProps<type
         setFocused(true);
         onFocus?.(event);
       }}
-      style={[style, focused ? styles.inputFocused : null, { outlineStyle: "none" } as never]}
+      style={[
+        inputStyle,
+        scrollableBody ? {
+          borderWidth: 0,
+          borderRadius: 0,
+          minHeight: typeof inputStyle?.minHeight === "number" ? Math.max(0, inputStyle.minHeight - borderWidth * 2) : inputStyle?.minHeight,
+        } : null,
+        iosBody ? { maxHeight: maximumBodyHeight } : null,
+        { outlineStyle: "none" } as never,
+      ]}
     />
+  );
+  if (!scrollableBody) return input;
+
+  return (
+    <ScrollView
+      nestedScrollEnabled
+      keyboardShouldPersistTaps="handled"
+      bounces={false}
+      style={{
+        flexGrow: 0,
+        width: inputStyle?.width,
+        minHeight: inputStyle?.minHeight,
+        maxHeight: maximumBodyHeight,
+        borderWidth,
+        borderColor: inputStyle?.borderColor,
+        borderRadius: inputStyle?.borderRadius,
+        backgroundColor: inputStyle?.backgroundColor,
+      }}
+    >
+      {input}
+    </ScrollView>
   );
 }
 
@@ -993,6 +1031,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         style={styles.formScroller}
         contentContainerStyle={[styles.content, isActivity ? styles.activityContent : null]}
         keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
       >
         {isActivity ? (
           <>
