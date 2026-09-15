@@ -801,9 +801,13 @@ export default function PostDetailScreen() {
           label="뒤로"
           onPress={handlePostBack}
         />
-        <Text numberOfLines={1} style={styles.appBarTitle}>
-          {appBarTitle}
-        </Text>
+        {/* 제목은 아이콘 줄과 같은 높이에 중앙 정렬한다. 상단 safe-area padding 아래에서 시작해야
+            상태바(카메라 컷아웃 포함) 영역에 겹치지 않는다. */}
+        <View pointerEvents="none" style={[styles.appBarTitleWrap, { top: Math.max(insets.top, 10) }]}>
+          <Text numberOfLines={1} style={styles.appBarTitle}>
+            {appBarTitle}
+          </Text>
+        </View>
         {isPhotoAlbum ? (
           <View style={styles.iconButton} />
         ) : (
@@ -1426,10 +1430,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 21,
   },
-  appBarTitle: {
+  appBarTitleWrap: {
     position: "absolute",
     left: 88,
     right: 88,
+    bottom: 10, // appBar paddingBottom과 동일
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  appBarTitle: {
     textAlign: "center",
     color: COLORS.text,
     fontSize: 18,
