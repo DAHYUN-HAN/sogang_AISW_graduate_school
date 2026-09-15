@@ -47,19 +47,22 @@ test("비활성 쿼리는 새로고침 대상에 포함하지 않는다", () => 
 test("공지 초기 로딩 중에는 pull indicator를 LoadingRows와 함께 표시하지 않는다", () => {
   assert.equal(noticeRefreshControlRefreshing({
     boardsLoading: true,
-    boardsRefetching: false,
-    postsRefetching: false,
+    pullRefreshing: true,
   }), false);
   assert.equal(noticeRefreshControlRefreshing({
     boardsLoading: false,
-    boardsRefetching: true,
-    postsRefetching: false,
-  }), true);
+    postsLoading: true,
+    pullRefreshing: true,
+  }), false);
   assert.equal(noticeRefreshControlRefreshing({
     boardsLoading: false,
-    boardsRefetching: false,
-    postsRefetching: true,
+    pullRefreshing: true,
   }), true);
+  // 탭 진입 시 자동 refetch만으로는 indicator를 켜지 않는다.
+  assert.equal(noticeRefreshControlRefreshing({
+    boardsLoading: false,
+    pullRefreshing: false,
+  }), false);
 });
 
 test("현재 공지 필터 재선택은 게시판과 현재 첫 페이지를 함께 새로고침한다", async () => {

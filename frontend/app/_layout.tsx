@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Image, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 
 import NotificationBootstrap from "../components/NotificationBootstrap";
+import StatusBarScrim from "../components/StatusBarScrim";
 import KeyboardViewport from "../components/KeyboardViewport";
 import { useUserStore } from "../stores/userStore";
 import { APP_FONTS, patchDefaultFontFamily } from "../utils/fonts";
@@ -97,6 +98,7 @@ export default function RootLayout() {
             <Stack.Screen name="legal/account-deletion" options={{ headerShown: false }} />
             <Stack.Screen name="legal/support" options={{ headerShown: false }} />
           </Stack>
+          <StatusBarScrim />
         </KeyboardViewport>
       </View>
     </QueryClientProvider>
