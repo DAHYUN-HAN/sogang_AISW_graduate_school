@@ -52,6 +52,7 @@ import {
 } from "../../../../utils/postDetailImagePresentation";
 import { imageDimensionsFromLoadEvent } from "../../../../utils/imageDimensions";
 import { postDetailFocusDecision } from "../../../../utils/postDetailCache";
+import { participationGuideImageSections } from "../../../../utils/postAttachments";
 import { participationApplicationUrl } from "../../../../utils/participationGuide";
 import { shouldShowPostAuthorBlock } from "../../../../utils/postMenu";
 import { REPORT_REASONS, getReportEntryState, getReportSubmission, type ReportReason } from "../../../../utils/reportForm";
@@ -680,11 +681,15 @@ export default function PostDetailScreen() {
     handleCreateComment();
   };
 
-  // 동아리/네트워킹 안내: 관리자가 등록한 사진을 제목과 본문 사이에 세로로 모두 나열한다.
+  // 동아리/네트워킹 안내: 대표 이미지(첫 번째)는 목록 카드에서 쓰므로 제외하고,
+  // 나머지 상세 이미지만 제목과 본문 사이에 세로로 나열한다.
+  const participationDetailImages = isAdminParticipationGuide
+    ? participationGuideImageSections(post.attachments).detailImages
+    : [];
   const participationImagesSection =
-    isAdminParticipationGuide && imageAttachments.length > 0 ? (
+    participationDetailImages.length > 0 ? (
       <View style={styles.participationImagesBlock}>
-        {imageAttachments.map((image) => (
+        {participationDetailImages.map((image) => (
           <ParticipationHeroImage key={image.id} media={image} />
         ))}
       </View>
