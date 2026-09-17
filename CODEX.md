@@ -4,6 +4,8 @@ This file turns the Notion Phase 1-4 planning into concrete work for coding agen
 
 ## Immediate Goal
 
+- 2026-09-17 WP5/WP9 P0: completed community existing photo/document editing and processing-owner mutual-aid evidence editing. Shared rows expose open/change/delete/add, explicit evidence replacement preserves legacy clients, and account-scoped caches plus fresh edit hydration prevent private-data reuse and stale attachment overwrite. Full frontend 640 tests and backend 422 tests (1 skipped) pass; desktop/mobile-web UI save/reopen, signed download and file/link roundtrips pass. Native package/physical-device validation remains Phase 5 QA. Details: `docs/qa/ATTACHMENT_EDIT_2026-09-17.md`.
+
 Use the Phase 2 contracts as the foundation, then execute Notion Phase 3 and Phase 4 as development sprints.
 
 2026-07-05 policy alignment: implement against `정책_정의서_260705.pdf` and AISW UI/design PDFs where they are more specific than Phase 2. Content routes are member-only; guest access is limited to login, signup/email verification, password recovery, refresh, registration options, legal screens, and health/docs.

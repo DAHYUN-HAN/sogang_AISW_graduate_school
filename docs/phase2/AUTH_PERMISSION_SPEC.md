@@ -95,7 +95,7 @@ Implementation:
 | Profile edit | No | Own only | Own/all if later needed |
 | Notification settings | No | Own only | Own only |
 | Read mutual-aid requests/comments | No | Yes | Yes |
-| Read/open/download mutual-aid evidence | No | No | Yes |
+| Read/open/download mutual-aid evidence | No | Own readable processing request only | Yes |
 | Issue media access URL | No | Authorized media only | All |
 
 ## 6. Board Write Policy
@@ -117,10 +117,10 @@ Rules:
 - Cohort-leader registration is stored through the admin-only board management API; members can read the configured cohort introductions but cannot create or edit them.
 - Past-council records use a separate admin-only board metadata area. FAQ remains a separate dedicated table/API; neither mutation path is available to members.
 - Suggestions remain anonymous in member and admin presentation. Only the admin reply endpoint can set an official answer and `answered` requires reply text.
-- Mutual-aid submission content and status are readable by authenticated members. Evidence files, evidence filenames, and `metadata.proof_url` are never returned to non-admin clients; direct evidence media lookup returns `404 NOT_FOUND`.
+- Mutual-aid submission content and status are readable by authenticated members. Ordinary member list/detail responses omit evidence. An explicit `GET /api/posts/{id}?for_edit=true` authorizes the processing request owner or administrator before returning evidence files, filenames and `metadata.proof_url`. Other members cannot request this edit response; evidence metadata/access lookup returns `404 NOT_FOUND` for peers or non-processing requesters, including legacy non-private evidence.
 - A requester may edit a mutual-aid submission only while it is `processing`. They may delete a `processing` or `rejected` submission, but never a `completed` submission; the API enforces the state rule even when called directly.
 - Draft and hidden posts are author/admin only across the same paths, while `deleted` status is admin-only; changing a previously readable post to an unpublished state removes it from other members' activity history and media authorization.
-- The backend does not mount the upload directory. It issues short-lived signed media URLs only after an authenticated metadata/access request passes object-level policy. Ordinary post attachments inherit post read policy; mutual-aid evidence is administrator-only even for the requester after attachment.
+- The backend does not mount the upload directory. It issues short-lived signed media URLs only after an authenticated metadata/access request passes object-level policy. Ordinary post attachments inherit post read policy; mutual-aid evidence is available to administrators or the readable processing request owner. Signed URLs already issued retain their original expiration; editing does not introduce token revocation. Removing an attachment detaches its post relation without physically deleting bytes.
 
 ## 7. Anonymous Writing
 
@@ -191,3 +191,5 @@ Rules:
 - Anonymous and forced-anonymous content remains anonymous to non-admin readers. Administrators may resolve its live author or historical snapshot. Mutual-aid evidence remains administrator-only after account deletion.
 - Administrators must transfer operational responsibility and be demoted by another administrator before self-deletion.
 - The completion receipt is deliberately non-identifying. There is no fixed application-level legal retention claim; any receipt or backup interval requires explicit privacy-owner approval.
+
+2026-09-17 client isolation (WP5/WP9): the root query cache and mounted form state are replaced when the authenticated principal (ID/role) changes; retired caches are cleared. Private edit responses and signed media URLs cannot carry over to the next account. Edit forms wait for a fresh mount fetch before their one-time hydration.

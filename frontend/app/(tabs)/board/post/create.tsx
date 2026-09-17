@@ -6,16 +6,16 @@ import { isAxiosError } from "axios";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { BackHandler, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
+import { BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
 import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon } from "../../../../components/icons";
 import { useBoardsQuery } from "../../../../hooks/useApi";
-import { resolveMediaAccessUrl } from "../../../../hooks/useMediaAccessUrl";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/usePosts";
 import CompletionState from "../../../../components/CompletionState";
 import LoadingState from "../../../../components/LoadingState";
+import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
 import { MediaImageBackground } from "../../../../components/MediaImage";
 import { duesPayerApi, postApi } from "../../../../services/api";
 import type { MediaAsset, PostListItem } from "../../../../types";
@@ -50,7 +50,6 @@ import {
   minimumMutualAidEventDate,
 } from "../../../../utils/dateSelection";
 import { createFormNotice, requiredFieldNotice, type FormNotice } from "../../../../utils/formNotice";
-import { openMediaUrl } from "../../../../utils/mediaOpener";
 import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../utils/mediaPicker";
 import {
   canEditMutualAidRequest,
@@ -381,7 +380,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   );
   const parsedPostId = Number(params.postId);
   const postId = Number.isFinite(parsedPostId) && parsedPostId > 0 ? parsedPostId : null;
-  const editPostQuery = usePostDetail(postId ?? 0, postId !== null);
+  const editPostQuery = usePostDetail(postId ?? 0, postId !== null, true);
   const existingPost = editPostQuery.data?.data;
   const boardId = existingPost?.board_id ?? selectedBoardId;
 
@@ -536,7 +535,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   } = participationGuideImageSections(attachments);
   const albumImageSelectionLimit = postImageSelectionLimit(boardType, attachmentIds.length);
   const isAlbumImageLimitReached = isAlbum && albumImageSelectionLimit === 0;
-  const hasStoredMutualAidEvidence = Boolean(postId && existingPost?.mutual_aid?.has_evidence);
   const syncParticipants = (items: ActivityParticipant[]) => {
     setSelectedParticipants(items);
     setValue("participants", items.map(formatActivityParticipant).join(", "), { shouldValidate: true });
@@ -642,7 +640,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     if (isMutualAid) {
       if (clean(values.eventDate)) metadata.event_date = clean(values.eventDate) as string;
       if (clean(values.relation)) metadata.relation = clean(values.relation) as string;
-      if (evidenceMode === "link" && evidenceLink.trim()) metadata.proof_url = evidenceLink.trim();
+      metadata.proof_url = evidenceMode === "link" ? evidenceLink.trim() : "";
     }
     if (isStudyRecruit) {
       metadata.recruitment_status = values.category === "마감" ? "closed" : "open";
@@ -754,8 +752,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       }
     } else if (
       requiresAttachment &&
-      (isAdminParticipationPost ? !participationRepresentativeImage : attachmentIds.length === 0) &&
-      !(isMutualAid && hasStoredMutualAidEvidence)
+      (isAdminParticipationPost ? !participationRepresentativeImage : attachmentIds.length === 0)
     ) {
       setFormNotice(createFormNotice(labels.attachment, `${labels.attachmentHelp}을 첨부하세요.`));
       return;
@@ -769,6 +766,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       category: isAlbum ? undefined : clean(values.category),
       metadata: buildMetadata(values),
       attachment_ids: attachmentIds,
+      replace_evidence: Boolean(postId && isMutualAid),
       is_anonymous: isSuggestion,
     };
     if (postId) {
@@ -898,20 +896,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     images: () => void uploadAttachments(pickPostImages),
     documents: () => void uploadAttachments(() => pickAndUploadDocuments()),
   });
-
-  const openAttachment = async (attachment: MediaAsset) => {
-    try {
-      const accessUrl = await resolveMediaAccessUrl(attachment);
-      if (!accessUrl) throw new Error("MISSING_MEDIA_URL");
-      await openMediaUrl(accessUrl, {
-        platform: Platform.OS,
-        assignWebLocation: (url) => window.location.assign(url),
-        openExternalUrl: (url) => Linking.openURL(url),
-      });
-    } catch {
-      setFormNotice(createFormNotice("파일 열기 실패", "첨부 파일에 접근할 수 없습니다. 잠시 후 다시 시도해주세요."));
-    }
-  };
 
   const participantResults = participantSearch.data?.data ?? [];
   const activitySourcePosts = useMemo(() => {
@@ -1498,6 +1482,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 return (
                   <Pressable
                     key={mode.key}
+                    disabled={isSubmitting}
                     onPress={() => {
                       setEvidenceMode(mode.key);
                       // 한 가지 증빙만 남긴다.
@@ -1512,36 +1497,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               })}
             </View>
             {evidenceMode === "file" ? (
-              <>
-                <Pressable disabled={isUploading} onPress={selectFile} style={[styles.compactAttachButton, styles.evidenceFileButton, isUploading ? styles.attachButtonDisabled : null]}>
-                  <Ionicons name="image-outline" size={16} color={COLORS.muted} />
-                  <Text style={styles.evidenceFileButtonText}>{isUploading ? "업로드 중" : "청첩장, 부고장 파일을 첨부해주세요 (JPG, PNG)"}</Text>
-                </Pressable>
-                {attachments.length > 0 ? (
-                  <View style={styles.compactAttachmentList}>
-                    {attachments.map((attachment) => (
-                      <View key={attachment.id} style={styles.compactAttachmentItem}>
-                        <Pressable
-                          accessibilityLabel={`${attachment.original_filename} 열기`}
-                          accessibilityRole="link"
-                          onPress={() => void openAttachment(attachment)}
-                          style={styles.compactAttachmentOpen}
-                        >
-                          <Ionicons name="document-outline" size={16} color={COLORS.primary} />
-                          <Text numberOfLines={1} style={styles.compactAttachmentName}>{attachment.original_filename}</Text>
-                        </Pressable>
-                        <Pressable
-                          accessibilityLabel={`${attachment.original_filename} 삭제`}
-                          hitSlop={8}
-                          onPress={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}
-                        >
-                          <Ionicons name="close-circle" size={18} color={COLORS.subtle} />
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </>
+              <PostAttachmentEditor
+                attachments={attachments}
+                onChange={setAttachments}
+                onUploadingChange={setIsUploading}
+                isPrivate
+                disabled={createMutation.isPending || updateMutation.isPending}
+                title="증빙파일"
+              />
             ) : (
               <View style={[styles.evidenceLinkField, evidenceLinkFocused ? styles.evidenceLinkFieldFocused : null]}>
                 <AttachLinkIcon size={16} color={COLORS.muted} />
@@ -1560,7 +1523,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             )}
             <View style={styles.evidenceNotice}>
               <Feather name="lock" size={14} color="#0C447C" />
-              <Text style={styles.evidenceNoticeText}>증빙자료는 원우회 관리자만 확인하며, 앱 화면에는 표시되지 않아요.</Text>
+              <Text style={styles.evidenceNoticeText}>처리 중인 신청의 증빙자료는 신청자와 원우회 관리자만 확인할 수 있어요.</Text>
             </View>
           </View>
           <Controller
@@ -1644,7 +1607,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         />
       ) : null}
 
-      {isStudyRecruit || isSuggestion || isMutualAid ? null : compactCreate ? (
+      {isStudyRecruit || isSuggestion || isMutualAid ? null : compactCreate && !isAlbum && !isAdminParticipationPost ? (
+        <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} disabled={createMutation.isPending || updateMutation.isPending} />
+      ) : compactCreate ? (
         <View style={styles.compactAttachWrap}>
           {!isAdminParticipationPost ? (
             <>

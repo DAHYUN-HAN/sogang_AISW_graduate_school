@@ -47,54 +47,6 @@ test("상조회 수정은 전용 신청 양식으로 이동하고 상태별 메�
   assert.match(detailSource, /canDeleteMutualAidRequest\(post\.mutual_aid\?\.status\)/);
 });
 
-test("상조회 수정 양식은 증빙을 노출하지 않고 기존 관리자 전용 증빙을 보존한다", () => {
-  assert.match(editFormSource, /existingPost\.mutual_aid\?\.event_type/);
-  assert.match(editFormSource, /existingPost\.mutual_aid\?\.event_date/);
-  assert.match(editFormSource, /existingPost\.mutual_aid\?\.relation/);
-  assert.match(editFormSource, /existingPost\?\.mutual_aid\?\.has_evidence/);
-  assert.match(editFormSource, /isMutualAid && hasStoredMutualAidEvidence/);
-  assert.match(editFormSource, /증빙자료는 원우회 관리자만 확인/);
-  assert.match(editFormSource, /attachment_ids: attachmentIds/);
-});
-
-test("상조회 증빙 첨부는 피그마 문구로 대표 지원 확장자를 표시한다", () => {
-  assert.match(
-    editFormSource,
-    /청첩장, 부고장 파일을 첨부해주세요 \(JPG, PNG\)/,
-  );
-  assert.doesNotMatch(editFormSource, /지원 형식:/);
-  assert.doesNotMatch(editFormSource, /최대 10MB/);
-  assert.match(editFormSource, /isUploading \? "업로드 중"/);
-  assert.match(editFormSource, /pickAndUploadDocuments\(undefined, isMutualAid\)/);
-  assert.match(
-    editFormSource,
-    /<Text style=\{styles\.evidenceFileButtonText\}>\{isUploading \? "업로드 중" : "청첩장, 부고장 파일을 첨부해주세요 \(JPG, PNG\)"\}<\/Text>/,
-  );
-
-  const evidenceFileButtonStyle = editFormSource.match(
-    /evidenceFileButton:\s*{([\s\S]*?)\r?\n  },\r?\n  evidenceFileButtonText:/,
-  )?.[1] ?? "";
-  assert.match(evidenceFileButtonStyle, /height:\s*40/);
-  assert.match(evidenceFileButtonStyle, /paddingHorizontal:\s*14/);
-  assert.match(evidenceFileButtonStyle, /paddingVertical:\s*0/);
-  assert.doesNotMatch(evidenceFileButtonStyle, /\bminHeight\s*:/);
-
-  const evidenceFileButtonTextStyle = editFormSource.match(
-    /evidenceFileButtonText:\s*{([\s\S]*?)\r?\n  },\r?\n  evidenceLinkField:/,
-  )?.[1] ?? "";
-  assert.match(evidenceFileButtonTextStyle, /flex:\s*1/);
-  assert.match(evidenceFileButtonTextStyle, /flexShrink:\s*1/);
-  assert.match(evidenceFileButtonTextStyle, /minWidth:\s*0/);
-  assert.match(evidenceFileButtonTextStyle, /flexWrap:\s*"wrap"/);
-  assert.match(evidenceFileButtonTextStyle, /lineHeight:\s*15/);
-
-  const evidenceLinkFieldStyle = editFormSource.match(
-    /evidenceLinkField:\s*{([\s\S]*?)\r?\n  },\r?\n  evidenceLinkInput:/,
-  )?.[1] ?? "";
-  assert.match(evidenceLinkFieldStyle, /height:\s*40/);
-  assert.match(evidenceLinkFieldStyle, /paddingHorizontal:\s*14/);
-});
-
 test("상조회 링크 입력은 프로젝트 체인 아이콘을 사용한다", () => {
   assert.match(
     editFormSource,

@@ -32,6 +32,11 @@ function layoutHarness(platform: "android" | "ios" | "web") {
   const modules: Record<string, unknown> = {
     "react/jsx-runtime": { jsx, jsxs: jsx },
     react: {
+      useMemo(factory: () => unknown) {
+        const index = stateIndex++;
+        if (!mounted) values[index] = factory();
+        return values[index];
+      },
       useState(initial: unknown) {
         const index = stateIndex++;
         if (!mounted) values[index] = typeof initial === "function" ? initial() : initial;
@@ -50,7 +55,7 @@ function layoutHarness(platform: "android" | "ios" | "web") {
       preventAutoHideAsync: () => { calls.push("prevent"); return Promise.resolve(true); },
       hide: () => { calls.push("hide"); },
     },
-    "@tanstack/react-query": { QueryClient: class {}, QueryClientProvider: "QueryClientProvider" },
+    "@tanstack/react-query": { QueryClient: class { clear() {} }, QueryClientProvider: "QueryClientProvider" },
     "../components/NotificationBootstrap": { default: "NotificationBootstrap" },
     "../components/StatusBarScrim": { default: "StatusBarScrim" },
     "../components/KeyboardViewport": { default: "KeyboardViewport" },

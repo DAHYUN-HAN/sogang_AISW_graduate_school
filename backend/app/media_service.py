@@ -24,6 +24,7 @@ from app.models.board import Board
 from app.models.faq import FAQ, FAQAttachment
 from app.models.media import MediaAsset, PostAttachment
 from app.models.post import Post
+from app.models.post_extension import PostMutualAid
 from app.models.user import User
 from app.post_access import require_post_read
 from app.security import generate_token_urlsafe, utc_now
@@ -441,20 +442,26 @@ def _readable_linked_post_exists(db: Session, media: MediaAsset, user: User) -> 
     return bool(posts), False
 
 
-def _is_mutual_aid_evidence(db: Session, media: MediaAsset) -> bool:
-    return (
-        db.scalar(
-            select(PostAttachment.id)
-            .join(Post, Post.id == PostAttachment.post_id)
-            .join(Board, Board.id == Post.board_id)
-            .where(
-                PostAttachment.media_id == media.id,
-                Board.board_type == "mutual_aid",
-            )
-            .limit(1)
+def _mutual_aid_evidence_access(db: Session, media: MediaAsset, user: User) -> tuple[bool, bool]:
+    rows = db.execute(
+        select(Post, PostMutualAid.status)
+        .join(PostAttachment, PostAttachment.post_id == Post.id)
+        .join(Board, Board.id == Post.board_id)
+        .outerjoin(PostMutualAid, PostMutualAid.post_id == Post.id)
+        .where(
+            PostAttachment.media_id == media.id,
+            Board.board_type == "mutual_aid",
         )
-        is not None
-    )
+    ).all()
+    for post, status in rows:
+        if post.author_id != user.id or post.deleted_at is not None or status != "processing":
+            continue
+        try:
+            require_post_read(db, post, user)
+        except AppException:
+            continue
+        return True, True
+    return bool(rows), False
 
 
 def require_media_access(db: Session, media: MediaAsset | None, user: User) -> MediaAsset:
@@ -462,8 +469,15 @@ def require_media_access(db: Session, media: MediaAsset | None, user: User) -> M
         raise AppException(status_code=404, message="Media not found.", code="NOT_FOUND")
     if user.role == "admin":
         return media
+    # Evidence policy takes precedence even for legacy non-private assets or
+    # assets also referenced by an ordinary post/profile.
+    is_evidence, can_edit_evidence = _mutual_aid_evidence_access(db, media, user)
+    if is_evidence:
+        if can_edit_evidence:
+            return media
+        raise AppException(status_code=404, message="Media not found.", code="NOT_FOUND")
     if media.is_private:
-        if media.owner_id == user.id and not _is_mutual_aid_evidence(db, media):
+        if media.owner_id == user.id:
             return media
         raise AppException(status_code=404, message="Media not found.", code="NOT_FOUND")
 

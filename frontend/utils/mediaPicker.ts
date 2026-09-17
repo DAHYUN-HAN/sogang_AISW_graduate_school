@@ -89,9 +89,9 @@ function pickLocalFiles({ accept, multiple }: { accept?: string; multiple?: bool
   });
 }
 
-export async function pickAndUploadDocuments(onProgress?: UploadProgress, isPrivate = false): Promise<MediaAsset[]> {
+export async function pickAndUploadDocuments(onProgress?: UploadProgress, isPrivate = false, options?: { multiple?: boolean }): Promise<MediaAsset[]> {
   if (Platform.OS === "web") {
-    const files = await pickLocalFiles({ multiple: true });
+    const files = await pickLocalFiles({ multiple: options?.multiple ?? true });
     return Promise.all(
       files.map((file) => {
         const type = inferDocumentContentType(file.name, file.type);
@@ -105,7 +105,7 @@ export async function pickAndUploadDocuments(onProgress?: UploadProgress, isPriv
 
   const result = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
-    multiple: true,
+    multiple: options?.multiple ?? true,
   });
   if (result.canceled) {
     return [];

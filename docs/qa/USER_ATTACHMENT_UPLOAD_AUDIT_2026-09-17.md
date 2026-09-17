@@ -2,6 +2,8 @@
 
 WP5/WP9, investigation only. Scope: member-facing upload call sites, create/edit routes and seeded board permissions. This is an audit of the current working-tree source and reference seed data, not a live production-board configuration audit. No application code or user data was changed.
 
+Follow-up: the approved community and mutual-aid fixes are documented in `docs/qa/ATTACHMENT_EDIT_2026-09-17.md`. The table below records the pre-fix audit.
+
 ## Current member menu flows
 
 | Location | Upload | Existing files in edit | Add/remove in edit |

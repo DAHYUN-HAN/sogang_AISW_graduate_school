@@ -761,8 +761,10 @@ def _post_attachments(
     post_id: int,
     board: Board,
     current_user: User,
+    *,
+    include_evidence: bool = False,
 ) -> list[dict]:
-    if board.board_type == "mutual_aid" and current_user.role != "admin":
+    if board.board_type == "mutual_aid" and current_user.role != "admin" and not include_evidence:
         return []
     rows = db.execute(
         select(PostAttachment, MediaAsset)
@@ -780,7 +782,7 @@ def _post_attachments(
             "is_private": media.is_private,
         }
         for _, media in rows
-        if not media.is_private or media.owner_id == current_user.id or current_user.role == "admin"
+        if include_evidence or not media.is_private or media.owner_id == current_user.id or current_user.role == "admin"
     ]
 
 
@@ -799,21 +801,17 @@ def _replace_attachments(
     requires_album_images = board is not None and board.board_type == "album"
     requires_activity_images = board is not None and board.board_type == "activity_certification"
     requires_admin_participation_image = board is not None and board.slug in ADMIN_PARTICIPATION_BOARD_SLUGS
-    existing_attachment_count = int(
-        db.scalar(
-            select(func.count(PostAttachment.id)).where(PostAttachment.post_id == post_id)
-        )
-        or 0
+    existing_attachment_ids = set(
+        db.scalars(select(PostAttachment.media_id).where(PostAttachment.post_id == post_id))
     )
     if (
         requires_private
         and preserve_existing_when_empty
         and not attachment_ids
-        and existing_attachment_count > 0
+        and existing_attachment_ids
     ):
-        # Members are not allowed to receive evidence metadata. An empty list
-        # during an ordinary edit therefore means "keep the protected evidence",
-        # not "delete evidence the client could not see".
+        # Legacy clients edit redacted detail data. An empty list without the
+        # explicit replacement flag still means "keep protected evidence".
         return
     if requires_private and not attachment_ids and not (evidence_link or "").strip():
         raise AppException(
@@ -833,9 +831,12 @@ def _replace_attachments(
     media_assets: list[MediaAsset] = []
     for media_id in attachment_ids:
         media = db.get(MediaAsset, media_id)
-        if media is None or media.status != "ready" or (media.owner_id != current_user.id and current_user.role != "admin"):
+        retained_evidence = requires_private and media_id in existing_attachment_ids
+        if media is None or media.status != "ready" or (
+            media.owner_id != current_user.id and current_user.role != "admin" and not retained_evidence
+        ):
             raise AppException(status_code=400, message="Invalid attachment.", code="BAD_REQUEST")
-        if requires_private and not media.is_private:
+        if requires_private and not media.is_private and not retained_evidence:
             raise AppException(status_code=400, message="Mutual-aid evidence must use private upload.", code="PRIVATE_MEDIA_REQUIRED")
         if not requires_private and media.is_private:
             raise AppException(status_code=400, message="Private media cannot be attached to this board.", code="BAD_REQUEST")
@@ -1039,6 +1040,19 @@ def _suggestion_has_admin_reply(db: Session, post_id: int) -> bool:
     return bool(suggestion and suggestion.admin_reply)
 
 
+def _require_post_edit(db: Session, post: Post, board: Board, current_user: User) -> None:
+    if post.author_id != current_user.id and current_user.role != "admin":
+        raise AppException(status_code=403, message="Forbidden.", code="FORBIDDEN")
+    if board.board_type == "mutual_aid":
+        mutual_aid = db.scalar(select(PostMutualAid).where(PostMutualAid.post_id == post.id))
+        if mutual_aid is None or mutual_aid.status != "processing":
+            raise AppException(
+                status_code=400,
+                message="Only processing mutual-aid requests can be edited.",
+                code="BAD_REQUEST",
+            )
+
+
 @router.get("/posts/admin/all")
 def get_admin_posts(
     page: int = Query(1, ge=1),
@@ -1204,6 +1218,7 @@ def get_admin_posts(
 @router.get("/posts/{post_id}")
 def get_post_detail(
     post_id: int,
+    for_edit: bool = False,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -1217,6 +1232,9 @@ def get_post_detail(
 
     post, nickname, cohort = row
     board = require_post_read(db, post, current_user)
+    if for_edit:
+        _require_post_edit(db, post, board, current_user)
+    include_evidence = for_edit and board.board_type == "mutual_aid"
 
     db.execute(
         update(Post)
@@ -1251,10 +1269,10 @@ def get_post_detail(
             "status": post.status,
             "category": post.category,
             "activity_source_title": activity_source_titles.get(_activity_source_post_id(post.metadata_json)),
-            "metadata": _safe_metadata(post, board, include_sensitive=current_user.role == "admin"),
+            "metadata": _safe_metadata(post, board, include_sensitive=current_user.role == "admin" or include_evidence),
             "suggestion": _suggestion_payload(db, post.id),
             "mutual_aid": _mutual_aid_payload(db, post.id),
-            "attachments": _post_attachments(db, post.id, board, current_user),
+            "attachments": _post_attachments(db, post.id, board, current_user, include_evidence=include_evidence),
             "view_count": post.view_count,
             "like_count": post.like_count,
             "comment_count": post.comment_count,
@@ -1354,8 +1372,14 @@ def update_post(
     if board is not None:
         _enforce_council_management_policy(board, current_user)
         _validate_admin_participation_post(board, normalized_metadata, current_user)
-    if post.author_id != current_user.id and current_user.role != "admin":
-        raise AppException(status_code=403, message="Forbidden.", code="FORBIDDEN")
+    _require_post_edit(db, post, board, current_user)
+    if payload.replace_evidence and board.board_type == "mutual_aid":
+        if payload.attachment_ids is None or not isinstance((normalized_metadata or {}).get("proof_url"), str):
+            raise AppException(
+                status_code=422,
+                message="Evidence replacement requires attachment_ids and metadata.proof_url (empty to clear).",
+                code="VALIDATION_ERROR",
+            )
     target_board = board
     if payload.board_id is not None and payload.board_id != post.board_id:
         if board.category != "resources" or board.board_type != "resource":
@@ -1434,6 +1458,7 @@ def update_post(
                 target_board is not None
                 and target_board.board_type == "mutual_aid"
                 and current_user.role != "admin"
+                and not payload.replace_evidence
                 and not payload.attachment_ids
                 and incoming_evidence_link is None
             ),
