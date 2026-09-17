@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Feather } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
+import { useIsFocused } from "@react-navigation/native";
 import { isAxiosError } from "axios";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
@@ -14,18 +15,19 @@ import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmal
 import { useBoardsQuery } from "../../../../hooks/useApi";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/usePosts";
 import CompletionState from "../../../../components/CompletionState";
+import ClubOperationStatusField from "../../../../components/ClubOperationStatusField";
+import { clubOperationStatus } from "../../../../utils/participationGuide";
 import LoadingState from "../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
 import { MediaImageBackground } from "../../../../components/MediaImage";
 import { duesPayerApi, postApi } from "../../../../services/api";
-import type { MediaAsset, PostListItem } from "../../../../types";
+import type { MediaAsset } from "../../../../types";
 import {
   ACTIVITY_PARTICIPANT_GUIDANCE,
   activityBankAccountFieldState,
   activityParticipantSelectionError,
   activityParticipantsFromMetadata,
   activitySourcePostIdFromMetadata,
-  currentClubActivitySourcePosts,
   buildActivityCertificationMetadata,
   formatActivityParticipant,
   loadPublishedActivitySourcePosts,
@@ -91,6 +93,7 @@ const schema = z.object({
   relation: z.string().optional(),
   contact: z.string().optional(),
   applicationUrl: z.string().optional(),
+  clubOperationStatus: z.enum(["active", "ended"]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -368,6 +371,12 @@ type PostCreateRouteParams = {
 
 export default function PostCreateScreen() {
   const params = useLocalSearchParams<PostCreateRouteParams>();
+  const isFocused = useIsFocused();
+  const postId = Number(params.postId);
+  const isEditing = Number.isFinite(postId) && postId > 0;
+  // Tab navigation retains this route. Discard abandoned new-post state,
+  // including pending attachment state, before the next writing session.
+  if (!isFocused && !isEditing) return null;
   return <PostCreateForm key={postCreateFormInstanceKey(params)} params={params} />;
 }
 
@@ -450,7 +459,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     return boards.find((item) => item.slug === "club-promo");
   }, [board?.slug, boards, isActivity]);
   const activitySourceQuery = useQuery({
-    queryKey: ["activity-source-options", activitySourceBoard?.id, activitySourceBoard?.slug],
+    queryKey: ["posts", activitySourceBoard?.id, "activity-source-options", activitySourceBoard?.slug],
     queryFn: () => loadPublishedActivitySourcePosts(
       activitySourceBoard?.id ?? 0,
       activitySourceBoard?.slug,
@@ -473,6 +482,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       relation: "",
       contact: "",
       applicationUrl: "",
+      clubOperationStatus: "active",
     },
   });
 
@@ -498,6 +508,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       ),
       contact: typeof metadata.contact === "string" ? metadata.contact : "",
       applicationUrl: typeof metadata.application_url === "string" ? metadata.application_url : "",
+      clubOperationStatus: clubOperationStatus(metadata),
     });
     setAttachments(existingPost.attachments);
     // 링크로 신청했던 글이면 링크 탭으로 열린다.
@@ -648,6 +659,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     }
     if (isAdminParticipationPost && clean(values.applicationUrl)) {
       metadata.application_url = clean(values.applicationUrl) as string;
+      if (board?.slug === "club-promo") metadata.club_operation_status = values.clubOperationStatus;
     }
     return Object.keys(metadata).length > 0 ? metadata : undefined;
   };
@@ -898,12 +910,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   });
 
   const participantResults = participantSearch.data?.data ?? [];
-  const activitySourcePosts = useMemo(() => {
-    const posts: PostListItem[] = activitySourceQuery.data ?? [];
-    return activitySourceBoard?.slug === "club-promo"
-      ? currentClubActivitySourcePosts(posts)
-      : posts;
-  }, [activitySourceBoard?.slug, activitySourceQuery.data]);
+  const activitySourcePosts = activitySourceQuery.data ?? [];
   const activityOptions: SelectionOption[] = activitySourcePosts.map((post) => ({ key: String(post.id), label: post.title }));
   const mutualAidTypeOptions: SelectionOption[] = [
     { key: "marriage", label: "결혼" },
@@ -1377,6 +1384,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               )}
             </FormField>
           )}
+        />
+      ) : null}
+
+      {board?.slug === "club-promo" ? (
+        <Controller
+          control={control}
+          name="clubOperationStatus"
+          render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} />}
         />
       ) : null}
 
