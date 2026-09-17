@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import CommentItem from "../../../../components/CommentItem";
 import ActivityCertificationMediaImage from "../../../../components/ActivityCertificationMediaImage";
 import LoadingState from "../../../../components/LoadingState";
+import ImageViewerModal from "../../../../components/ImageViewerModal";
 import MediaImage from "../../../../components/MediaImage";
 import NaturalAspectMediaImage from "../../../../components/NaturalAspectMediaImage";
 import { AttachDocIcon, AttachLinkIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../components/icons";
@@ -277,6 +278,7 @@ export default function PostDetailScreen() {
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<number | null>(null);
   const [commentDeleteError, setCommentDeleteError] = useState<string | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
   const likeMutation = useToggleLike(postId, post?.board_id ?? 0, board);
   const bookmarkMutation = useToggleBookmark(postId);
@@ -300,6 +302,7 @@ export default function PostDetailScreen() {
 
   useEffect(() => {
     setGalleryIndex(0);
+    setViewerIndex(null);
   }, [postId]);
 
   useFocusEffect(
@@ -686,11 +689,14 @@ export default function PostDetailScreen() {
   const participationDetailImages = isAdminParticipationGuide
     ? participationGuideImageSections(post.attachments).detailImages
     : [];
+  const viewerImages = isNotice ? [] : isAdminParticipationGuide ? participationDetailImages : imageAttachments;
   const participationImagesSection =
     participationDetailImages.length > 0 ? (
       <View style={styles.participationImagesBlock}>
-        {participationDetailImages.map((image) => (
-          <ParticipationHeroImage key={image.id} media={image} />
+        {participationDetailImages.map((image, index) => (
+          <Pressable key={image.id} accessibilityRole="button" accessibilityLabel={`${index + 1}번째 사진 크게 보기`} onPress={() => setViewerIndex(index)}>
+            <ParticipationHeroImage media={image} />
+          </Pressable>
         ))}
       </View>
     ) : null;
@@ -705,7 +711,11 @@ export default function PostDetailScreen() {
         isPhotoAlbum ? styles.visualHeroAlbum : null,
       ]}>
         {heroAttachment ? (
-          isAdminParticipationGuide ? (
+          <Pressable disabled={isNotice} accessibilityRole={isNotice ? undefined : "button"}
+            accessibilityLabel={isNotice ? undefined : `${normalizedGalleryIndex + 1}번째 사진 크게 보기`}
+            onPress={() => setViewerIndex(normalizedGalleryIndex)}
+            style={hasNaturalHero ? undefined : StyleSheet.absoluteFill}>
+          {isAdminParticipationGuide ? (
             <ParticipationHeroImage key={heroAttachment.id} media={heroAttachment} />
           ) : isActivityCertification ? (
             <ActivityCertificationMediaImage
@@ -723,7 +733,8 @@ export default function PostDetailScreen() {
               resizeMode={heroImagePresentation === "fixed-contain" ? "contain" : "cover"}
               style={styles.visualHeroImage}
             />
-          )
+          )}
+          </Pressable>
         ) : isAdminParticipationGuide ? (
           <View style={styles.participationHeroPlaceholder}>
             <ImagePlaceholderIcon size={36} />
@@ -795,6 +806,9 @@ export default function PostDetailScreen() {
 
   return (
     <View style={styles.screen}>
+      {viewerIndex !== null && viewerImages.length > 0 ? (
+        <ImageViewerModal key={postId} images={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
+      ) : null}
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
         <IconButton
           icon="chevron-back"
@@ -948,7 +962,14 @@ export default function PostDetailScreen() {
                 contentType: attachment.content_type,
               });
               return !canOpenAttachment ? (
-                <NoticeAttachmentImage key={attachment.id} media={attachment} />
+                isNotice ? <NoticeAttachmentImage key={attachment.id} media={attachment} /> : (
+                  <Pressable key={attachment.id} accessibilityRole="button"
+                    accessibilityLabel={`${viewerImages.findIndex((image) => image.id === attachment.id) + 1}번째 사진 크게 보기`}
+                    onPress={() => setViewerIndex(viewerImages.findIndex((image) => image.id === attachment.id))}
+                    style={styles.imageAttachment}>
+                    <NaturalAspectMediaImage media={attachment} style={styles.attachmentImage} />
+                  </Pressable>
+                )
               ) : (
                 <Pressable
                   key={attachment.id}
