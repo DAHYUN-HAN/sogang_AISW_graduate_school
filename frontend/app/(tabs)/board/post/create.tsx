@@ -14,6 +14,7 @@ import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmal
 import { useBoardsQuery } from "../../../../hooks/useApi";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/usePosts";
 import CompletionState from "../../../../components/CompletionState";
+import DiscardWriteModal from "../../../../components/DiscardWriteModal";
 import LoadingState from "../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
 import { MediaImageBackground } from "../../../../components/MediaImage";
@@ -399,6 +400,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [activitySourcePostId, setActivitySourcePostId] = useState<number | null>(null);
   const [createdPostId, setCreatedPostId] = useState<number | null>(null);
   const [formNotice, setFormNotice] = useState<FormNotice | null>(null);
+  const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
+  // 수정 모드는 기존 글 값이 기준선이 된다. 작성 모드는 빈 문자열로 시작한다.
+  const unsavedBaseline = useRef({ attachmentIds: "", participantIds: "", evidenceLink: "" });
   const hydratedPostId = useRef<number | null>(null);
   const boards = useMemo(() => boardsRes?.data.flatMap((group) => group.boards) ?? [], [boardsRes?.data]);
   const board = useMemo(
@@ -460,7 +464,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     retry: false,
   });
 
-  const { clearErrors, control, handleSubmit, reset, setError, setValue } = useForm<FormValues>({
+  const { clearErrors, control, formState, handleSubmit, reset, setError, setValue } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: params.title ?? "",
@@ -507,6 +511,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     setSelectedParticipants(storedParticipants);
     setParticipantQuery("");
     setActivitySourcePostId(activitySourcePostIdFromMetadata(metadata));
+    // 불러온 값이 "변경 없음"의 기준이 된다. 이후 이 값과 달라지면 이탈 시 확인창을 띄운다.
+    unsavedBaseline.current = {
+      attachmentIds: existingPost.attachments.map((attachment) => attachment.id).join(","),
+      participantIds: storedParticipants.map((participant) => participant.id).join(","),
+      evidenceLink: storedProofUrl,
+    };
     hydratedPostId.current = postId;
   }, [existingPost, postId, reset]);
 
@@ -912,6 +922,29 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const mutualAidRelationOptions: SelectionOption[] = ["본인", "배우자", "부모", "자녀", "형제/자매"].map((label) => ({ key: label, label }));
   const imageAttachments = attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
 
+  // 제목·본문 등 폼 필드의 변경은 react-hook-form이 기준선 대비로 이미 추적한다.
+  // 첨부·참가자·증빙 링크는 폼 밖 상태라 기준선과 직접 비교한다.
+  const hasUnsavedChanges =
+    formState.isDirty ||
+    attachments.map((attachment) => attachment.id).join(",") !== unsavedBaseline.current.attachmentIds ||
+    selectedParticipants.map((participant) => participant.id).join(",") !== unsavedBaseline.current.participantIds ||
+    evidenceLink !== unsavedBaseline.current.evidenceLink;
+
+  const leaveCreateScreen = useCallback(() => {
+    const decision = postCreateFormBackDecision({
+      boardType,
+      editOrigin: params.editOrigin,
+      postId: params.postId,
+      returnTo: params.returnTo,
+      canGoBack: router.canGoBack(),
+      boardId,
+      fromBoardId: params.fromBoardId,
+    });
+    if (decision.action === "back") router.back();
+    else if (decision.action === "navigate") router.navigate(decision.route as never);
+    else router.replace(decision.route as never);
+  }, [boardId, boardType, params.editOrigin, params.fromBoardId, params.postId, params.returnTo]);
+
   const handleCreateBack = useCallback(() => {
     if (createdPostId) {
       router.replace(postCreateCompletionRoute(boardType, createdPostId, boardId, params.returnTo) as never);
@@ -925,19 +958,29 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       setDatePickerOpen(false);
       return;
     }
-    const decision = postCreateFormBackDecision({
-      boardType,
-      editOrigin: params.editOrigin,
-      postId: params.postId,
-      returnTo: params.returnTo,
-      canGoBack: router.canGoBack(),
-      boardId,
-      fromBoardId: params.fromBoardId,
-    });
-    if (decision.action === "back") router.back();
-    else if (decision.action === "navigate") router.navigate(decision.route as never);
-    else router.replace(decision.route as never);
-  }, [boardId, boardType, createdPostId, datePickerOpen, params.editOrigin, params.fromBoardId, params.postId, params.returnTo, selectionSheet]);
+    // 작성·수정 중인 내용이 있으면 바로 나가지 않고 확인부터 받는다.
+    if (hasUnsavedChanges) {
+      setDiscardPromptOpen(true);
+      return;
+    }
+    leaveCreateScreen();
+  }, [boardId, boardType, createdPostId, datePickerOpen, hasUnsavedChanges, leaveCreateScreen, params.returnTo, selectionSheet]);
+
+  const handleDiscardConfirm = useCallback(() => {
+    setDiscardPromptOpen(false);
+    // 작성 모드는 returnTo 경로에서 화면이 스택에 남을 수 있어 직접 비운다.
+    // 수정 모드는 뒤로가기가 스택을 pop 하므로 언마운트되며 사라진다.
+    if (!postId) {
+      reset();
+      setAttachments([]);
+      setSelectedParticipants([]);
+      setParticipantQuery("");
+      setEvidenceLink("");
+      setEvidenceMode("file");
+      setActivitySourcePostId(null);
+    }
+    leaveCreateScreen();
+  }, [leaveCreateScreen, postId, reset]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1833,6 +1876,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           setValue("relation", option.label, { shouldValidate: true });
           setSelectionSheet(null);
         }}
+      />
+      <DiscardWriteModal
+        visible={discardPromptOpen}
+        mode={postId ? "edit" : "create"}
+        onKeep={() => setDiscardPromptOpen(false)}
+        onDiscard={handleDiscardConfirm}
       />
       <FormNoticeModal notice={formNotice} onClose={() => setFormNotice(null)} />
     </View>

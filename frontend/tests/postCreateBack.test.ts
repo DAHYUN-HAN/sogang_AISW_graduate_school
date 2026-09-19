@@ -23,17 +23,19 @@ function findHeader(node: ts.Node) {
 }
 findHeader(form);
 assert.ok(headerBack);
+const BACK_CALLBACKS = ["leaveCreateScreen", "handleCreateBack", "handleDiscardConfirm"];
 const backStatements = form.body!.statements.filter((node) =>
-  (ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => declaration.name.getText(source) === "handleCreateBack")) ||
+  (ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => BACK_CALLBACKS.includes(declaration.name.getText(source)))) ||
   (ts.isExpressionStatement(node) && ts.isCallExpression(node.expression) && node.expression.expression.getText(source) === "useFocusEffect"),
 );
-const code = ts.transpileModule(`${backStatements.map((node) => node.getText(source)).join("\n")}\nheaderCallback = ${headerBack.getText(source)};`, {
+const code = ts.transpileModule(`${backStatements.map((node) => node.getText(source)).join("\n")}\nheaderCallback = ${headerBack.getText(source)};\ndiscardCallback = handleDiscardConfirm;`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
 
-function harness(options: { platform?: string; returnTo?: string; canGoBack?: boolean; postId?: string; editOrigin?: string; createdPostId?: number; boardType?: string; selectionSheet?: string; datePickerOpen?: boolean } = {}) {
+function harness(options: { platform?: string; returnTo?: string; canGoBack?: boolean; postId?: string; editOrigin?: string; createdPostId?: number; boardType?: string; selectionSheet?: string; datePickerOpen?: boolean; hasUnsavedChanges?: boolean } = {}) {
   const navigation: string[] = [];
-  const state = { selectionSheet: options.selectionSheet ?? null, datePickerOpen: options.datePickerOpen ?? false };
+  const cleared: string[] = [];
+  const state = { selectionSheet: options.selectionSheet ?? null, datePickerOpen: options.datePickerOpen ?? false, discardPromptOpen: false };
   let listener: (() => boolean) | undefined;
   let focusEffect: (() => (() => void) | undefined) | undefined;
   const context = {
@@ -49,8 +51,18 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
     },
     postCreateFormBackDecision,
     postCreateCompletionRoute,
+    postId: options.postId ? Number(options.postId) : null,
+    hasUnsavedChanges: options.hasUnsavedChanges ?? false,
     setSelectionSheet: (value: string | null) => { state.selectionSheet = value; },
     setDatePickerOpen: (value: boolean) => { state.datePickerOpen = value; },
+    setDiscardPromptOpen: (value: boolean) => { state.discardPromptOpen = value; },
+    reset: () => { cleared.push("form"); },
+    setAttachments: () => { cleared.push("attachments"); },
+    setSelectedParticipants: () => { cleared.push("participants"); },
+    setParticipantQuery: () => { cleared.push("participantQuery"); },
+    setEvidenceLink: () => { cleared.push("evidenceLink"); },
+    setEvidenceMode: () => { cleared.push("evidenceMode"); },
+    setActivitySourcePostId: () => { cleared.push("activitySource"); },
     useCallback: (callback: unknown) => callback,
     useFocusEffect: (effect: typeof focusEffect) => { focusEffect = effect; },
     Platform: { OS: options.platform ?? "android" },
@@ -62,6 +74,7 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
       },
     },
     headerCallback: undefined as (() => void) | undefined,
+    discardCallback: undefined as (() => void) | undefined,
   };
   let rendered = { ...context, ...state };
   function render() {
@@ -69,7 +82,15 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
     runInNewContext(code, rendered);
   }
   render();
-  return { navigation, state, header: () => rendered.headerCallback!(), focus: () => { render(); return focusEffect?.(); }, hardware: () => listener?.() };
+  return {
+    navigation,
+    cleared,
+    state,
+    header: () => rendered.headerCallback!(),
+    discard: () => rendered.discardCallback!(),
+    focus: () => { render(); return focusEffect?.(); },
+    hardware: () => listener?.(),
+  };
 }
 
 for (const returnTo of [COMMUNITY_TAB_ROUTE, PARTICIPATION_TAB_ROUTE]) {
@@ -159,4 +180,53 @@ test("작성 중 펼친 날짜 선택기도 Back에서 먼저 닫는다", () => 
   h.focus();
   h.hardware();
   assert.deepEqual(h.navigation, [`navigate:${PARTICIPATION_TAB_ROUTE}`]);
+});
+
+test("작성 중인 내용이 있으면 헤더와 Android Back이 곧바로 나가지 않고 확인창을 연다", () => {
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true });
+  h.focus();
+  assert.equal(h.hardware(), true, "확인창을 열 때도 Android Back을 소비해야 한다");
+  h.header();
+  assert.deepEqual(h.navigation, [], "확인 전에는 이동하지 않는다");
+  assert.equal(h.state.discardPromptOpen, true);
+});
+
+test("작성 취소를 확인하면 폼을 비우고 원래 탭으로 복귀한다", () => {
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true });
+  h.header();
+  assert.equal(h.state.discardPromptOpen, true);
+  h.discard();
+  assert.equal(h.state.discardPromptOpen, false);
+  assert.deepEqual(h.cleared, ["form", "attachments", "participants", "participantQuery", "evidenceLink", "evidenceMode", "activitySource"]);
+  assert.deepEqual(h.navigation, [`navigate:${COMMUNITY_TAB_ROUTE}`]);
+});
+
+test("수정 취소를 확인하면 폼을 비우지 않고 수정 전 게시글 상세로 돌아간다", () => {
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, postId: "42", editOrigin: "post-detail", hasUnsavedChanges: true });
+  h.header();
+  assert.equal(h.state.discardPromptOpen, true);
+  h.discard();
+  assert.deepEqual(h.cleared, [], "수정 화면은 pop되어 언마운트되므로 비우지 않는다");
+  assert.deepEqual(h.navigation, ["back"]);
+});
+
+test("변경사항이 있어도 선택창과 날짜 선택기를 확인창보다 먼저 닫는다", () => {
+  for (const options of [{ selectionSheet: "board" }, { datePickerOpen: true }]) {
+    const h = harness({ returnTo: PARTICIPATION_TAB_ROUTE, hasUnsavedChanges: true, ...options });
+    h.header();
+    assert.deepEqual(h.navigation, []);
+    assert.equal(h.state.discardPromptOpen, false, "선택기를 닫는 단계에서는 확인창을 열지 않는다");
+    h.focus();
+    h.header();
+    assert.deepEqual(h.navigation, [], "확인창이 열린 동안에도 이동하지 않는다");
+    assert.equal(h.state.discardPromptOpen, true);
+  }
+});
+
+test("등록 완료 후에는 변경사항이 남아 있어도 확인창 없이 완료 경로로 간다", () => {
+  const h = harness({ boardType: "suggestion", createdPostId: 42, hasUnsavedChanges: true });
+  h.focus();
+  assert.equal(h.hardware(), true);
+  assert.equal(h.state.discardPromptOpen, false);
+  assert.deepEqual(h.navigation, [`replace:${postCreateCompletionRoute("suggestion", 42, 7)}`]);
 });
