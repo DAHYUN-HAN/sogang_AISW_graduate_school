@@ -18,6 +18,7 @@ type ActivityBadgePost = {
 const GENERIC_CLUB_ACTIVITY_LABELS = new Set(["동아리 활동 인증", "활동 인증", "안내"]);
 
 export const CURRENT_CLUB_NAMES = [
+  "파인튜닝",
   "SG_LLM",
   "알바트로스냅",
   "서강의 봄",

@@ -265,9 +265,10 @@ test("활동 인증의 원본 선택 목록은 공개된 운영진 게시글만 
   assert.deepEqual(activitySourcePostFilters(), { sort: "latest", status: "published" });
 });
 
-test("동아리 활동 인증 선택창은 현재 7개 동아리만 공식 순서로 반환한다", () => {
+test("동아리 활동 인증 선택창은 현재 8개 동아리만 공식 순서로 반환한다", () => {
   const posts = [
     { id: 90, title: "예전 볼링 동아리" },
+    { id: 18, title: "파인튜닝 (커피)" },
     { id: 17, title: "FC리턴윈 (풋살)" },
     { id: 16, title: "인간지능투자 (주식/코인)" },
     { id: 15, title: "서강와인 (와인/위스키)" },
@@ -278,9 +279,9 @@ test("동아리 활동 인증 선택창은 현재 7개 동아리만 공식 순�
   ];
 
   assert.deepEqual(CURRENT_CLUB_NAMES, [
-    "SG_LLM", "알바트로스냅", "서강의 봄", "서뽈링", "서강와인", "인간지능투자", "FC리턴윈",
+    "파인튜닝", "SG_LLM", "알바트로스냅", "서강의 봄", "서뽈링", "서강와인", "인간지능투자", "FC리턴윈",
   ]);
-  assert.deepEqual(currentClubActivitySourcePosts(posts).map((post) => post.id), [11, 12, 13, 14, 15, 16, 17]);
+  assert.deepEqual(currentClubActivitySourcePosts(posts).map((post) => post.id), [18, 11, 12, 13, 14, 15, 16, 17]);
 });
 
 test("현재 동아리 이름의 경계를 확인하고 최신 글 하나만 선택한다", () => {
