@@ -190,7 +190,7 @@ Required sections:
 
 Resource-board exceptions:
 
-- `lecture-reviews` keeps forced-anonymous presentation and has no comments.
+- `lecture-reviews` keeps forced-anonymous presentation for the post author and supports comments; comment rows show the commenter's cohort/author like other boards.
 - `exam-archive` shows the cohort/author and supports comments as shown in the latest approved Figma capture.
 - Comment rows display `cohort + author`, content, and `YY.MM.DD(weekday) · N분 전` for recent comments or `YY.MM.DD(weekday) · HH:mm` afterward. After account deletion, the writing-time author/cohort snapshot remains visible; only historical orphan rows without any snapshot use `Deleted user`.
 

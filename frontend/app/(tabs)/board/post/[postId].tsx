@@ -88,8 +88,6 @@ const ALBUM_FALLBACK_GRADIENTS: readonly (readonly [string, string])[] = [
   ["#B94A2F", "#F39A7D"],
 ];
 
-const NO_COMMENT_RESOURCE_SLUGS = new Set(["lecture-reviews"]);
-
 type ReportTarget = {
   type: "post" | "comment";
   id: number;
@@ -251,7 +249,7 @@ export default function PostDetailScreen() {
   const isSuggestionRequest = board?.board_type === "suggestion";
   const isNotice = board?.board_type === "notice" || post?.is_notice === true;
   const isResource = board?.board_type === "resource";
-  const commentsDisabled = isMutualAidRequest || isSuggestionRequest || isNotice || board?.board_type === "activity_certification" || board?.board_type === "activity_history" || Boolean(board?.slug && NO_COMMENT_RESOURCE_SLUGS.has(board.slug));
+  const commentsDisabled = isMutualAidRequest || isSuggestionRequest || isNotice || board?.board_type === "activity_certification" || board?.board_type === "activity_history";
   const { data: commentRes } = usePostComments(postId, Boolean(board) && !commentsDisabled);
   const comments = commentRes?.data ?? [];
 

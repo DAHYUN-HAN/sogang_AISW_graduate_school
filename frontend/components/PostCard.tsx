@@ -116,7 +116,7 @@ export default function PostCard({ post, onPress, boardType, boardSlug, isLast }
   const isSuggestion = boardType === "suggestion";
   const isWorkflowRequest = isMutualAid || isSuggestion;
   const showAuthor = !isLectureReview && !isSuggestion;
-  const showCommentCount = !isLectureReview && !isWorkflowRequest && !isStudyRecruit;
+  const showCommentCount = !isWorkflowRequest && !isStudyRecruit;
   const showLikeCount = !isWorkflowRequest && !isStudyRecruit;
 
   return (

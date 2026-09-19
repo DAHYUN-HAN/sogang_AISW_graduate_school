@@ -82,12 +82,15 @@ def test_exam_archive_shows_author_and_allows_comments(api) -> None:
         headers=api.headers["other"],
     )
 
-    assert lecture_create.status_code == 403
-    assert lecture_create.json()["code"] == "COMMENTS_DISABLED"
-    assert api.client.get(
+    # 강의후기는 글 작성자만 익명이고, 댓글은 다른 게시판처럼 작성자를 표시한다.
+    assert lecture_create.status_code == 200
+    lecture_comments = api.client.get(
         f"/api/posts/{lecture_post_id}/comments",
         headers=api.headers["other"],
-    ).json()["data"] == []
+    ).json()["data"]
+    assert [
+        (comment["content"], comment["author_nickname"]) for comment in lecture_comments
+    ] == [("Hidden lecture comment", "Owner"), ("Must remain disabled", "Other")]
     assert exam_create.status_code == 200
 
     with api.session() as db:

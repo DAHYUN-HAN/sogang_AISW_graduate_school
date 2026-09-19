@@ -329,7 +329,7 @@ export function adminBoardCapability(board?: Board): AdminBoardCapability {
   if (board.slug === "lecture-reviews") {
     lockedPolicies.push(
       lockedPolicy("forced-anonymous", "강제 익명", "강의 후기는 작성자 익명으로 운영합니다.", "allow_anonymous"),
-      lockedPolicy("comments-disabled", "댓글 비활성화", "강의 후기에는 댓글을 허용하지 않습니다.", null),
+      lockedPolicy("comments-enabled", "댓글 활성화", "강의 후기에는 댓글을 허용합니다.", null),
     );
   } else if (board.slug === "exam-archive") {
     lockedPolicies.push(
