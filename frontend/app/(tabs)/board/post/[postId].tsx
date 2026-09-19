@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { Alert, BackHandler, Image, Keyboard, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
+import { Alert, BackHandler, Image, Keyboard, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CommentItem from "../../../../components/CommentItem";
@@ -59,6 +59,7 @@ import { shouldShowPostAuthorBlock } from "../../../../utils/postMenu";
 import { REPORT_REASONS, getReportEntryState, getReportSubmission, type ReportReason } from "../../../../utils/reportForm";
 import { createReplyTarget, getReplyComposerState, type ReplyTarget } from "../../../../utils/replyComposer";
 import { resourceCategoryLabel, resourceDetailMeta } from "../../../../utils/resourceBoards";
+import { RESOURCE_SUBJECT_SEPARATOR, resourceSubjectSegments, type ResourceSubjectTone } from "../../../../utils/resourcePostFields";
 
 const COLORS = {
   primary: "#2761FF",
@@ -249,6 +250,8 @@ export default function PostDetailScreen() {
   const isSuggestionRequest = board?.board_type === "suggestion";
   const isNotice = board?.board_type === "notice" || post?.is_notice === true;
   const isResource = board?.board_type === "resource";
+  // 강의후기·시험족보의 교수명·난이도·만족도. 값이 없는 예전 글은 빈 배열이라 줄이 빠진다.
+  const subjectSegments = resourceSubjectSegments(board?.slug, post?.metadata);
   const commentsDisabled = isMutualAidRequest || isSuggestionRequest || isNotice || board?.board_type === "activity_certification" || board?.board_type === "activity_history";
   const { data: commentRes } = usePostComments(postId, Boolean(board) && !commentsDisabled);
   const comments = commentRes?.data ?? [];
@@ -877,6 +880,17 @@ export default function PostDetailScreen() {
                   : isStudyRecruit
                     ? `${formatCohortName(post.author_cohort, post.author_nickname)} · ${formatBoardDate(post.created_at)}`
                   : `${post.author_nickname} · ${formatBoardDate(post.created_at)}`}
+              </Text>
+            ) : null}
+
+            {subjectSegments.length > 0 ? (
+              <Text style={styles.subjectInfo}>
+                {subjectSegments.map((segment, index) => (
+                  <Text key={segment.tone}>
+                    {index > 0 ? <Text style={styles.subjectSeparator}>{RESOURCE_SUBJECT_SEPARATOR}</Text> : null}
+                    <Text style={SUBJECT_TONE_STYLES[segment.tone]}>{segment.text}</Text>
+                  </Text>
+                ))}
               </Text>
             ) : null}
 
@@ -1942,6 +1956,27 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontSize: 13,
   },
+  // Figma 과목정보 래퍼: 14/Medium, 항목마다 색이 다르고 구분점은 연한 회색.
+  // 메타(날짜)와의 간격은 Figma 좌표 기준 16 (메타 텍스트 하단 86 → 과목정보 상단 102).
+  subjectInfo: {
+    color: COLORS.muted,
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 17,
+    marginTop: 16,
+  },
+  subjectSeparator: {
+    color: "#C7CCD4",
+  },
+  subjectProfessor: {
+    color: COLORS.muted,
+  },
+  subjectDifficulty: {
+    color: "#1F4E8C",
+  },
+  subjectSatisfaction: {
+    color: "#3B6D11",
+  },
   metaMutualAid: {
     color: "#A6ACB7", // Figma: Regular 12/15
     fontSize: 12,
@@ -2483,3 +2518,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
 });
+
+const SUBJECT_TONE_STYLES: Record<ResourceSubjectTone, TextStyle> = {
+  professor: styles.subjectProfessor,
+  difficulty: styles.subjectDifficulty,
+  satisfaction: styles.subjectSatisfaction,
+};

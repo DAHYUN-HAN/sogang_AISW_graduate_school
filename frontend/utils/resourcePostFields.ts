@@ -9,6 +9,8 @@ export type ResourcePostFields = {
   professor: boolean;
   difficulty: boolean;
   satisfaction: boolean;
+  // 목록 카드에서 본문 미리보기 대신 과목정보를 보여줄지. 디자인상 강의후기만 그렇다.
+  subjectInListCard: boolean;
 };
 
 export type ResourcePostFieldValues = {
@@ -23,12 +25,14 @@ const RESOURCE_POST_FIELDS: Record<string, ResourcePostFields> = {
     professor: true,
     difficulty: true,
     satisfaction: true,
+    subjectInListCard: true,
   },
   "exam-archive": {
     titlePlaceholder: "강의명을 입력하세요",
     professor: true,
     difficulty: false,
     satisfaction: false,
+    subjectInListCard: false,
   },
 };
 
@@ -68,6 +72,43 @@ export function resourcePostMetadata(
   const satisfaction = fields.satisfaction ? ratingLevel(values.satisfaction) : undefined;
   if (satisfaction) metadata[METADATA_KEYS.satisfaction] = satisfaction;
   return metadata;
+}
+
+export const RESOURCE_SUBJECT_SEPARATOR = " · ";
+
+export type ResourceSubjectTone = "professor" | "difficulty" | "satisfaction";
+export type ResourceSubjectSegment = { tone: ResourceSubjectTone; text: string };
+
+/**
+ * 상세·목록에 보여줄 과목정보 조각들. 상세는 조각마다 색이 다르고 목록은 단색이라
+ * 색은 화면이 정하고 여기서는 순서와 문구만 만든다. 값이 없는 항목은 건너뛰므로
+ * metadata를 채우지 않은 예전 글은 빈 배열이 된다.
+ */
+export function resourceSubjectSegments(
+  boardSlug?: string | null,
+  metadata?: Record<string, unknown> | null,
+): ResourceSubjectSegment[] {
+  const fields = resourcePostFields(boardSlug);
+  if (!fields || !metadata) return [];
+  const segments: ResourceSubjectSegment[] = [];
+  const professor = fields.professor ? trimmed(metadata[METADATA_KEYS.professor]) : undefined;
+  if (professor) segments.push({ tone: "professor", text: `${professor} 교수` });
+  const difficulty = fields.difficulty ? ratingLevel(metadata[METADATA_KEYS.difficulty]) : undefined;
+  if (difficulty) segments.push({ tone: "difficulty", text: `난이도 ${difficulty}` });
+  const satisfaction = fields.satisfaction ? ratingLevel(metadata[METADATA_KEYS.satisfaction]) : undefined;
+  if (satisfaction) segments.push({ tone: "satisfaction", text: `만족도 ${satisfaction}` });
+  return segments;
+}
+
+/** 목록 카드용 단색 한 줄. 과목정보를 쓰지 않는 게시판과 값이 없는 글은 빈 문자열이다. */
+export function resourceSubjectSummary(
+  boardSlug?: string | null,
+  metadata?: Record<string, unknown> | null,
+): string {
+  if (!resourcePostFields(boardSlug)?.subjectInListCard) return "";
+  return resourceSubjectSegments(boardSlug, metadata)
+    .map((segment) => segment.text)
+    .join(RESOURCE_SUBJECT_SEPARATOR);
 }
 
 /**

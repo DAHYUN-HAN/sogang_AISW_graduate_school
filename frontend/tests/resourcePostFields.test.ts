@@ -6,6 +6,8 @@ import {
   resourcePostFieldValues,
   resourcePostFields,
   resourcePostMetadata,
+  resourceSubjectSegments,
+  resourceSubjectSummary,
 } from "../utils/resourcePostFields";
 
 test("강의후기는 교수명·난이도·만족도를, 시험족보는 교수명만 받는다", () => {
@@ -14,12 +16,14 @@ test("강의후기는 교수명·난이도·만족도를, 시험족보는 교수
     professor: true,
     difficulty: true,
     satisfaction: true,
+    subjectInListCard: true,
   });
   assert.deepEqual(resourcePostFields("exam-archive"), {
     titlePlaceholder: "강의명을 입력하세요",
     professor: true,
     difficulty: false,
     satisfaction: false,
+    subjectInListCard: false,
   });
 });
 
@@ -95,4 +99,52 @@ test("프리필은 게시판이 쓰지 않는 필드와 잘못된 값을 빈 값
   );
   assert.deepEqual(resourcePostFieldValues(resourcePostFields("lecture-reviews"), null), {});
   assert.deepEqual(resourcePostFieldValues(null, { professor_name: "이영섭" }), {});
+});
+
+test("강의후기 과목정보는 교수·난이도·만족도 순서로 조각을 만든다", () => {
+  assert.deepEqual(
+    resourceSubjectSegments("lecture-reviews", {
+      professor_name: "이영섭",
+      lecture_difficulty: "중",
+      lecture_satisfaction: "상",
+    }),
+    [
+      { tone: "professor", text: "이영섭 교수" },
+      { tone: "difficulty", text: "난이도 중" },
+      { tone: "satisfaction", text: "만족도 상" },
+    ],
+  );
+});
+
+test("시험족보 과목정보는 교수명만 만든다", () => {
+  assert.deepEqual(
+    resourceSubjectSegments("exam-archive", {
+      professor_name: "이영섭",
+      lecture_difficulty: "중",
+      lecture_satisfaction: "상",
+    }),
+    [{ tone: "professor", text: "이영섭 교수" }],
+  );
+});
+
+test("값이 일부만 있으면 있는 항목만 보여준다", () => {
+  assert.deepEqual(
+    resourceSubjectSegments("lecture-reviews", { lecture_satisfaction: "하" }),
+    [{ tone: "satisfaction", text: "만족도 하" }],
+  );
+});
+
+test("metadata를 채우지 않은 예전 글과 대상 아닌 게시판은 과목정보가 없다", () => {
+  assert.deepEqual(resourceSubjectSegments("lecture-reviews", {}), []);
+  assert.deepEqual(resourceSubjectSegments("lecture-reviews", null), []);
+  assert.deepEqual(resourceSubjectSegments("comprehensive-exam", { professor_name: "이영섭" }), []);
+  assert.deepEqual(resourceSubjectSegments(undefined, { professor_name: "이영섭" }), []);
+});
+
+test("목록 카드 과목정보는 강의후기에서만 한 줄로 합쳐진다", () => {
+  const metadata = { professor_name: "이영섭", lecture_difficulty: "중", lecture_satisfaction: "상" };
+  assert.equal(resourceSubjectSummary("lecture-reviews", metadata), "이영섭 교수 · 난이도 중 · 만족도 상");
+  // 시험족보 카드는 디자인대로 기존 본문 미리보기를 유지한다.
+  assert.equal(resourceSubjectSummary("exam-archive", metadata), "");
+  assert.equal(resourceSubjectSummary("lecture-reviews", {}), "");
 });
