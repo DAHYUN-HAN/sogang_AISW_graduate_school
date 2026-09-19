@@ -66,6 +66,12 @@ import {
   replaceParticipationGuideRepresentative,
   writeAttachmentActions,
 } from "../../../../utils/postAttachments";
+import {
+  RESOURCE_RATING_LEVELS,
+  resourcePostFieldValues,
+  resourcePostFields,
+  resourcePostMetadata,
+} from "../../../../utils/resourcePostFields";
 
 const COLORS = {
   primary: "#2761FF",
@@ -81,6 +87,12 @@ const COLORS = {
   page: "#F7F8FA",
 };
 
+// 난이도·만족도는 표시 라벨만 다르고 동작이 같아서 한 곳에서 돌린다.
+const RESOURCE_RATING_FIELDS = [
+  { name: "difficulty", label: "강의 난이도" },
+  { name: "satisfaction", label: "강의 만족도" },
+] as const;
+
 const schema = z.object({
   title: z.string().optional(),
   category: z.string().optional(),
@@ -92,6 +104,9 @@ const schema = z.object({
   relation: z.string().optional(),
   contact: z.string().optional(),
   applicationUrl: z.string().optional(),
+  professor: z.string().optional(),
+  difficulty: z.string().optional(),
+  satisfaction: z.string().optional(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -428,6 +443,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   // 처음 올릴 때부터 마감 상태인 모집글을 막는다. 마감 전환은 등록 후 수정에서만.
   const canCloseRecruitment = Boolean(postId);
   const isNetworkingProgram = board?.slug === "networking-programs";
+  // 자료공유 게시판별 추가 입력(교수명·난이도·만족도)은 resourcePostFields 표가 정한다.
+  const resourceFields = resourcePostFields(board?.slug);
   const isAdminParticipationPost = board?.slug === "club-promo" || isNetworkingProgram;
   const bankAccountField = activityBankAccountFieldState(postId);
   const compactCreate = !isActivity && !isMutualAid;
@@ -477,11 +494,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       relation: "",
       contact: "",
       applicationUrl: "",
+      professor: "",
+      difficulty: "",
+      satisfaction: "",
     },
   });
 
   useEffect(() => {
-    if (!postId || !existingPost || hydratedPostId.current === postId) return;
+    // 게시판이 확정되기 전에 프리필하면 게시판별 추가 입력이 빈 값으로 덮인다.
+    if (!postId || !existingPost || !board || hydratedPostId.current === postId) return;
 
     const metadata = existingPost.metadata ?? {};
     const storedParticipants = activityParticipantsFromMetadata(metadata);
@@ -502,6 +523,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       ),
       contact: typeof metadata.contact === "string" ? metadata.contact : "",
       applicationUrl: typeof metadata.application_url === "string" ? metadata.application_url : "",
+      ...resourcePostFieldValues(resourceFields, metadata),
     });
     setAttachments(existingPost.attachments);
     // 링크로 신청했던 글이면 링크 탭으로 열린다.
@@ -518,7 +540,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       evidenceLink: storedProofUrl,
     };
     hydratedPostId.current = postId;
-  }, [existingPost, postId, reset]);
+  }, [board, existingPost, postId, reset, resourceFields]);
 
   useEffect(() => {
     if (isStudyRecruit && (!params.category || params.category === "모집")) {
@@ -573,6 +595,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           ? "제목을 입력하세요"
         : isStudyRecruit
           ? "스터디 제목을 입력하세요"
+        : resourceFields
+          ? resourceFields.titlePlaceholder
           : "제목을 입력하세요",
     category: isMutualAid ? "경조사 종류" : isActivity ? "소속 그룹" : isStudyRecruit ? "모집 상태" : "분류",
     categoryPlaceholder: isMutualAid ? "결혼 / 상(喪) 중 선택" : isActivity ? "활동 대상을 선택하세요" : isStudyRecruit ? "진행중 / 마감" : "선택 입력",
@@ -659,6 +683,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     if (isAdminParticipationPost && clean(values.applicationUrl)) {
       metadata.application_url = clean(values.applicationUrl) as string;
     }
+    Object.assign(metadata, resourcePostMetadata(resourceFields, values));
     return Object.keys(metadata).length > 0 ? metadata : undefined;
   };
 
@@ -1357,6 +1382,56 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           )}
         />
       ) : null}
+
+      {resourceFields?.professor ? (
+        <Controller
+          control={control}
+          name="professor"
+          render={({ field }) => (
+            <FormField label={compactCreate ? "" : "교수명"}>
+              <View style={styles.suffixInputRow}>
+                <FormTextInput
+                  onChangeText={field.onChange}
+                  placeholder="교수명을 입력하세요"
+                  placeholderTextColor="#A6ACB7"
+                  style={styles.suffixInput}
+                  value={field.value}
+                />
+                <Text style={styles.suffixInputLabel}>교수</Text>
+              </View>
+            </FormField>
+          )}
+        />
+      ) : null}
+
+      {RESOURCE_RATING_FIELDS.filter((rating) => resourceFields?.[rating.name]).map((rating) => (
+        <Controller
+          control={control}
+          key={rating.name}
+          name={rating.name}
+          render={({ field }) => (
+            <FormField label={rating.label}>
+              <View style={styles.ratingRow}>
+                {RESOURCE_RATING_LEVELS.map((level) => {
+                  const selected = field.value === level;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      key={level}
+                      // 같은 값을 다시 누르면 선택을 해제한다. 필수 입력이 아니다.
+                      onPress={() => field.onChange(selected ? "" : level)}
+                      style={[styles.ratingButton, selected ? styles.ratingButtonActive : null]}
+                    >
+                      <Text style={[styles.ratingText, selected ? styles.ratingTextActive : null]}>{level}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </FormField>
+          )}
+        />
+      ))}
 
       {!isAlbum && (isMutualAid || board?.slug === "club-promo") ? (
         <Controller
@@ -2716,6 +2791,59 @@ const styles = StyleSheet.create({
     color: "#A6ACB7",
     fontSize: 12,
     fontWeight: "400",
+  },
+  // Figma: 교수명 입력 — 우측에 "교수" 접미 라벨이 붙은 단일 입력 박스
+  suffixInputRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    backgroundColor: COLORS.bg,
+    paddingHorizontal: 14,
+  },
+  suffixInput: {
+    flex: 1,
+    minHeight: 41,
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "400",
+    lineHeight: 17,
+    paddingVertical: 12,
+  },
+  suffixInputLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.muted,
+  },
+  // Figma: 난이도/만족도 — 테두리 버튼 3개, 선택 시 primary 테두리 + 연한 배경
+  ratingRow: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 8,
+  },
+  ratingButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+  },
+  ratingButtonActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: "#E8EEFF",
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.muted,
+  },
+  ratingTextActive: {
+    color: COLORS.primary,
   },
   input: {
     width: "100%",

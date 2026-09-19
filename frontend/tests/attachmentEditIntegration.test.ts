@@ -4,6 +4,8 @@ import { runInNewContext } from "node:vm";
 import test from "node:test";
 import ts from "typescript";
 
+import { resourcePostMetadata } from "../utils/resourcePostFields";
+
 const edit = ts.createSourceFile("edit.tsx", readFileSync("app/(tabs)/board/post/edit/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const create = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 function expression(source: ts.SourceFile, find: (node: ts.Node) => boolean) {
@@ -89,6 +91,8 @@ test("mutual-aid saves explicit replacement with remaining file IDs and clears a
     isActivity: false, isMutualAid: true, isStudyRecruit: false, isAdminParticipationPost: false,
     isAlbum: false, isSuggestion: false, evidenceMode: "file", evidenceLink: "https://example.com/old-proof",
     clean: (value?: string) => value?.trim() || undefined,
+    // 상조회는 자료공유 추가 입력이 없는 게시판이라 resourceFields가 null이다.
+    resourceFields: null, resourcePostMetadata,
   };
   const buildMetadata = runInNewContext(metadataCode, context);
   const payload = runInNewContext(payloadCode, {
