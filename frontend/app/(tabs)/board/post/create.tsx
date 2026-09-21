@@ -1710,6 +1710,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             <View style={styles.evidenceModeRow}>
               {EVIDENCE_MODES.map((mode) => {
                 const active = evidenceMode === mode.key;
+                // 증빙이 비었다는 표시는 고른 쪽 탭에만 띄운다.
+                const showsError = active && missingRequiredAttachment;
                 return (
                   <Pressable
                     key={mode.key}
@@ -1720,8 +1722,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                     onPress={() => handleEvidenceModeSelect(mode.key)}
                     style={styles.evidenceModeTab}
                   >
-                    <View style={[styles.evidenceModeTabVisual, active ? styles.evidenceModeTabActive : null]}>
-                      <Text style={[styles.evidenceModeText, active ? styles.evidenceModeTextActive : null]}>{mode.label}</Text>
+                    <View style={[styles.evidenceModeTabVisual, active ? styles.evidenceModeTabActive : null, showsError ? styles.evidenceModeTabError : null]}>
+                      <Text style={[styles.evidenceModeText, active && !showsError ? styles.evidenceModeTextActive : null]}>{mode.label}</Text>
                     </View>
                   </Pressable>
                 );
@@ -1775,7 +1777,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 ) : null}
               </View>
             ) : evidenceMode === "link" ? (
-              <View style={[styles.evidenceLinkField, evidenceLinkFocused ? styles.evidenceLinkFieldFocused : null, missingRequiredAttachment ? styles.inputError : null]}>
+              <View style={[styles.evidenceLinkField, evidenceLinkFocused ? styles.evidenceLinkFieldFocused : null]}>
                 <AttachLinkIcon size={16} color={COLORS.muted} />
                 <TextInput
                   autoCapitalize="none"
@@ -2791,6 +2793,15 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     backgroundColor: "#E8EEFF", // Figma: 선택 탭 배경
   },
+  // Figma MutualAidApply-ImageMode-Error / LinkMode-Error: 고른 탭이 파란 채움과
+  // 파란 글자를 잃고 빨간 테두리만 남는다. 링크 입력칸은 빨개지지 않는다.
+  // 두께는 선택 탭의 파란 테두리와 같은 1px이라야 오류가 켜질 때 탭 크기가
+  // 흔들리지 않는다.
+  evidenceModeTabError: {
+    borderWidth: 1,
+    borderColor: "#D64545",
+    backgroundColor: COLORS.bg,
+  },
   evidenceModeText: {
     color: COLORS.muted, // Figma: #6B7280 Medium 13/16
     fontSize: 13,
@@ -2804,10 +2815,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   evidenceImageHint: {
-    color: COLORS.muted,
-    fontSize: 12,
+    // Figma MutualAidApply-ImageMode-Error: Regular 13/16 #999EA8
+    color: "#999EA8",
+    fontSize: 13,
     fontWeight: "400",
-    lineHeight: 15,
+    lineHeight: 16,
   },
   evidenceImageGrid: {
     flexDirection: "row",

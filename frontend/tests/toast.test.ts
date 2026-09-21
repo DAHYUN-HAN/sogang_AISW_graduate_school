@@ -95,10 +95,12 @@ test("강의후기는 교수명·난이도·만족도가 필수다", () => {
 test("비어 있는 필수 칸은 문구 없이 테두리만 빨갛게 한다", () => {
   // setError의 message가 비어 있어야 칸 아래 문구가 뜨지 않는다.
   assert.match(createSource, /setError\(name, \{ message: "" \}\)/);
-  // 폼 밖의 첨부·증빙은 별도 상태로 테두리를 켠다. 활동인증 첨부 박스와
-  // 상조회 증빙 링크 칸이 같은 상태를 본다.
+  // 폼 밖의 첨부·증빙은 별도 상태로 테두리를 켠다. 활동인증은 첨부 박스,
+  // 상조회는 고른 쪽 증빙 탭이 같은 상태를 본다 — Figma MutualAidApply-*-Error.
   assert.match(createSource, /missingRequiredAttachment \? styles\.borderOnlyError : null/);
-  assert.match(createSource, /missingRequiredAttachment \? styles\.inputError : null/);
+  assert.match(createSource, /showsError \? styles\.evidenceModeTabError : null/);
+  // 링크 입력칸은 회색을 유지한다. 오류는 탭에만 띄운다.
+  assert.doesNotMatch(createSource, /missingRequiredAttachment \? styles\.inputError : null/);
 });
 
 test("도달할 수 없던 상조회 날짜 제한 안내를 제거했다", () => {
