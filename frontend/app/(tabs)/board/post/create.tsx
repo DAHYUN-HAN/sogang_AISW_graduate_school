@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
+import { BackHandler, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -16,6 +16,7 @@ import CompletionState from "../../../../components/CompletionState";
 import DiscardWriteModal from "../../../../components/DiscardWriteModal";
 import LoadingState from "../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
+import NoticeModal, { type NoticeModalContent } from "../../../../components/NoticeModal";
 import Toast from "../../../../components/Toast";
 import { MediaImageBackground } from "../../../../components/MediaImage";
 import { duesPayerApi, postApi } from "../../../../services/api";
@@ -49,8 +50,8 @@ import {
   maximumActivityCertificationDate,
   minimumMutualAidEventDate,
 } from "../../../../utils/dateSelection";
-import { createFormNotice, requiredFieldNotice, type FormNotice } from "../../../../utils/formNotice";
 import { TOAST_MESSAGES, nextToastState, type ToastState } from "../../../../utils/toast";
+import { uploadFailureFeedback } from "../../../../utils/uploadFeedback";
 import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../utils/mediaPicker";
 import {
   canEditMutualAidRequest,
@@ -266,25 +267,6 @@ function SelectionSheet({
   );
 }
 
-function FormNoticeModal({ notice, onClose }: { notice: FormNotice | null; onClose: () => void }) {
-  return (
-    <Modal animationType="fade" transparent visible={Boolean(notice)} onRequestClose={onClose}>
-      <Pressable accessibilityViewIsModal onPress={onClose} style={styles.noticeBackdrop}>
-        <Pressable onPress={() => undefined} style={styles.noticeCard}>
-          <View style={styles.noticeIcon}>
-            <Ionicons name="alert-circle-outline" size={24} color={COLORS.primary} />
-          </View>
-          <Text accessibilityRole="header" style={styles.noticeTitle}>{notice?.title}</Text>
-          <Text style={styles.noticeMessage}>{notice?.message}</Text>
-          <Pressable accessibilityRole="button" onPress={onClose} style={styles.noticeButton}>
-            <Text style={styles.noticeButtonText}>확인</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
 const CAL_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
 function InlineCalendar({
@@ -410,7 +392,13 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [evidenceLink, setEvidenceLink] = useState("");
   const [activitySourcePostId, setActivitySourcePostId] = useState<number | null>(null);
   const [createdPostId, setCreatedPostId] = useState<number | null>(null);
-  const [formNotice, setFormNotice] = useState<FormNotice | null>(null);
+  const [notice, setNotice] = useState<NoticeModalContent | null>(null);
+  // 업로드 실패 원인에 따라 토스트와 모달을 나눠 보여준다.
+  const showUploadFailure = useCallback((error: unknown, imagesOnly = false) => {
+    const feedback = uploadFailureFeedback(error, imagesOnly);
+    if (feedback.kind === "modal") setNotice(feedback.notice);
+    else setToast((current) => nextToastState(current, feedback.message));
+  }, []);
   const [toast, setToast] = useState<ToastState>(null);
   // 첨부·증빙은 react-hook-form 밖에 있어서 테두리 표시를 따로 들고 있는다.
   const [missingRequiredAttachment, setMissingRequiredAttachment] = useState(false);
@@ -696,24 +684,23 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     return Object.keys(metadata).length > 0 ? metadata : undefined;
   };
 
+  // 참여 버튼 링크(관리자 전용)만 쓰는 검사. 토스트 전환 대상이 아니라서
+  // 기존과 같은 확인창 문구를 그대로 유지한다.
   const requireValue = (value: string | undefined, label: string) => {
     if (clean(value)) {
       return false;
     }
-    setFormNotice(requiredFieldNotice(label));
+    setNotice({ title: "필수 항목", body: `${label} 항목을 입력하세요.` });
     return true;
   };
 
   const handleMutationError = () => {
-    setFormNotice(createFormNotice(
-      postId ? "수정 실패" : isMutualAid ? "신청 실패" : "등록 실패",
-      "입력 내용과 첨부파일을 확인한 뒤 다시 시도하세요."
-    ));
+    showToast(TOAST_MESSAGES.error);
   };
 
   const onSubmit = (values: FormValues) => {
     if (isAlbum && attachmentIds.length > PHOTO_ALBUM_IMAGE_SELECTION_LIMIT) {
-      setFormNotice(createFormNotice("사진 첨부", "사진첩은 게시글당 최대 20장까지 등록할 수 있어요. 사진을 20장 이하로 줄여주세요."));
+      showToast(TOAST_MESSAGES.error);
       return;
     }
     // 디자인은 비어 있는 필수 칸을 한 번에 빨갛게 표시한다. 첫 항목에서 멈추지 않고
@@ -757,13 +744,13 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     if (isActivity) {
       if (!isActivityCertificationDateAllowed(values.activityDate)) {
         const message = "오늘 이후 날짜는 선택할 수 없어요.";
-        setError("activityDate", { message });
-        setFormNotice(createFormNotice("활동일", message));
+        setError("activityDate", { message: "" });
+        showToast(message);
         return;
       }
       const participantError = activityParticipantSelectionError(selectedParticipants, existingPost?.metadata);
       if (participantError) {
-        setFormNotice(createFormNotice("참가자 재선택", participantError));
+        showToast(participantError);
         return;
       }
     }
@@ -776,7 +763,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         const parsed = new URL(applicationUrl as string);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("INVALID_PROTOCOL");
       } catch {
-        setFormNotice(createFormNotice("참여 버튼 링크", "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요."));
+        setNotice({
+          title: "참여 버튼 링크",
+          body: "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요.",
+        });
         return;
       }
     }
@@ -842,8 +832,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           return isAlbum ? next.slice(0, PHOTO_ALBUM_IMAGE_SELECTION_LIMIT) : next;
         });
       }
-    } catch {
-      setFormNotice(createFormNotice("업로드 실패", "파일 업로드를 다시 시도하세요."));
+    } catch (error) {
+      showUploadFailure(error, isAlbum || isActivity || isAdminParticipationPost);
     } finally {
       setIsUploading(false);
     }
@@ -851,7 +841,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
   const pickPostImages = () => {
     if (isAlbumImageLimitReached) {
-      setFormNotice(createFormNotice("사진 첨부", "사진첩은 게시글당 최대 20장까지 등록할 수 있어요."));
+      showToast("게시글당 최대 20장까지 등록할 수 있어요");
       return Promise.resolve([]);
     }
     return pickAndUploadImages(
@@ -865,7 +855,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 skippedCount > 0 ? `게시글당 최대 20장까지 등록할 수 있어 ${skippedCount}장은 제외했어요.` : null,
                 failedCount > 0 ? `${uploadedCount}장은 추가했고 ${failedCount}장은 업로드하지 못했어요.` : null,
               ].filter((message): message is string => Boolean(message));
-              setFormNotice(createFormNotice("사진 업로드 안내", messages.join(" ")));
+              setNotice({ title: "사진 업로드 안내", body: messages.join("\n") });
             },
           }
         : undefined,
@@ -884,7 +874,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             failedCount > 0 ? "대표 이미지를 업로드하지 못했어요." : null,
           ].filter((message): message is string => Boolean(message));
           if (messages.length > 0) {
-            setFormNotice(createFormNotice("대표 이미지", messages.join(" ")));
+            setNotice({ title: "대표 이미지", body: messages.join("\n") });
           }
         },
       });
@@ -893,8 +883,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           replaceParticipationGuideRepresentative(current, uploaded[0]),
         );
       }
-    } catch {
-      setFormNotice(createFormNotice("업로드 실패", "대표 이미지 업로드를 다시 시도하세요."));
+    } catch (error) {
+      showUploadFailure(error, true);
     } finally {
       setIsUploading(false);
     }
@@ -905,10 +895,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       retainSuccessfulUploads: true,
       onBatchIssue: ({ uploadedCount, failedCount }) => {
         if (failedCount > 0) {
-          setFormNotice(createFormNotice(
-            "상세 글 이미지",
-            `${uploadedCount}장은 추가했고 ${failedCount}장은 업로드하지 못했어요.`,
-          ));
+          setNotice({
+            title: "상세 글 이미지",
+            body: `${uploadedCount}장은 추가했고 ${failedCount}장은 업로드하지 못했어요.`,
+          });
         }
       },
     }),
@@ -1426,7 +1416,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                       accessibilityState={{ selected }}
                       key={level}
                       // 필수 입력이라 해제는 없다. 다른 등급을 눌러 바꾼다.
-                      onPress={() => { field.onChange(level); clearErrors(rating.name); }}
+                      // 위 입력칸에 포커스가 남아 있으면 검은 테두리와 키보드가 그대로라
+                      // 등급을 고르는 순간 포커스를 놓아준다.
+                      onPress={() => { Keyboard.dismiss(); field.onChange(level); clearErrors(rating.name); }}
                       style={[
                         styles.ratingButton,
                         selected ? styles.ratingButtonActive : null,
@@ -1975,7 +1967,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         onKeep={() => setDiscardPromptOpen(false)}
         onDiscard={handleDiscardConfirm}
       />
-      <FormNoticeModal notice={formNotice} onClose={() => setFormNotice(null)} />
+      <NoticeModal notice={notice} onClose={() => setNotice(null)} />
       <Toast toast={toast} onHide={hideToast} />
     </View>
   );
@@ -2389,59 +2381,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "400",
     paddingVertical: 0,
-  },
-  noticeBackdrop: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(17, 24, 39, 0.42)",
-    paddingHorizontal: 24,
-  },
-  noticeCard: {
-    width: "100%",
-    maxWidth: 360,
-    alignItems: "center",
-    borderRadius: 16,
-    backgroundColor: COLORS.bg,
-    paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 20,
-  },
-  noticeIcon: {
-    width: 46,
-    height: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 23,
-    backgroundColor: COLORS.primary50,
-  },
-  noticeTitle: {
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginTop: 14,
-    textAlign: "center",
-  },
-  noticeMessage: {
-    color: COLORS.muted,
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  noticeButton: {
-    width: "100%",
-    minHeight: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    marginTop: 20,
-  },
-  noticeButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "400",
   },
   activityDateValue: {
     flex: 1,

@@ -54,14 +54,26 @@ test("증빙 링크 오류는 팝업 대신 토스트로 알린다", () => {
   // 증빙서류 첨부의 옛 팝업이 남아 있으면 안 된다.
   assert.doesNotMatch(createSource, /createFormNotice\("증빙서류 첨부"/);
   assert.doesNotMatch(createSource, /청첩장·부고장 링크를 입력하세요/);
-  // 참여 버튼 링크(application_url)는 이번 범위가 아니라 팝업을 그대로 쓴다.
-  assert.match(createSource, /createFormNotice\("참여 버튼 링크"/);
+  // 참여 버튼 링크(관리자 전용)는 전환 대상이 아니라 문구·확인창 그대로다.
+  assert.match(createSource, /title: "참여 버튼 링크"/);
+  assert.match(createSource, /http:\/\/ 또는 https:\/\/로 시작하는 올바른 주소를 입력하세요/);
+  assert.doesNotMatch(createSource, /createFormNotice/);
 });
 
-test("나머지 안내는 아직 기존 팝업을 쓴다", () => {
-  // 1단계 범위는 링크 2건이다. 나머지는 다음 단계에서 옮긴다.
-  assert.match(createSource, /<FormNoticeModal notice=\{formNotice\}/);
+test("FormNoticeModal은 사라지고 토스트와 확인 모달만 남는다", () => {
+  assert.doesNotMatch(createSource, /FormNoticeModal/);
   assert.match(createSource, /<Toast toast=\{toast\} onHide=\{hideToast\} \/>/);
+  // 읽고 넘어가야 하는 안내(업로드 실패·요청 제한·부분 성공)는 확인 모달을 쓴다.
+  assert.match(createSource, /<NoticeModal notice=\{notice\} onClose=\{\(\) => setNotice\(null\)\} \/>/);
+});
+
+test("업로드 실패는 원인별로 다르게 알린다", () => {
+  const feedback = readFileSync("utils/uploadFeedback.ts", "utf8");
+  // 하나로 뭉치면 횟수 제한·형식 문제일 때 계속 실패한다.
+  assert.match(feedback, /status === 429 \|\| codeOf\(error\) === "RATE_LIMITED"/);
+  assert.match(feedback, /status === 413 \|\| codeOf\(error\) === "FILE_TOO_LARGE"/);
+  assert.match(feedback, /status === 415/);
+  assert.match(createSource, /showUploadFailure\(error/);
 });
 
 test("필수 항목은 첫 항목에서 멈추지 않고 전부 모아 한 번에 표시한다", () => {
