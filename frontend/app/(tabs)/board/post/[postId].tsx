@@ -1187,10 +1187,18 @@ export default function PostDetailScreen() {
               <Text style={styles.actionText}>추천 {likeCount}</Text>
             </Pressable>
             {!commentsDisabled ? (
-              <View style={styles.iconAction}>
+              <Pressable
+                accessibilityLabel="댓글 쓰기"
+                // 댓글 수를 누르면 하단 입력창이 바로 열리도록 커서를 준다.
+                onPress={() => {
+                  setReplyTarget(null);
+                  commentInputRef.current?.focus();
+                }}
+                style={styles.iconAction}
+              >
                 <Ionicons name="chatbubble-outline" size={16} color={COLORS.muted} />
                 <Text style={styles.actionText}>댓글 {post.comment_count}</Text>
-              </View>
+              </Pressable>
             ) : null}
           </View>
         ) : null}

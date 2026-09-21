@@ -193,3 +193,9 @@ test("댓글 수정 입력은 1.3px 파란 테두리에 13\/16 본문과 10\/12 
   assert.match(commentItem, /borderWidth: 1\.3,\s*\n\s*borderColor: "#2761FF"/);
   assert.match(commentItem, /fontSize: 13,\s*\n\s*lineHeight: 16,\s*\n\s*paddingHorizontal: 12,\s*\n\s*paddingVertical: 10,/);
 });
+
+test("본문 반응행의 댓글 수를 누르면 하단 댓글 입력창에 커서가 간다", () => {
+  const detail = source("app/(tabs)/board/post/[postId].tsx");
+  assert.match(detail, /accessibilityLabel="댓글 쓰기"[\s\S]{0,260}commentInputRef\.current\?\.focus\(\)/);
+  assert.doesNotMatch(detail, /<View style=\{styles\.iconAction\}>\s*\n\s*<Ionicons name="chatbubble-outline"/);
+});
