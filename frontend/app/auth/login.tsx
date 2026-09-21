@@ -1,15 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { authApi } from "../../services/api";
 import { useUserStore } from "../../stores/userStore";
+import MigrationNoticeModal from "../../components/MigrationNoticeModal";
 import SchoolEmailInput from "../../components/SchoolEmailInput";
 import { composeSchoolEmail, emailIdError } from "../../utils/authValidation";
+import { dismissMigrationNoticeForNow, hideMigrationNoticeForever, isMigrationNoticeHidden } from "../../utils/migrationNotice";
 
-import { BackIcon } from "../../components/icons";
 const COLORS = {
   primary: "#2761FF", // primary/500
   text: "#15171C", // gray/900 (Figma)
@@ -34,6 +35,18 @@ export default function LoginScreen() {
   const [errors, setErrors] = useState<LoginErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const setSession = useUserStore((state) => state.setSession);
+  // 구버전 앱 사용자는 로그인이 안 된다. 게스트가 닿는 화면이 여기뿐이라 여기서 알린다.
+  const [migrationNoticeVisible, setMigrationNoticeVisible] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    void isMigrationNoticeHidden().then((hidden) => {
+      if (active && !hidden) setMigrationNoticeVisible(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleLogin = async () => {
     if (isSubmitting) return;
@@ -60,15 +73,8 @@ export default function LoginScreen() {
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 18) }]}>
-        <Pressable
-          accessibilityLabel="뒤로"
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-          }}
-          style={styles.iconButton}
-        >
-          <BackIcon size={22} color={COLORS.text} />
-        </Pressable>
+        {/* Figma TopBar: 좌우 모두 아이콘 없는 22x22 자리다. 제목만 가운데 남는다. */}
+        <View style={styles.iconButton} />
         <Text style={styles.appBarTitle}>로그인</Text>
         <View style={styles.iconButton} />
       </View>
@@ -131,6 +137,23 @@ export default function LoginScreen() {
           </Pressable>
         </View>
       </ScrollView>
+
+      <MigrationNoticeModal
+        visible={migrationNoticeVisible}
+        onClose={() => {
+          dismissMigrationNoticeForNow();
+          setMigrationNoticeVisible(false);
+        }}
+        onRegister={() => {
+          dismissMigrationNoticeForNow();
+          setMigrationNoticeVisible(false);
+          router.push("/auth/register");
+        }}
+        onHideForever={() => {
+          void hideMigrationNoticeForever();
+          setMigrationNoticeVisible(false);
+        }}
+      />
     </View>
   );
 }
