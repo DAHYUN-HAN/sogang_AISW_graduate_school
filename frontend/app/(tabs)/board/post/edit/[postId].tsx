@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
-import { Alert, BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
@@ -594,7 +594,8 @@ export default function PostEditScreen() {
 
         <Pressable
           disabled={updateMutation.isPending || isUploading}
-          onPress={handleSubmit(onSubmit)}
+          // 제출할 때도 포커스를 놓아 검은 테두리와 키보드를 함께 걷는다.
+          onPress={() => { Keyboard.dismiss(); handleSubmit(onSubmit)(); }}
           style={[styles.submitButton, updateMutation.isPending || isUploading ? styles.submitButtonDisabled : null]}
         >
           <Text style={styles.submitText}>{updateMutation.isPending || isUploading ? "저장 중" : "완료"}</Text>

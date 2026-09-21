@@ -1984,7 +1984,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
       <Pressable
         disabled={isSubmitting}
-        onPress={handleSubmit(onSubmit)}
+        // 제출할 때도 포커스를 놓아 검은 테두리와 키보드를 함께 걷는다.
+        onPress={() => { Keyboard.dismiss(); handleSubmit(onSubmit)(); }}
         style={[styles.submitButton, isActivity ? styles.activitySubmitButton : null, isSubmitting ? styles.submitButtonDisabled : null]}
       >
         <Text style={[styles.submitText, isActivity ? styles.activitySubmitText : null]}>{createMutation.isPending || updateMutation.isPending ? "저장 중" : submitLabel}</Text>

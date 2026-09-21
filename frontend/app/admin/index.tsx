@@ -5,7 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { z } from "zod";
 
 import BackButton from "../../components/BackButton";
@@ -4031,7 +4031,7 @@ export default function AdminScreen() {
           <Controller control={control} name="end_at" render={({ field }) => <EventDateTimePicker label="종료일시" value={field.value ?? ""} onChange={field.onChange} fallbackTime="11:00" />} />
           <Controller control={control} name="location" render={({ field }) => <Field onChangeText={field.onChange} placeholder="장소" value={field.value ?? ""} />} />
           <Controller control={control} name="description" render={({ field }) => <Field multiline onChangeText={field.onChange} placeholder="상세 설명" value={field.value ?? ""} />} />
-          <ActionButton icon="save-outline" label={editEventId ? "일정 저장" : "일정 등록"} onPress={handleSubmit(onSubmitEvent)} />
+          <ActionButton icon="save-outline" label={editEventId ? "일정 저장" : "일정 등록"} onPress={() => { Keyboard.dismiss(); handleSubmit(onSubmitEvent)(); }} />
         </View>
       </Panel>
       <AdminBoardContentQueryState isLoading={eventsQuery.isLoading} isError={eventsQuery.isError} isEmpty={events.length === 0} emptyMessage="등록된 일정이 없습니다." onRetry={() => void eventsQuery.refetch()} />
