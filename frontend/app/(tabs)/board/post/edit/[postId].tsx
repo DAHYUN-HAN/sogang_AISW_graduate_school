@@ -1,3 +1,4 @@
+import { useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
@@ -232,6 +233,27 @@ export default function PostEditScreen() {
     });
     return () => subscription.remove();
   }, [requestClose]));
+
+  // iOS 가장자리 스와이프는 UIKit이 직접 pop 해서 위 핸들러를 타지 않는다.
+  // usePreventRemove가 native-stack의 preventNativeDismiss를 켜 그것까지 막는다.
+  const navigation = useNavigation();
+  const [removeConfirmed, setRemoveConfirmed] = useState(false);
+  const pendingRemoveAction = useRef<NavigationAction | null>(null);
+
+  usePreventRemove(hasUnsavedChanges && !removeConfirmed, ({ data }) => {
+    pendingRemoveAction.current = data.action;
+    setDiscardPromptOpen(true);
+  });
+
+  useEffect(() => {
+    if (!removeConfirmed) return;
+    // 잠금이 풀린 뒤에 원래 하려던 이동을 진행한다. 헤더·안드로이드에서 왔으면
+    // 남겨둔 동작이 없어 기존 경로를 탄다.
+    const action = pendingRemoveAction.current;
+    pendingRemoveAction.current = null;
+    if (action) navigation.dispatch(action);
+    else leaveScreen();
+  }, [leaveScreen, navigation, removeConfirmed]);
 
   const navigationHeader = (
     <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 18) }]}>
@@ -761,7 +783,7 @@ export default function PostEditScreen() {
         visible={discardPromptOpen}
         mode="edit"
         onKeep={() => setDiscardPromptOpen(false)}
-        onDiscard={() => { setDiscardPromptOpen(false); leaveScreen(); }}
+        onDiscard={() => { setDiscardPromptOpen(false); setRemoveConfirmed(true); }}
       />
       <DiscardWriteModal
         visible={pendingBoardId !== null}

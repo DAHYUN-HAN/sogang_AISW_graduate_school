@@ -1,3 +1,4 @@
+import { usePreventRemove } from "@react-navigation/native";
 import { useFocusEffect, useNavigation } from "expo-router";
 import { useCallback, useRef } from "react";
 import { BackHandler, Platform } from "react-native";
@@ -35,6 +36,11 @@ export function useReturnToMyPageDrawer(route: MyPageDrawerSettingsRoute) {
     hasLaidOut.current = true;
     revealWhenPainted();
   }, [revealWhenPainted]);
+  // 이 화면들의 "뒤로"는 스택 pop이 아니라 서랍으로 덮은 뒤 원래 탭으로 가는
+  // 별도 전환이다. iOS 가장자리 스와이프는 UIKit이 그냥 pop 해버려 설정 목록으로
+  // 떨어지므로, 그 pop을 막고 헤더·안드로이드와 같은 복귀를 태운다.
+  usePreventRemove(true, () => returnFromScreen());
+
   useFocusEffect(
     useCallback(() => {
       // Retained settings screens may focus again without another layout event.

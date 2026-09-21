@@ -22,6 +22,9 @@ if (Platform.OS !== "web") {
 // Route every <Text>/<TextInput> through the matching Pretendard face (design uses Inter + Korean fallback).
 patchDefaultFontFamily();
 
+// iOS 기본 가장자리 스와이프 뒤로가기는 켜둔다. 예전에 이 제스처가 오작동한 건
+// 마이페이지 서랍이 같은 구역에 자체 PanResponder를 걸어 다퉜기 때문이고,
+// 그 자체 제스처를 없애서 해결했다. gestureEnabled를 끄지 말 것.
 export default function RootLayout() {
   const [minimumSplashDurationElapsed, setMinimumSplashDurationElapsed] = useState(false);
   const { width } = useWindowDimensions();

@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { isAxiosError } from "axios";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
@@ -1069,6 +1069,28 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     leaveCreateScreen();
   }, [boardId, boardType, createdPostId, datePickerOpen, hasUnsavedChanges, leaveCreateScreen, params.returnTo, selectionSheet]);
 
+  // iOS 가장자리 스와이프는 UIKit이 직접 pop 해서 위 핸들러들을 타지 않는다.
+  // usePreventRemove가 native-stack의 preventNativeDismiss를 켜 그 제스처까지
+  // 막아주므로, 확인창을 헤더·안드로이드 뒤로가기와 같은 지점으로 모은다.
+  const navigation = useNavigation();
+  const [removeConfirmed, setRemoveConfirmed] = useState(false);
+  const pendingRemoveAction = useRef<NavigationAction | null>(null);
+
+  usePreventRemove(hasUnsavedChanges && !createdPostId && !removeConfirmed, ({ data }) => {
+    pendingRemoveAction.current = data.action;
+    setDiscardPromptOpen(true);
+  });
+
+  useEffect(() => {
+    if (!removeConfirmed) return;
+    // 잠금이 풀린 뒤에 원래 하려던 이동을 그대로 진행한다. 제스처가 아니라
+    // 헤더·안드로이드에서 왔으면 남겨둔 동작이 없어 기존 경로를 탄다.
+    const action = pendingRemoveAction.current;
+    pendingRemoveAction.current = null;
+    if (action) navigation.dispatch(action);
+    else leaveCreateScreen();
+  }, [leaveCreateScreen, navigation, removeConfirmed]);
+
   const handleDiscardConfirm = useCallback(() => {
     setDiscardPromptOpen(false);
     // 작성 모드는 returnTo 경로에서 화면이 스택에 남을 수 있어 직접 비운다.
@@ -1082,8 +1104,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       setEvidenceMode("file");
       setActivitySourcePostId(null);
     }
-    leaveCreateScreen();
-  }, [leaveCreateScreen, postId, reset]);
+    // 잠금을 먼저 풀어야 이동이 다시 막히지 않는다. 실제 이동은 위 effect가 한다.
+    setRemoveConfirmed(true);
+  }, [postId, reset]);
 
   useFocusEffect(
     useCallback(() => {

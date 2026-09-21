@@ -181,54 +181,41 @@ test("작성 글과 스크랩을 반복해서 열어도 필터를 보존하고 �
   }
 });
 
-test("닫힌 마이페이지는 화면을 덮지 않고 왼쪽 버튼의 탭과 작은 손떨림을 통과시킨다", () => {
+test("닫힌 마이페이지는 화면을 덮지 않고 어떤 제스처도 가로채지 않는다", () => {
+  // 왼쪽 가장자리 드래그로 서랍을 열던 동작을 없앴다. iOS의 기본 스와이프
+  // 뒤로가기와 같은 구역을 다퉜고, 네이티브 제스처는 JS 반응자가 막을 수
+  // 없어 뒤로가기와 서랍이 번갈아 걸렸다.
   const h = harness("/board/post/1");
   const host = h.host();
   assert.deepEqual(nodes(host).map((node) => node.type), ["View", "Navigator"]);
-  const start = host.props.onStartShouldSetResponder as (event: unknown, gesture: Gesture) => boolean;
-  const capture = host.props.onStartShouldSetResponderCapture as (event: unknown, gesture: Gesture) => boolean;
-  const move = host.props.onMoveShouldSetResponderCapture as (event: unknown, gesture: Gesture) => boolean;
-  capture?.({ nativeEvent: { pageX: 16 } }, { x0: 0, dx: 0, dy: 0, numberActiveTouches: 1 });
-  assert.equal(start({}, { x0: 16, dx: 0, dy: 0, numberActiveTouches: 1 }), false);
-  assert.equal(move({}, { x0: 16, dx: 5, dy: 2, numberActiveTouches: 1 }), false);
-  assert.equal(h.overlay(), undefined);
-});
-
-test("마이페이지는 왼쪽 가장자리의 한 손가락 가로 드래그만 인식한다", () => {
-  const h = harness("/board/post/1");
-  const move = h.host().props.onMoveShouldSetResponderCapture as (event: unknown, gesture: Gesture) => boolean;
-  const capture = h.host().props.onStartShouldSetResponderCapture as (event: unknown, gesture: Gesture) => boolean;
-  assert.equal(typeof move, "function");
-  for (const gesture of [
-    { x0: 24, dx: 60, dy: 0, numberActiveTouches: 1 },
-    { x0: 16, dx: 14, dy: 0, numberActiveTouches: 1 },
-    { x0: 16, dx: 20, dy: 30, numberActiveTouches: 1 },
-    { x0: 16, dx: -60, dy: 0, numberActiveTouches: 1 },
-    { x0: 16, dx: 60, dy: 0, numberActiveTouches: 2 },
+  for (const handler of [
+    "onStartShouldSetResponder",
+    "onStartShouldSetResponderCapture",
+    "onMoveShouldSetResponderCapture",
+    "onResponderRelease",
   ]) {
-    capture?.({ nativeEvent: { pageX: gesture.x0 } }, { ...gesture, x0: 0, dx: 0, dy: 0 });
-    // Native PanResponder leaves x0 at zero until the responder is granted.
-    assert.equal(move({}, { ...gesture, x0: 0 }), false, JSON.stringify(gesture));
+    assert.equal(host.props[handler], undefined, `${handler}가 남아 있으면 스와이프 뒤로가기와 다툰다`);
   }
-  capture?.({ nativeEvent: { pageX: 23 } }, { x0: 0, dx: 0, dy: 0, numberActiveTouches: 1 });
-  assert.equal(move({}, { x0: 0, dx: 40, dy: 5, numberActiveTouches: 1 }), true);
+  assert.equal(h.overlay(), undefined);
 });
 
-test("가장자리 드래그가 충분히 진행된 뒤에만 마이페이지를 연다", () => {
-  const h = harness("/board/post/1");
-  const release = h.host().props.onResponderRelease as (event: unknown, gesture: Gesture) => void;
-  const capture = h.host().props.onStartShouldSetResponderCapture as (event: unknown, gesture: Gesture) => boolean;
-  assert.equal(typeof release, "function");
-  capture({ nativeEvent: { pageX: 16 } }, { x0: 0, dx: 0, dy: 0, numberActiveTouches: 1 });
-  release({ nativeEvent: { pageX: 46 } }, { x0: 16, dx: 0, dy: 0, numberActiveTouches: 0 });
-  h.render();
-  assert.equal(h.overlay(), undefined);
-  // A quick swipe can release immediately after grant resets gesture.dx to zero.
-  release({ nativeEvent: { pageX: 76 } }, { x0: 16, dx: 0, dy: 0, numberActiveTouches: 0 });
-  h.render();
-  assert.ok(h.overlay());
-  const move = h.host().props.onMoveShouldSetResponderCapture as (event: unknown, gesture: Gesture) => boolean;
-  assert.equal(move({}, { x0: 16, dx: 60, dy: 0, numberActiveTouches: 1 }), false);
+test("서랍에는 여닫는 스와이프가 없다", () => {
+  const source = readFileSync("components/MyPageDrawer.tsx", "utf8");
+  assert.doesNotMatch(source, /PanResponder/);
+  assert.doesNotMatch(source, /panHandlers/);
+});
+
+test("iOS 기본 스와이프 뒤로가기는 꺼두지 않는다", () => {
+  // 예전 오작동은 서랍이 같은 구역에 자체 PanResponder를 걸어 다퉜기 때문이고,
+  // 그 자체 제스처를 없애서 해결했다. 플랫폼 기본 제스처까지 끄지 않는다.
+  for (const layout of [
+    "app/_layout.tsx",
+    "app/(tabs)/board/_layout.tsx",
+    "app/(tabs)/events/_layout.tsx",
+    "app/(tabs)/settings/_layout.tsx",
+  ]) {
+    assert.doesNotMatch(readFileSync(layout, "utf8"), /gestureEnabled: false/, `${layout}에서 기본 제스처를 껐다`);
+  }
 });
 
 test("활동 목록 위의 패널에서 다른 필터를 선택해도 쿼리를 잃거나 대기가 멈추지 않는다", () => {
