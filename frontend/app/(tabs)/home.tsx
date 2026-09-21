@@ -13,6 +13,7 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  PanResponder,
   Platform,
   Pressable,
   RefreshControl,
@@ -80,6 +81,11 @@ const POPULAR_BOARD_SLUGS = [
 ];
 const ALBUM_BOARD_SLUGS = ["activity-history", "event-album", "photo-album", "student-council"];
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 달 넘기기 스와이프. 제스처를 가져오는 기준(8)과 실제로 넘기는 기준(48)을
+// 나눠, 손을 살짝 떨어도 달이 바뀌지 않게 한다.
+const MONTH_SWIPE_CLAIM_DX = 8;
+const MONTH_SWIPE_MIN_DX = 48;
 const MOBILE_WEB_WIDTH = 405;
 const HORIZONTAL_PADDING = 20;
 const ALBUM_CARD_WIDTH = 120;
@@ -446,6 +452,24 @@ function NoticeList({
 }
 
 function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; month: Date; onChangeMonth: (delta: number) => void }) {
+  // 달력을 좌우로 쓸어 달을 넘긴다. 사진첩·캐러셀과 같은 방향으로, 손가락을
+  // 왼쪽으로 밀면 다음 달이 뒤에서 들어온다.
+  const changeMonthRef = useRef(onChangeMonth);
+  changeMonthRef.current = onChangeMonth;
+  const monthSwipe = useMemo(
+    () =>
+      PanResponder.create({
+        // 세로 스크롤을 빼앗지 않도록 가로 이동이 분명할 때만 제스처를 가져온다.
+        // 눌렀다 떼는 동작은 움직임이 없으니 날짜 셀의 탭은 그대로 살아 있다.
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          Math.abs(gesture.dx) > MONTH_SWIPE_CLAIM_DX && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+        onPanResponderRelease: (_event, gesture) => {
+          if (Math.abs(gesture.dx) < MONTH_SWIPE_MIN_DX) return;
+          changeMonthRef.current(gesture.dx < 0 ? 1 : -1);
+        },
+      }),
+    []
+  );
   const today = koreaCalendarDate();
   const visibleEvents = events;
   const activeDay = today.year === month.getFullYear() && today.month === month.getMonth() + 1 ? today.day : 1;
@@ -466,7 +490,7 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
           <ForwardIcon size={16} color={COLORS.subtle} />
         </Pressable>
       </View>
-      <View style={styles.calendarGrid}>
+      <View {...monthSwipe.panHandlers} style={styles.calendarGrid}>
         {WEEKDAYS.map((day, index) => (
           <Text key={day} style={[styles.weekday, index === 0 ? styles.weekdaySunday : null]}>
             {day}
