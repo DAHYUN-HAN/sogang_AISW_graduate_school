@@ -842,6 +842,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   };
 
   const uploadAttachments = async (pickAttachments: () => Promise<MediaAsset[]>) => {
+    // 갤러리·파일 선택창이 키보드 위로 뜨면 뒤에 키보드가 남는다. 먼저 내린다.
+    Keyboard.dismiss();
     try {
       setIsUploading(true);
       const uploaded = await pickAttachments();
@@ -883,6 +885,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   };
 
   const selectParticipationRepresentativeImage = async () => {
+    Keyboard.dismiss();
     try {
       setIsUploading(true);
       const uploaded = await pickAndUploadImages(undefined, {

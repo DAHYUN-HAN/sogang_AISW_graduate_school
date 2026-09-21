@@ -368,6 +368,7 @@ export default function PostEditScreen() {
   };
 
   const selectImages = async () => {
+    Keyboard.dismiss();
     if (isAlbumImageLimitReached) {
       setUploadNotice("사진첩은 게시글당 최대 20장까지 등록할 수 있어요.");
       return;
@@ -405,6 +406,7 @@ export default function PostEditScreen() {
   };
 
   const selectParticipationImages = async (kind: "representative" | "detail") => {
+    Keyboard.dismiss();
     if (kind === "detail" && !participationRepresentativeImage) {
       setUploadNotice("대표 이미지를 먼저 등록해주세요.");
       return;

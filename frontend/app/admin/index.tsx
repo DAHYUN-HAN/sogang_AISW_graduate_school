@@ -2724,6 +2724,7 @@ export default function AdminScreen() {
   };
 
   const handleUploadNoticeImage = async () => {
+    Keyboard.dismiss();
     const operation = startNoticeEditorOperation("upload");
     if (!operation) return;
     try {

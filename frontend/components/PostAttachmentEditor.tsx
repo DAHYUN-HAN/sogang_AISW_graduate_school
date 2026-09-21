@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { resolveMediaAccessUrl } from "../hooks/useMediaAccessUrl";
 import type { MediaAsset } from "../types";
@@ -35,6 +35,7 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
 
   const upload = async (previous?: MediaAsset) => {
     if (disabled || busy.current) return;
+    Keyboard.dismiss();
     busy.current = true;
     setUploading(true);
     onUploadingChange(true);
