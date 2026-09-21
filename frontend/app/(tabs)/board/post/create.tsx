@@ -957,7 +957,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   });
 
   const participantResults = participantSearch.data?.data ?? [];
-  const activitySourcePosts = activitySourceQuery.data ?? [];
+  // 동아리 활동인증은 운영 중인 동아리만 고를 수 있다. 운영이 끝난 동아리의
+  // 안내 글은 지우지 않고 남겨둔다 — 과거 활동인증이 그 글을 참조해 배지에
+  // 마지막 공식명을 띄우기 때문이다.
+  const activitySourcePosts = useMemo(() => {
+    const posts = activitySourceQuery.data ?? [];
+    if (activitySourceBoard?.slug !== "club-promo") return posts;
+    return posts.filter((post) => clubOperationStatus(post.metadata) === "active");
+  }, [activitySourceBoard?.slug, activitySourceQuery.data]);
   const activityOptions: SelectionOption[] = activitySourcePosts.map((post) => ({ key: String(post.id), label: post.title }));
   const mutualAidTypeOptions: SelectionOption[] = [
     { key: "marriage", label: "결혼" },
