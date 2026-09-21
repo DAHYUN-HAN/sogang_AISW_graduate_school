@@ -54,6 +54,7 @@ test("목록에서 글쓰기를 열면 검색 입력과 결과를 초기화하�
   const openCreate = runInNewContext(compile(`const closeSearch = ${expressions.get("closeSearch")}; (${expressions.get("openCreate")});`), {
     ...state,
     isAuthenticated: true, boardId: 8, isTabRoot: true, isActivityCards: false,
+    feedMode: "board", board: { category: "resources" },
     detailReturnRoute: "/(tabs)/community",
     postCreateRouteFromBoardList,
     useCallback: (fn: unknown) => fn,
@@ -65,4 +66,32 @@ test("목록에서 글쓰기를 열면 검색 입력과 결과를 초기화하�
   openCreate();
   assert.deepEqual(state, { showSearch: false, query: "", queryInput: "", selectedFilter: "시험족보" });
   assert.match(destination, /boardId=8&category=%EC%8B%9C%ED%97%98%EC%A1%B1%EB%B3%B4/);
+});
+
+test("자료공유 전체에서 글쓰기를 열면 게시판을 정하지 않고 그룹만 넘긴다", () => {
+  // 전체는 여러 게시판을 모아 보는 상태다. 마지막으로 들른 게시판이 그대로
+  // 선택돼 있으면 사용자가 의도하지 않은 게시판에 글이 올라간다.
+  const board = parse("app/(tabs)/board/[boardId].tsx");
+  const expressions = new Map<string, string>();
+  function visit(node: ts.Node) {
+    if (ts.isVariableDeclaration(node) && node.initializer) expressions.set(node.name.getText(board), node.initializer.getText(board));
+    ts.forEachChild(node, visit);
+  }
+  visit(board);
+  let destination = "";
+  const openCreate = runInNewContext(compile(`const closeSearch = ${expressions.get("closeSearch")}; (${expressions.get("openCreate")});`), {
+    showSearch: false, query: "", queryInput: "", selectedFilter: "전체",
+    isAuthenticated: true, boardId: 8, isTabRoot: true, isActivityCards: false,
+    feedMode: "resources", board: { category: "resources" },
+    detailReturnRoute: "/(tabs)/community",
+    postCreateRouteFromBoardList,
+    useCallback: (fn: unknown) => fn,
+    setShowSearch: () => undefined,
+    setQuery: () => undefined,
+    setQueryInput: () => undefined,
+    router: { push: (route: string) => { destination = route; } },
+  });
+  openCreate();
+  assert.doesNotMatch(destination, /boardId=/);
+  assert.match(destination, /boardGroup=resources/);
 });

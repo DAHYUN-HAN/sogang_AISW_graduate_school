@@ -216,6 +216,8 @@ function clean(value?: string) {
   return trimmed || undefined;
 }
 
+const BOARD_SELECT_PLACEHOLDER = "게시판을 선택하세요";
+
 const EVIDENCE_MODES = [
   { key: "file" as const, label: "이미지 첨부" },
   { key: "link" as const, label: "링크 첨부" },
@@ -353,6 +355,7 @@ function InlineCalendar({
 
 type PostCreateRouteParams = {
   boardId?: string;
+  boardGroup?: string;
   postId?: string;
   title?: string;
   category?: string;
@@ -395,6 +398,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [professorFocused, setProfessorFocused] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<ActivityParticipant[]>([]);
   const [selectionSheet, setSelectionSheet] = useState<"activity" | "mutualType" | "mutualRelation" | "board" | null>(null);
+  const [missingBoard, setMissingBoard] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   // 증빙서류는 파일 업로드와 링크 입력 중 하나만 사용한다.
   const [evidenceMode, setEvidenceMode] = useState<"file" | "link" | null>(null);
@@ -450,9 +454,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const canPickBoard =
     !postId && compactCreate && !isAlbum && !isSuggestion && !isStudyRecruit && !isNetworkingProgram && !isAdminParticipationPost;
   const selectableBoards = useMemo(() => {
-    const group = boardsRes?.data.find((entry) => entry.boards.some((item) => item.id === boardId));
-    return group?.boards ?? [];
-  }, [boardsRes?.data, boardId]);
+    const groups = boardsRes?.data ?? [];
+    const owning = groups.find((entry) => entry.boards.some((item) => item.id === boardId));
+    if (owning) return owning.boards;
+    // 게시판을 아직 안 골랐으면 어느 묶음에서 왔는지로 후보를 좁힌다.
+    return groups.find((entry) => entry.category === params.boardGroup)?.boards ?? [];
+  }, [boardsRes?.data, boardId, params.boardGroup]);
   const trimmedParticipantQuery = participantQuery.trim();
   const participantSearch = useQuery({
     queryKey: ["dues-payer-search", trimmedParticipantQuery],
@@ -745,9 +752,13 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       && requiresAttachment
       && (isAdminParticipationPost ? !participationRepresentativeImage : attachmentIds.length === 0);
 
+    // 게시판을 고르지 않으면 어디로 보낼지 정해지지 않는다. 다른 필수 칸과
+    // 같은 시점에 같은 방식으로 알린다.
+    const boardUnselected = canPickBoard && !board;
     clearErrors(missing);
+    setMissingBoard(boardUnselected);
     setMissingRequiredAttachment(missingAttachment || missingEvidenceLink);
-    if (missing.length > 0 || missingAttachment || missingEvidenceLink) {
+    if (boardUnselected || missing.length > 0 || missingAttachment || missingEvidenceLink) {
       // message를 비워 칸 아래 문구 없이 테두리만 빨갛게 만든다.
       for (const name of missing) setError(name, { message: "" });
       showToast(TOAST_MESSAGES.requiredFieldError);
@@ -1294,39 +1305,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         {canPickBoard ? (
           <View style={styles.boardSelectWrap}>
             <Pressable
-              onPress={() => { Keyboard.dismiss(); setSelectionSheet(selectionSheet === "board" ? null : "board"); }}
-              style={styles.selectLike}
+              onPress={() => { Keyboard.dismiss(); setSelectionSheet("board"); }}
+              style={[styles.selectLike, missingBoard ? styles.inputError : null]}
             >
               <Text style={[styles.selectText, !board ? styles.selectPlaceholder : null]} numberOfLines={1}>
-                {board?.name ?? "게시판을 선택하세요"}
+                {board?.name ?? BOARD_SELECT_PLACEHOLDER}
               </Text>
-              <Ionicons name={selectionSheet === "board" ? "chevron-up" : "chevron-down"} size={16} color="#A6ACB7" />
+              <Ionicons name="chevron-down" size={16} color="#A6ACB7" />
             </Pressable>
-            {selectionSheet === "board" ? (
-              <View style={styles.boardDropdown}>
-                <Text style={styles.boardDropdownTitle}>게시판을 선택하세요</Text>
-                {selectableBoards.length === 0 ? (
-                  <Text style={styles.boardDropdownEmpty}>선택할 수 있는 게시판이 없습니다.</Text>
-                ) : (
-                  selectableBoards.map((item, index) => {
-                    const active = item.id === boardId;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => {
-                          setBoardId(item.id);
-                          setSelectionSheet(null);
-                        }}
-                        style={[styles.boardDropdownItem, index > 0 ? styles.boardDropdownDivider : null]}
-                      >
-                        <Text style={[styles.boardDropdownText, active ? styles.boardDropdownTextActive : null]}>{item.name}</Text>
-                        {active ? <Ionicons name="checkmark" size={16} color={COLORS.primary} /> : null}
-                      </Pressable>
-                    );
-                  })
-                )}
-              </View>
-            ) : null}
           </View>
         ) : null}
 
@@ -1993,6 +1979,19 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       </ScrollView>
 
       <SelectionSheet
+        visible={selectionSheet === "board"}
+        title={BOARD_SELECT_PLACEHOLDER}
+        options={selectableBoards.map((item) => ({ key: String(item.id), label: item.name }))}
+        emptyText={isBoardsLoading ? "게시판을 불러오는 중입니다." : "선택할 수 있는 게시판이 없습니다."}
+        selectedKey={board ? String(board.id) : undefined}
+        onClose={() => setSelectionSheet(null)}
+        onSelect={(option) => {
+          setBoardId(Number(option.key));
+          setMissingBoard(false);
+          setSelectionSheet(null);
+        }}
+      />
+      <SelectionSheet
         visible={selectionSheet === "activity"}
         title={activitySelectPlaceholder(board?.slug)}
         options={activityOptions}
@@ -2598,49 +2597,6 @@ const styles = StyleSheet.create({
     width: "100%",
     position: "relative",
     zIndex: 10,
-  },
-  boardDropdown: {
-    marginTop: 6,
-    borderWidth: 0.5,
-    borderColor: "#E1E4E9",
-    borderRadius: 8,
-    backgroundColor: "#FFFFFF",
-    overflow: "hidden",
-  },
-  boardDropdownTitle: {
-    color: COLORS.text,
-    fontSize: 17,
-    fontWeight: "500",
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 8,
-  },
-  boardDropdownItem: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  boardDropdownDivider: {
-    borderTopWidth: 1,
-    borderTopColor: "#EAECEF",
-  },
-  boardDropdownText: {
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "400",
-  },
-  boardDropdownTextActive: {
-    color: COLORS.primary,
-    fontWeight: "500",
-  },
-  boardDropdownEmpty: {
-    color: COLORS.subtle,
-    fontSize: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 16,
   },
   guideBox: {
     flexDirection: "row",

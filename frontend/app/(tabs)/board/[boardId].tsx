@@ -1137,7 +1137,17 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
     }
     const category = selectedFilter !== "전체" ? selectedFilter : "";
     closeSearch();
-    router.push(postCreateRouteFromBoardList(boardId, category, isTabRoot, isActivityCards, detailReturnRoute) as never);
+    // 자료공유 `전체`는 여러 게시판을 모아 보여주는 상태다. 마지막으로 들른
+    // 게시판을 임의로 집어넣지 말고, 글쓰기 화면에서 고르게 그룹만 넘긴다.
+    const boardUnresolved = feedMode === "resources";
+    router.push(postCreateRouteFromBoardList(
+      boardUnresolved ? null : boardId,
+      category,
+      isTabRoot,
+      isActivityCards,
+      detailReturnRoute,
+      boardUnresolved ? board?.category : undefined,
+    ) as never);
   };
 
   if (board?.slug === "accounting") {
