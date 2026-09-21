@@ -190,28 +190,30 @@ export default function PostEditScreen() {
     else router.replace(postDetailRoute(postId));
   }, [board?.board_type, params.editOrigin, params.fromBoardId, params.returnTo, post?.board_id, postId]);
 
-  // 쓰던 내용이 바뀌었는지. 게시판 변경 확인창은 이것만 본다. 게시판 이동까지
-  // 세면 A->B 뒤 B->C에서 지울 내용이 없는데도 다시 물어보게 된다.
-  const hasDraftChanges =
-    formState.isDirty
-    || attachments.map((attachment) => attachment.id).join(",") !== unsavedBaseline.current.attachmentIds;
-
+  // 나갈 때 확인창을 띄울지. 내용·첨부뿐 아니라 게시판을 옮긴 것도 변경으로 센다.
   const hasUnsavedChanges =
-    hasDraftChanges
+    formState.isDirty
+    || attachments.map((attachment) => attachment.id).join(",") !== unsavedBaseline.current.attachmentIds
     || (selectedBoardId !== 0 && selectedBoardId !== unsavedBaseline.current.boardId);
 
   // 게시판마다 받는 항목이 달라서 고치던 값을 그대로 옮기면 엉뚱한 칸에 남는다.
   // 작성 화면과 달리 빈 폼이 아니라 저장된 글로 되돌린다. 비우면 그대로 저장할 때
   // 글 내용이 사라진다.
+  // 게시판을 바꾸면 쓰던 내용을 비운다. 작성 화면과 같은 규칙이다.
+  const clearForBoardChange = useCallback((nextBoardId: number) => {
+    setSelectedBoardId(nextBoardId);
+    reset();
+    setAttachments([]);
+    clearErrors();
+  }, [clearErrors, reset]);
+
   const selectBoard = useCallback((nextBoardId: number) => {
     setIsBoardMenuOpen(false);
     if (nextBoardId === selectedBoardId) return;
-    if (!hasDraftChanges) {
-      setSelectedBoardId(nextBoardId);
-      return;
-    }
+    // 작성 화면과 달리 늘 물어본다. 수정 화면은 저장된 글이 이미 채워져 있어
+    // 비울 내용이 없는 경우가 없다.
     setPendingBoardId(nextBoardId);
-  }, [hasDraftChanges, selectedBoardId]);
+  }, [selectedBoardId]);
 
   const requestClose = useCallback(() => {
     if (isBoardMenuOpen) {
@@ -790,10 +792,7 @@ export default function PostEditScreen() {
         mode="boardChange"
         onKeep={() => setPendingBoardId(null)}
         onDiscard={() => {
-          if (pendingBoardId !== null) {
-            hydrateFromPost();
-            setSelectedBoardId(pendingBoardId);
-          }
+          if (pendingBoardId !== null) clearForBoardChange(pendingBoardId);
           setPendingBoardId(null);
         }}
       />

@@ -31,22 +31,31 @@ test("작성 화면은 확인을 받은 뒤에만 게시판을 바꾸고 폼을 
   }
 });
 
-test("아무것도 안 썼으면 묻지 않고 바로 바꾼다", () => {
+test("작성 화면은 아무것도 안 썼으면 묻지 않고 바로 바꾼다", () => {
   assert.match(createSource, /if \(!hasUnsavedChanges\) \{\s*applyBoardChange\(nextBoardId\);/);
-  assert.match(editSource, /if \(!hasDraftChanges\) \{\s*setSelectedBoardId\(nextBoardId\);/);
 });
 
-test("수정 화면은 비우지 않고 저장된 글로 되돌린다", () => {
-  // 비우면 그대로 저장할 때 글 내용이 사라진다.
-  assert.match(editSource, /hydrateFromPost\(\);\s*setSelectedBoardId\(pendingBoardId\);/);
-  assert.doesNotMatch(editSource, /setPendingBoardId[\s\S]{0,200}setAttachments\(\[\]\)/);
+test("수정 화면은 늘 물어본다", () => {
+  // 저장된 글이 이미 채워져 있어 비울 내용이 없는 경우가 없다.
+  assert.doesNotMatch(editSource, /if \(!hasDraftChanges\)/);
+  assert.match(editSource, /if \(nextBoardId === selectedBoardId\) return;[\s\S]{0,200}setPendingBoardId\(nextBoardId\);/);
 });
 
-test("수정 화면의 게시판 변경 확인은 게시판 이동 자체를 변경으로 세지 않는다", () => {
-  // A->B 뒤 B->C에서 지울 내용이 없는데 다시 묻지 않도록 판정을 나눈다.
-  assert.match(editSource, /const hasDraftChanges =\s*formState\.isDirty/);
-  assert.match(editSource, /const hasUnsavedChanges =\s*hasDraftChanges\s*\|\|\s*\(selectedBoardId !== 0/);
-  assert.match(editSource, /\[hasDraftChanges, selectedBoardId\]/);
+test("수정 화면도 변경을 누르면 작성 화면처럼 내용을 비운다", () => {
+  assert.match(editSource, /const clearForBoardChange = useCallback\(\(nextBoardId: number\) => \{/);
+  for (const call of ["setSelectedBoardId(nextBoardId)", "reset()", "setAttachments([])", "clearErrors()"]) {
+    assert.ok(editSource.includes(call), `${call} 누락`);
+  }
+  assert.match(editSource, /if \(pendingBoardId !== null\) clearForBoardChange\(pendingBoardId\);/);
+  // 저장된 글로 되돌리던 예전 동작은 남기지 않는다.
+  assert.doesNotMatch(editSource, /hydrateFromPost\(\);\s*setSelectedBoardId\(pendingBoardId\)/);
+});
+
+test("나갈 때 확인은 내용·첨부와 게시판 이동을 모두 센다", () => {
+  assert.match(
+    editSource,
+    /const hasUnsavedChanges =\s*formState\.isDirty[\s\S]{0,200}unsavedBaseline\.current\.boardId\);/,
+  );
 });
 
 test("같은 게시판을 다시 고르면 아무 일도 없다", () => {
