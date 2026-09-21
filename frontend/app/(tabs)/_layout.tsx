@@ -1,6 +1,7 @@
 import { BottomTabBar, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { router, Tabs, usePathname } from "expo-router";
 import { useRef } from "react";
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CommunityTabIcon, CouncilTabIcon, HomeTabIcon, NoticeTabIcon, ParticipationTabIcon } from "../../components/icons";
@@ -13,11 +14,19 @@ import {
 } from "../../stores/tabRootResetStore";
 import { shouldHideTabBar } from "../../utils/tabBarVisibility";
 
+// 탭 한 칸의 내용물은 아이콘 22 + 간격 3 + 라벨 13 = 38pt다. 아래 높이에서
+// 위아래 여백을 뺀 값이 이보다 작으면 라벨이 잘린다.
+//
+// iOS 표준 탭바는 49pt라 74를 쓰면 다른 앱보다 25pt 두꺼워 보인다. 49에 맞추려면
+// 여백을 8에서 줄여야 38이 들어간다(49 - 5 - 6 = 38).
+// 안드로이드 74는 Material 하단 네비 범위(56~80) 안이라 그대로 둔다.
+const TAB_BAR_METRICS = Platform.OS === "ios"
+  ? { height: 49, paddingTop: 5, paddingBottom: 6 }
+  : { height: 74, paddingTop: 8, paddingBottom: 8 };
+
 const TAB_BAR_STYLE = {
-  height: 74,
+  ...TAB_BAR_METRICS,
   borderTopColor: "#E1E4E9",
-  paddingTop: 8,
-  paddingBottom: 8,
   backgroundColor: "#FFFFFF",
 };
 
