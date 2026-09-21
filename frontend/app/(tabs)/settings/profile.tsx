@@ -165,7 +165,7 @@ export default function ProfileSettingsScreen() {
           </Pressable>
         </View>
       ) : (
-        <ScrollView style={styles.scroller} contentContainerStyle={styles.content}>
+        <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroller} contentContainerStyle={styles.content}>
         <View style={styles.avatarSection}>
           <Pressable disabled={isUploadingImage} onPress={() => setPhotoSheetVisible(true)} style={styles.avatarButton}>
             {hasProfileImage ? (

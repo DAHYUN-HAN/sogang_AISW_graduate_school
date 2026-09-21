@@ -4080,7 +4080,7 @@ export default function AdminScreen() {
 
   return (
     <>
-      <ScrollView style={{ flex: 1, backgroundColor: COLORS.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" style={{ flex: 1, backgroundColor: COLORS.bg }} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
         <View style={{ gap: 14 }}>
         <BackButton fallback="/(tabs)/settings" />
         <View style={{ borderRadius: RADIUS.card, borderWidth: 1, borderColor: COLORS.primary700, backgroundColor: COLORS.primary900, padding: 20 }}>

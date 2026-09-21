@@ -1327,6 +1327,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         <LoadingState />
       ) : (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           key={isAlbum ? "album" : isParticipationGuideCards ? "participation-guide" : isActivityCards ? "activity" : "list"}
           numColumns={isAlbum ? 2 : 1}
           data={posts}
