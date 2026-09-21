@@ -143,7 +143,7 @@ function FormField({ label, required, requiredStar, optional, helper, error, chi
   );
 }
 
-// Figma: 입력 중(포커스) 상태는 1.5px #21262E 테두리
+// Figma: 기본 0.5px #E1E4E9, 입력 중(포커스)과 오류는 1px 테두리
 function FormTextInput({ style, hasError, onBlur, onFocus, ...props }: ComponentProps<typeof TextInput> & { hasError?: boolean }) {
   const [focused, setFocused] = useState(false);
   // 오류 테두리가 포커스 테두리를 이긴다. 값을 채우기 전까지는 눌러도 빨간색을
@@ -2548,9 +2548,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   activityInputWithIconFocused: {
-    borderWidth: 1.5, // Figma 참가자검색 focus: 1.5px #21262E
+    borderWidth: 1, // Figma 참가자검색 focus: 1px #21262E
     borderColor: "#21262E",
-    paddingHorizontal: 13, // 굵어진 테두리만큼 보정해 내용 흔들림 방지
   },
   activityInlineInput: {
     flex: 1,
@@ -2917,7 +2916,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   evidenceLinkFieldFocused: {
-    borderWidth: 1.5, // Figma focus: 1.5px #21262E
+    borderWidth: 1, // Figma focus: 1px #21262E
     borderColor: "#21262E",
   },
   calCard: {
@@ -2967,9 +2966,8 @@ const styles = StyleSheet.create({
   },
   // 제목 칸(input)과 글자 시작 위치를 맞추려면 굵어진 테두리만큼 패딩을 줄인다.
   suffixInputRowFocused: {
-    borderWidth: 1.5, // Figma focus: 1.5px #21262E
+    borderWidth: 1, // Figma focus: 1px #21262E
     borderColor: "#21262E",
-    paddingHorizontal: 13,
   },
   suffixInput: {
     flex: 1,
@@ -3030,21 +3028,19 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   inputFocused: {
-    borderWidth: 1.5, // Figma 참가자검색 focus와 동일: 1.5px #21262E
+    borderWidth: 1, // Figma 참가자검색 focus와 동일: 1px #21262E
     borderColor: "#21262E",
-    paddingHorizontal: 13, // 굵어진 테두리만큼 보정
-    paddingVertical: 11,
   },
-  // Figma 오류 상태: 1.5px #D64545. 입력칸·등급 버튼 모두 같은 굵기다.
+  // Figma 오류 상태: 1px #D64545. 입력칸·등급 버튼 모두 같은 굵기다.
+  // 기본 0.5 -> 1로 0.5px만 굵어져 여백 보정 없이도 글자가 밀리지 않는다.
   // 기본 테두리(0.5)보다 굵어지는 만큼 좌우 패딩을 줄여 글자 위치를 유지한다.
   inputError: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#D64545",
-    paddingHorizontal: 13,
   },
   // 등급 버튼은 좌우 패딩이 없어 두께만 바꾼다.
   borderOnlyError: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#D64545",
   },
   textArea: {

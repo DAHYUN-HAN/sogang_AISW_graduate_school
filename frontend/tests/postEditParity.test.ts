@@ -61,8 +61,8 @@ test("수정 화면도 비어 있는 필수 칸을 한 번에 모아 테두리�
 });
 
 test("수정 화면 오류 테두리는 작성 화면과 같은 규칙이다", () => {
-  // 1.5px #D64545, 분홍 배경 없음.
-  assert.match(editSource, /inputError: \{\s*borderWidth: 1\.5,\s*borderColor: "#D64545",\s*paddingHorizontal: 13,/);
+  // 1px #D64545, 분홍 배경 없음. 기본 0.5px에서 0.5만 굵어져 여백 보정이 없다.
+  assert.match(editSource, /inputError: \{\s*borderWidth: 1,\s*borderColor: "#D64545",\s*\}/);
   assert.doesNotMatch(editSource, /backgroundColor: COLORS\.danger50/);
 });
 

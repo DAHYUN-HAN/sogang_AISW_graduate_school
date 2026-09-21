@@ -124,10 +124,10 @@ test("값을 고치면 인증 화면처럼 빨간 테두리가 바로 풀린다"
   assert.match(createSource, /setMissingRequiredAttachment\(false\)/);
 });
 
-test("오류 테두리는 1.5px #D64545 이고 포커스보다 우선한다", () => {
-  // Figma Write-LectureReview-Error: 입력칸·등급 버튼 모두 border-[1.5px] #d64545
-  assert.match(createSource, /inputError: \{\r?\n\s+borderWidth: 1\.5,\r?\n\s+borderColor: "#D64545"/);
-  assert.match(createSource, /borderOnlyError: \{\r?\n\s+borderWidth: 1\.5,\r?\n\s+borderColor: "#D64545"/);
+test("오류 테두리는 1px #D64545 이고 포커스보다 우선한다", () => {
+  // Figma Write-LectureReview-Error(1479:116): 입력칸·등급 버튼 모두 border 1px #d64545.
+  assert.match(createSource, /inputError: \{\r?\n\s+borderWidth: 1,\r?\n\s+borderColor: "#D64545"/);
+  assert.match(createSource, /borderOnlyError: \{\r?\n\s+borderWidth: 1,\r?\n\s+borderColor: "#D64545"/);
   // FormTextInput 안에서 오류 스타일이 포커스 스타일보다 뒤에 온다.
   assert.match(createSource, /focused \? styles\.inputFocused : null,\r?\n\s+hasError \? styles\.inputError : null,/);
 });

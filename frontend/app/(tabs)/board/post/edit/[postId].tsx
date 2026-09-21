@@ -970,15 +970,14 @@ const styles = StyleSheet.create({
   studyContentInput: {
     height: 111, // Figma: 스터디 내용입력 111h
   },
-  // 작성 화면과 같은 규칙. 0.5 -> 1.5px 늘어난 만큼 가로 여백을 줄여 글자가 밀리지 않는다.
+  // 작성 화면과 같은 규칙. Figma 오류 상태는 1px이고 여백은 기본과 같다.
   inputError: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#D64545",
-    paddingHorizontal: 13,
   },
   // 등급 버튼은 좌우 여백이 없어 두께만 바꾼다.
   borderOnlyError: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: "#D64545",
   },
   suffixInputRow: {
