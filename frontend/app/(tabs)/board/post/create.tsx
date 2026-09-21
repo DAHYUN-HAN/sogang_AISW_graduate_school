@@ -55,6 +55,7 @@ import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../utils/m
 import {
   canEditMutualAidRequest,
   isUnchangedMutualAidEventDate,
+  isValidEvidenceLink,
   mutualAidEventTypeLabel,
   mutualAidRelationLabel,
   normalizeMutualAidEventDate,
@@ -778,10 +779,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         setFormNotice(createFormNotice("증빙서류 첨부", "청첩장·부고장 링크를 입력하세요."));
         return;
       }
-      try {
-        const parsed = new URL(link);
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("INVALID_PROTOCOL");
-      } catch {
+      if (!isValidEvidenceLink(link)) {
         setFormNotice(createFormNotice("증빙서류 첨부", "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요."));
         return;
       }

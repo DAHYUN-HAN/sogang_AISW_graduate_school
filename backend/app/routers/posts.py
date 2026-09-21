@@ -969,12 +969,31 @@ def _evidence_link(metadata: dict | None) -> str | None:
     return value.strip() if isinstance(value, str) and value.strip() else None
 
 
+def _is_valid_evidence_link_host(hostname: str) -> bool:
+    """호스트가 도메인 꼴인지 확인한다.
+
+    `http://www.`처럼 도메인을 덜 입력해도 netloc이 비어 있지 않아 통과하던
+    것을 막는다. 퓨니코드(xn--)와 한글 도메인을 거르지 않도록 글자 종류는
+    제한하지 않고, 라벨 구조만 본다. 클라이언트도 같은 기준을 쓴다.
+    """
+
+    labels = hostname.split(".")
+    if len(labels) < 2 or any(not label for label in labels):
+        return False
+    return len(labels[-1]) >= 2
+
+
 def _validate_evidence_link(metadata: dict | None) -> None:
     link = _evidence_link(metadata)
     if link is None:
         return
     parsed = urlparse(link)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc or len(link) > 500:
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or not _is_valid_evidence_link_host(parsed.hostname)
+        or len(link) > 500
+    ):
         raise AppException(
             status_code=422,
             message="Evidence link must be an http(s) URL.",
