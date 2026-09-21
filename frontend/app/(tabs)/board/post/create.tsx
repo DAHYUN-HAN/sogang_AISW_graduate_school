@@ -22,6 +22,7 @@ import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
 import NoticeModal, { type NoticeModalContent } from "../../../../components/NoticeModal";
 import Toast from "../../../../components/Toast";
 import { MediaImageBackground } from "../../../../components/MediaImage";
+import { setWriteLeaveGuard } from "../../../../stores/writeLeaveGuard";
 import { duesPayerApi, postApi } from "../../../../services/api";
 import type { MediaAsset } from "../../../../types";
 import {
@@ -1081,6 +1082,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const navigation = useNavigation();
   const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const pendingRemoveAction = useRef<NavigationAction | null>(null);
+  // 하단 탭을 눌러 떠나려는 경우. 확인 후에 이 함수를 불러 그 탭으로 옮긴다.
+  const pendingTabLeave = useRef<(() => void) | null>(null);
 
   usePreventRemove(hasUnsavedChanges && !createdPostId && !submitted && !removeConfirmed, ({ data }) => {
     pendingRemoveAction.current = data.action;
@@ -1096,13 +1099,28 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     go?.();
   }, [submitted]);
 
+  // 탭바는 이 화면의 부모라 handleCreateBack을 타지 않는다. 가로채기를 걸어
+  // 헤더·안드로이드 뒤로가기와 같은 확인창을 거치게 한다.
+  const blocksLeaving = hasUnsavedChanges && !createdPostId && !removeConfirmed;
+  useEffect(() => {
+    if (!blocksLeaving) return undefined;
+    setWriteLeaveGuard((proceed) => {
+      pendingTabLeave.current = proceed;
+      setDiscardPromptOpen(true);
+    });
+    return () => setWriteLeaveGuard(null);
+  }, [blocksLeaving]);
+
   useEffect(() => {
     if (!removeConfirmed) return;
     // 잠금이 풀린 뒤에 원래 하려던 이동을 그대로 진행한다. 제스처가 아니라
     // 헤더·안드로이드에서 왔으면 남겨둔 동작이 없어 기존 경로를 탄다.
+    const tabLeave = pendingTabLeave.current;
+    pendingTabLeave.current = null;
     const action = pendingRemoveAction.current;
     pendingRemoveAction.current = null;
-    if (action) navigation.dispatch(action);
+    if (tabLeave) tabLeave();
+    else if (action) navigation.dispatch(action);
     else leaveCreateScreen();
   }, [leaveCreateScreen, navigation, removeConfirmed]);
 

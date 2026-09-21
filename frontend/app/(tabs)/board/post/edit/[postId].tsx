@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
+import { setWriteLeaveGuard } from "../../../../../stores/writeLeaveGuard";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import LoadingState from "../../../../../components/LoadingState";
@@ -241,19 +242,36 @@ export default function PostEditScreen() {
   const navigation = useNavigation();
   const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const pendingRemoveAction = useRef<NavigationAction | null>(null);
+  // 하단 탭을 눌러 떠나려는 경우. 확인 후에 이 함수를 불러 그 탭으로 옮긴다.
+  const pendingTabLeave = useRef<(() => void) | null>(null);
 
   usePreventRemove(hasUnsavedChanges && !removeConfirmed, ({ data }) => {
     pendingRemoveAction.current = data.action;
     setDiscardPromptOpen(true);
   });
 
+  // 탭바는 이 화면의 부모라 requestClose를 타지 않는다. 가로채기를 걸어
+  // 헤더·안드로이드 뒤로가기와 같은 확인창을 거치게 한다.
+  const blocksLeaving = hasUnsavedChanges && !removeConfirmed;
+  useEffect(() => {
+    if (!blocksLeaving) return undefined;
+    setWriteLeaveGuard((proceed) => {
+      pendingTabLeave.current = proceed;
+      setDiscardPromptOpen(true);
+    });
+    return () => setWriteLeaveGuard(null);
+  }, [blocksLeaving]);
+
   useEffect(() => {
     if (!removeConfirmed) return;
     // 잠금이 풀린 뒤에 원래 하려던 이동을 진행한다. 헤더·안드로이드에서 왔으면
     // 남겨둔 동작이 없어 기존 경로를 탄다.
+    const tabLeave = pendingTabLeave.current;
+    pendingTabLeave.current = null;
     const action = pendingRemoveAction.current;
     pendingRemoveAction.current = null;
-    if (action) navigation.dispatch(action);
+    if (tabLeave) tabLeave();
+    else if (action) navigation.dispatch(action);
     else leaveScreen();
   }, [leaveScreen, navigation, removeConfirmed]);
 

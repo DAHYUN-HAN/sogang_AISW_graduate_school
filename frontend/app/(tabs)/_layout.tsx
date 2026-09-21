@@ -12,6 +12,7 @@ import {
   tabRootPressAction,
   type VisibleTabRootName,
 } from "../../stores/tabRootResetStore";
+import { requestWriteLeave } from "../../stores/writeLeaveGuard";
 import { shouldHideTabBar } from "../../utils/tabBarVisibility";
 
 // 탭 한 칸의 내용물은 아이콘 22 + 간격 3 + 라벨 13 = 38pt다. 아래 높이에서
@@ -38,10 +39,16 @@ function handleTabRootPress(
 ) {
   const action = tabRootPressAction(tabName);
   event.preventDefault();
-  if (action.resetTab) {
-    requestTabRootReset(action.resetTab);
-  }
-  router.navigate(action.route as never);
+  const go = () => {
+    if (action.resetTab) {
+      requestTabRootReset(action.resetTab);
+    }
+    router.navigate(action.route as never);
+  };
+  // 글쓰기·수정 중이면 폼 화면이 확인창을 띄우고, 사용자가 취소를 고른 뒤에
+  // 누른 탭으로 옮긴다.
+  if (requestWriteLeave(go)) return;
+  go();
 }
 
 // 숨김 탭(board/events 등)이 포커스되면 기본 탭바는 아무 탭도 하이라이트하지 않는다.

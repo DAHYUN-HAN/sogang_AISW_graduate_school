@@ -24,7 +24,7 @@ function findHeader(node: ts.Node) {
 findHeader(form);
 assert.ok(headerBack);
 // removeConfirmed/pendingRemoveAction은 구조 분해라 이름이 정확히 일치하지 않는다.
-const BACK_CALLBACKS = ["leaveCreateScreen", "handleCreateBack", "handleDiscardConfirm", "removeConfirmed", "pendingRemoveAction"];
+const BACK_CALLBACKS = ["leaveCreateScreen", "handleCreateBack", "handleDiscardConfirm", "removeConfirmed", "pendingRemoveAction", "pendingTabLeave"];
 const backStatements = form.body!.statements.filter((node) => {
   if (ts.isVariableStatement(node)) {
     return node.declarationList.declarations.some((declaration) =>
@@ -50,7 +50,9 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
   let focusEffect: (() => (() => void) | undefined) | undefined;
   let preventRemove: { prevent: boolean; callback: (event: { data: { action: unknown } }) => void } | undefined;
   const effects: (() => void)[] = [];
-  const pendingRemoveRef = { current: null as unknown };
+  // useRef는 호출 순서대로 각기 다른 상자를 돌려주고, 다시 그려도 같은 상자를 유지한다.
+  const refs: { current: unknown }[] = [];
+  let refCursor = 0;
   const context = {
     boardId: 7,
     boardType: options.boardType ?? "resource",
@@ -79,7 +81,7 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
       effects.splice(0).forEach((effect) => effect());
     },
     useState: (initial: unknown) => [state.removeConfirmed || initial, rendered.setRemoveConfirmed],
-    useRef: () => pendingRemoveRef,
+    useRef: () => (refs[refCursor] ??= { current: null }, refs[refCursor++]),
     useEffect: (effect: () => void) => { effects.push(effect); },
     usePreventRemove: (prevent: boolean, callback: (event: { data: { action: unknown } }) => void) => {
       preventRemove = { prevent, callback };
@@ -108,6 +110,7 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
   let rendered = { ...context, ...state };
   function render() {
     effects.length = 0;
+    refCursor = 0;
     rendered = { ...context, ...state };
     runInNewContext(code, rendered);
   }
