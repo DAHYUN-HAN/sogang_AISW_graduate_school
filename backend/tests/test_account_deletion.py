@@ -350,14 +350,15 @@ def test_authenticated_account_deletion_removes_pii_and_preserves_all_authored_c
     assert comments.json()["data"][0]["author_id"] is None
     assert comments.json()["data"][0]["author_nickname"] == "Owner"
 
+    # 상조회 증빙(첨부·링크)은 게시글을 읽을 수 있는 원우 모두에게 공개한다.
     member_mutual_aid = api.client.get("/api/posts/1", headers=api.headers["other"])
     assert member_mutual_aid.status_code == 200
-    assert member_mutual_aid.json()["data"]["attachments"] == []
-    assert "proof_url" not in (member_mutual_aid.json()["data"]["metadata"] or {})
+    assert member_mutual_aid.json()["data"]["attachments"][0]["id"] == private_media_id
+    assert member_mutual_aid.json()["data"]["metadata"]["proof_url"] == "https://example.com/private-proof"
     assert api.client.get(
         f"/api/media/{private_media_id}/access-url",
         headers=api.headers["other"],
-    ).status_code == 404
+    ).status_code == 200
 
     admin_mutual_aid = api.client.get("/api/posts/1", headers=api.headers["admin"])
     assert admin_mutual_aid.status_code == 200

@@ -441,29 +441,17 @@ def _readable_linked_post_exists(db: Session, media: MediaAsset, user: User) -> 
     return bool(posts), False
 
 
-def _is_mutual_aid_evidence(db: Session, media: MediaAsset) -> bool:
-    return (
-        db.scalar(
-            select(PostAttachment.id)
-            .join(Post, Post.id == PostAttachment.post_id)
-            .join(Board, Board.id == Post.board_id)
-            .where(
-                PostAttachment.media_id == media.id,
-                Board.board_type == "mutual_aid",
-            )
-            .limit(1)
-        )
-        is not None
-    )
-
-
 def require_media_access(db: Session, media: MediaAsset | None, user: User) -> MediaAsset:
     if media is None or media.status != "ready":
         raise AppException(status_code=404, message="Media not found.", code="NOT_FOUND")
     if user.role == "admin":
         return media
     if media.is_private:
-        if media.owner_id == user.id and not _is_mutual_aid_evidence(db, media):
+        if media.owner_id == user.id:
+            return media
+        # 상조회 증빙은 게시글을 읽을 수 있는 원우 모두에게 공개한다.
+        _, can_read_evidence_post = _readable_linked_post_exists(db, media, user)
+        if can_read_evidence_post:
             return media
         raise AppException(status_code=404, message="Media not found.", code="NOT_FOUND")
 

@@ -53,8 +53,6 @@ def _safe_metadata(post: Post, board: Board, *, include_sensitive: bool = False)
         metadata.pop("bank_account", None)
     if board.slug == "study-activity" and not include_sensitive:
         metadata.pop("legacy_original_title", None)
-    if board.board_type == "mutual_aid" and not include_sensitive:
-        metadata.pop("proof_url", None)
     return metadata
 
 
@@ -493,7 +491,6 @@ def _serialize_post_list_item(
     activity_source_title: str | None = None,
 ) -> dict:
     content_preview = post_content_preview(_visible_post_content(post, board), board.slug)
-    hide_mutual_aid_media = board.board_type == "mutual_aid" and current_user.role != "admin"
     return {
         "id": post.id,
         "board_id": post.board_id,
@@ -511,9 +508,9 @@ def _serialize_post_list_item(
         "metadata": _safe_metadata(post, board),
         "suggestion": _suggestion_payload(db, post.id) if board.board_type == "suggestion" else None,
         "mutual_aid": _mutual_aid_payload(db, post.id) if board.board_type == "mutual_aid" else None,
-        "attachment_count": 0 if hide_mutual_aid_media else attachment_count,
-        "thumbnail_media_id": None if hide_mutual_aid_media else thumbnail_media_id,
-        "thumbnail_url": None if hide_mutual_aid_media else thumbnail_url,
+        "attachment_count": attachment_count,
+        "thumbnail_media_id": thumbnail_media_id,
+        "thumbnail_url": thumbnail_url,
         "view_count": post.view_count,
         "like_count": post.like_count,
         "comment_count": post.comment_count,
@@ -758,16 +755,14 @@ def _highlight(text: str, keyword: str | None) -> str:
 
 def _post_attachments(
     db: Session,
-    post_id: int,
+    post: Post,
     board: Board,
     current_user: User,
 ) -> list[dict]:
-    if board.board_type == "mutual_aid" and current_user.role != "admin":
-        return []
     rows = db.execute(
         select(PostAttachment, MediaAsset)
         .join(MediaAsset, MediaAsset.id == PostAttachment.media_id)
-        .where(PostAttachment.post_id == post_id)
+        .where(PostAttachment.post_id == post.id)
         .order_by(PostAttachment.sort_order.asc(), PostAttachment.id.asc())
     ).all()
     return [
@@ -780,7 +775,11 @@ def _post_attachments(
             "is_private": media.is_private,
         }
         for _, media in rows
-        if not media.is_private or media.owner_id == current_user.id or current_user.role == "admin"
+        # 상조회 증빙(비공개 업로드)은 게시글을 읽을 수 있는 원우 모두에게 공개한다.
+        if not media.is_private
+        or board.board_type == "mutual_aid"
+        or media.owner_id == current_user.id
+        or current_user.role == "admin"
     ]
 
 
@@ -790,8 +789,6 @@ def _replace_attachments(
     attachment_ids: list[int],
     current_user: User,
     evidence_link: str | None = None,
-    *,
-    preserve_existing_when_empty: bool = False,
 ) -> None:
     post = db.get(Post, post_id)
     board = db.get(Board, post.board_id) if post is not None else None
@@ -799,22 +796,6 @@ def _replace_attachments(
     requires_album_images = board is not None and board.board_type == "album"
     requires_activity_images = board is not None and board.board_type == "activity_certification"
     requires_admin_participation_image = board is not None and board.slug in ADMIN_PARTICIPATION_BOARD_SLUGS
-    existing_attachment_count = int(
-        db.scalar(
-            select(func.count(PostAttachment.id)).where(PostAttachment.post_id == post_id)
-        )
-        or 0
-    )
-    if (
-        requires_private
-        and preserve_existing_when_empty
-        and not attachment_ids
-        and existing_attachment_count > 0
-    ):
-        # Members are not allowed to receive evidence metadata. An empty list
-        # during an ordinary edit therefore means "keep the protected evidence",
-        # not "delete evidence the client could not see".
-        return
     if requires_private and not attachment_ids and not (evidence_link or "").strip():
         raise AppException(
             status_code=400,
@@ -1254,7 +1235,7 @@ def get_post_detail(
             "metadata": _safe_metadata(post, board, include_sensitive=current_user.role == "admin"),
             "suggestion": _suggestion_payload(db, post.id),
             "mutual_aid": _mutual_aid_payload(db, post.id),
-            "attachments": _post_attachments(db, post.id, board, current_user),
+            "attachments": _post_attachments(db, post, board, current_user),
             "view_count": post.view_count,
             "like_count": post.like_count,
             "comment_count": post.comment_count,
@@ -1423,20 +1404,12 @@ def update_post(
         _upsert_suggestion_extension(db, post, target_board, payload.category)
         _upsert_mutual_aid_extension(db, post, target_board, payload.category, normalized_metadata)
     if payload.attachment_ids is not None:
-        incoming_evidence_link = _evidence_link(normalized_metadata)
         _replace_attachments(
             db,
             post.id,
             payload.attachment_ids,
             current_user,
             _evidence_link(post.metadata_json),
-            preserve_existing_when_empty=(
-                target_board is not None
-                and target_board.board_type == "mutual_aid"
-                and current_user.role != "admin"
-                and not payload.attachment_ids
-                and incoming_evidence_link is None
-            ),
         )
         db.flush()
     if target_board is not None:
