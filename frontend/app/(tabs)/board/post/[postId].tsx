@@ -11,7 +11,7 @@ import LoadingState from "../../../../components/LoadingState";
 import ImageViewerModal from "../../../../components/ImageViewerModal";
 import MediaImage from "../../../../components/MediaImage";
 import NaturalAspectMediaImage from "../../../../components/NaturalAspectMediaImage";
-import { AttachDocIcon, AttachLinkIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../components/icons";
+import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../components/icons";
 import { useBoardsQuery } from "../../../../hooks/useApi";
 import { resolveMediaAccessUrl, useMediaAccessUrl } from "../../../../hooks/useMediaAccessUrl";
 import type { MediaReference } from "../../../../utils/mediaAccess";
@@ -104,7 +104,6 @@ type WebTextInputKeyPressEvent = TextInputKeyPressEvent & {
   };
 };
 
-type IconName = keyof typeof Ionicons.glyphMap;
 
 const SUGGESTION_STATUSES = [
   { value: "received", label: "대기중" },
@@ -151,10 +150,12 @@ function firstUrlFromText(value: string) {
   return value.match(/https?:\/\/[^\s)]+/)?.[0];
 }
 
-function IconButton({ icon, onPress, label, size = 24, color = COLORS.text }: { icon: IconName; onPress: () => void; label: string; size?: number; color?: string }) {
+// 뒤로가기는 Figma TopBar의 22x22 벡터를 그대로 옮긴 BackIcon을 쓴다. Ionicons의
+// chevron-back은 획 두께와 꺾임 위치가 달라 일정 화면과 다르게 보였다.
+function BackButton({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable accessibilityLabel={label} onPress={onPress} style={styles.iconButton}>
-      <Ionicons name={icon} size={size} color={color} />
+    <Pressable accessibilityLabel="뒤로" onPress={onPress} style={styles.iconButton}>
+      <BackIcon size={24} color={COLORS.text} />
     </Pressable>
   );
 }
@@ -358,7 +359,7 @@ export default function PostDetailScreen() {
 
   const navigationHeader = (
     <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
-      <IconButton icon="chevron-back" label="뒤로" onPress={handlePostBack} />
+      <BackButton onPress={handlePostBack} />
       <Text numberOfLines={1} style={styles.appBarTitle}>{board?.name ?? "게시글"}</Text>
       <View style={styles.iconButton} />
     </View>
@@ -811,11 +812,7 @@ export default function PostDetailScreen() {
         <ImageViewerModal key={postId} images={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
       ) : null}
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
-        <IconButton
-          icon="chevron-back"
-          label="뒤로"
-          onPress={handlePostBack}
-        />
+        <BackButton onPress={handlePostBack} />
         {/* 제목은 아이콘 줄과 같은 높이에 중앙 정렬한다. 상단 safe-area padding 아래에서 시작해야
             상태바(카메라 컷아웃 포함) 영역에 겹치지 않는다. */}
         <View pointerEvents="none" style={[styles.appBarTitleWrap, { top: Math.max(insets.top, 10) }]}>

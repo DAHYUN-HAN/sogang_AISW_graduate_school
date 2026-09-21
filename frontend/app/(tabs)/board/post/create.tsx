@@ -1174,7 +1174,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           onPress={handleCreateBack}
           style={styles.iconButton}
         >
-          <Ionicons name={isActivity ? "chevron-back" : "close"} size={24} color={COLORS.text} />
+          {isActivity ? <BackIcon size={24} color={COLORS.text} /> : <Ionicons name="close" size={24} color={COLORS.text} />}
         </Pressable>
         <Text style={styles.appBarTitle}>{labels.screenTitle}</Text>
         <View style={styles.iconButton} />

@@ -175,7 +175,7 @@ for (const path of ["board/post/[postId]", "board/post/edit/[postId]", "events/[
       let backs = 0;
       const result = runInNewContext(jsx, {
         React: { createElement: (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props, children }) },
-        View: "View", Text: "Text", Pressable: "Pressable", IconButton: "IconButton", LoadingState: "LoadingState", BackIcon: "BackIcon", CloseIcon: "CloseIcon",
+        View: "View", Text: "Text", Pressable: "Pressable", BackButton: "BackButton", LoadingState: "LoadingState", BackIcon: "BackIcon", CloseIcon: "CloseIcon",
         styles: {}, COLORS: {}, insets: { top: 0 }, board: undefined, isStudyRecruit: false,
         isLoading, isError: true, post: undefined, event: undefined,
         handleBack: () => backs++, handlePostBack: () => backs++, goBack: () => backs++, requestClose: () => backs++,
@@ -183,7 +183,8 @@ for (const path of ["board/post/[postId]", "board/post/edit/[postId]", "events/[
       const controls: { onPress?: () => void }[] = [];
       function visit(node: any) {
         if (!node || typeof node !== "object") return;
-        if (["뒤로", "닫기"].includes(node.props?.accessibilityLabel ?? node.props?.label)) controls.push(node.props);
+        // BackButton은 라벨을 안쪽 Pressable에 들고 있어 겉에서는 보이지 않는다.
+        if (node.type === "BackButton" || ["뒤로", "닫기"].includes(node.props?.accessibilityLabel ?? node.props?.label)) controls.push(node.props);
         node.children?.flat(Infinity).forEach(visit);
       }
       visit(result);

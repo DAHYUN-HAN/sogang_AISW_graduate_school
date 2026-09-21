@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, Platform, Pre
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import MediaImage, { MediaImageBackground } from "../../../components/MediaImage";
-import { EmptyCalendarIcon, LedgerIcon, PersonAvatarIcon, SearchBackIcon, SearchIcon } from "../../../components/icons";
+import { BackIcon, EmptyCalendarIcon, LedgerIcon, PersonAvatarIcon, SearchBackIcon, SearchIcon } from "../../../components/icons";
 import LoadingState from "../../../components/LoadingState";
 import PostCard from "../../../components/PostCard";
 import { useBoardsQuery } from "../../../hooks/useApi";
@@ -106,7 +106,6 @@ const ALBUM_GRADIENTS: readonly (readonly [string, string])[] = [
   ["#0E7B60", "#55C69A"],
   ["#B94A2F", "#F39A7D"],
 ];
-type IconName = keyof typeof Ionicons.glyphMap;
 type SectionTab = {
   label: string;
   active: boolean;
@@ -227,10 +226,12 @@ function sectionTabs(board: Board | undefined, boards: Board[]): SectionTab[] {
   return [];
 }
 
-function IconButton({ icon, onPress, label }: { icon: IconName; onPress: () => void; label: string }) {
+// 뒤로가기는 Figma TopBar의 22x22 벡터를 그대로 옮긴 BackIcon을 쓴다. Ionicons의
+// chevron-back은 획 두께와 꺾임 위치가 달라 일정 화면과 다르게 보였다.
+function BackButton({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable accessibilityLabel={label} onPress={onPress} style={styles.iconButton}>
-      <Ionicons name={icon} size={24} color={COLORS.text} />
+    <Pressable accessibilityLabel="뒤로" onPress={onPress} style={styles.iconButton}>
+      <BackIcon size={24} color={COLORS.text} />
     </Pressable>
   );
 }
@@ -440,7 +441,7 @@ function CohortLeaderScreen({
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={handleBack} />
+        <BackButton onPress={handleBack} />
         <Text style={styles.appBarTitle}>{headerTitle}</Text>
         <View style={styles.iconButton} />
       </View>
@@ -604,7 +605,7 @@ function PastCouncilScreen({
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={handleBack} />
+        <BackButton onPress={handleBack} />
         <Text style={styles.appBarTitle}>{selected ? `${selected.cohort} 원우회 임원진` : "역대 원우회"}</Text>
         <View style={styles.iconButton} />
       </View>
@@ -655,7 +656,7 @@ function ExecutiveIntroScreen({ board, topInset, onBack }: { board?: Board | nul
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={onBack} />
+        <BackButton onPress={onBack} />
         <Text style={styles.appBarTitle}>원우회 임원진 소개</Text>
         <View style={styles.iconButton} />
       </View>
@@ -748,7 +749,7 @@ function CouncilActivityHistoryScreen({
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={onBack} />
+        <BackButton onPress={onBack} />
         <Text style={styles.appBarTitle}>원우회 활동내역</Text>
         <View style={styles.iconButton} />
       </View>
@@ -823,7 +824,7 @@ function AccountingExternalScreen({ board, topInset, onBack }: { board?: Board |
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={onBack} />
+        <BackButton onPress={onBack} />
         <Text style={styles.appBarTitle}>회계장부</Text>
         <View style={styles.iconButton} />
       </View>
@@ -1239,7 +1240,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
             {isTabRoot ? (
               <View style={styles.iconButton} />
             ) : (
-              <IconButton icon="chevron-back" label="뒤로" onPress={exitBoardDepth} />
+              <BackButton onPress={exitBoardDepth} />
             )}
             <Text style={styles.appBarTitle}>{display.name}</Text>
             {/* 참여활동은 활동 인증에서만 검색을 제공한다. */}
