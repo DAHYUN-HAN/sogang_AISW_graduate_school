@@ -17,6 +17,7 @@ import CompletionState from "../../../../components/CompletionState";
 import DiscardWriteModal from "../../../../components/DiscardWriteModal";
 import LoadingState from "../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
+import Toast from "../../../../components/Toast";
 import { MediaImageBackground } from "../../../../components/MediaImage";
 import { duesPayerApi, postApi } from "../../../../services/api";
 import type { MediaAsset, PostListItem } from "../../../../types";
@@ -51,6 +52,7 @@ import {
   minimumMutualAidEventDate,
 } from "../../../../utils/dateSelection";
 import { createFormNotice, requiredFieldNotice, type FormNotice } from "../../../../utils/formNotice";
+import { TOAST_MESSAGES, nextToastState, type ToastState } from "../../../../utils/toast";
 import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../utils/mediaPicker";
 import {
   canEditMutualAidRequest,
@@ -416,6 +418,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [activitySourcePostId, setActivitySourcePostId] = useState<number | null>(null);
   const [createdPostId, setCreatedPostId] = useState<number | null>(null);
   const [formNotice, setFormNotice] = useState<FormNotice | null>(null);
+  const [toast, setToast] = useState<ToastState>(null);
+  const showToast = useCallback((message: string) => setToast((current) => nextToastState(current, message)), []);
+  const hideToast = useCallback(() => setToast(null), []);
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
   // 수정 모드는 기존 글 값이 기준선이 된다. 작성 모드는 빈 문자열로 시작한다.
   const unsavedBaseline = useRef({ attachmentIds: "", participantIds: "", evidenceLink: "" });
@@ -776,11 +781,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     if (isMutualAid && evidenceMode === "link") {
       const link = evidenceLink.trim();
       if (!link) {
-        setFormNotice(createFormNotice("증빙서류 첨부", "청첩장·부고장 링크를 입력하세요."));
+        showToast(TOAST_MESSAGES.requiredFieldError);
         return;
       }
       if (!isValidEvidenceLink(link)) {
-        setFormNotice(createFormNotice("증빙서류 첨부", "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요."));
+        showToast(TOAST_MESSAGES.linkFormatError);
         return;
       }
     } else if (
@@ -1957,6 +1962,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         onDiscard={handleDiscardConfirm}
       />
       <FormNoticeModal notice={formNotice} onClose={() => setFormNotice(null)} />
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }
