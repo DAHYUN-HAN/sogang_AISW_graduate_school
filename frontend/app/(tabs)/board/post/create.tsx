@@ -70,6 +70,7 @@ import {
   writeAttachmentActions,
 } from "../../../../utils/postAttachments";
 import {
+  RESOURCE_RATING_FIELDS,
   RESOURCE_RATING_LEVELS,
   resourcePostFieldValues,
   resourcePostFields,
@@ -89,12 +90,6 @@ const COLORS = {
   bg: "#FFFFFF",
   page: "#F7F8FA",
 };
-
-// 난이도·만족도는 표시 라벨만 다르고 동작이 같아서 한 곳에서 돌린다.
-const RESOURCE_RATING_FIELDS = [
-  { name: "difficulty", label: "강의 난이도" },
-  { name: "satisfaction", label: "강의 만족도" },
-] as const;
 
 const schema = z.object({
   title: z.string().optional(),
@@ -418,6 +413,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const showToast = useCallback((message: string) => setToast((current) => nextToastState(current, message)), []);
   const hideToast = useCallback(() => setToast(null), []);
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
+  // 확인창을 띄우는 동안 고른 게시판을 들고 있는다. 확인 전에는 바꾸지 않는다.
+  const [pendingBoardId, setPendingBoardId] = useState<number | null>(null);
   // 수정 모드는 기존 글 값이 기준선이 된다. 작성 모드는 빈 문자열로 시작한다.
   const unsavedBaseline = useRef({ attachmentIds: "", participantIds: "", evidenceLink: "" });
   const hydratedPostId = useRef<number | null>(null);
@@ -981,6 +978,33 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     attachments.map((attachment) => attachment.id).join(",") !== unsavedBaseline.current.attachmentIds ||
     selectedParticipants.map((participant) => participant.id).join(",") !== unsavedBaseline.current.participantIds ||
     evidenceLink !== unsavedBaseline.current.evidenceLink;
+
+  // 게시판마다 받는 항목이 달라서 쓰던 값을 그대로 옮기면 엉뚱한 칸에 남는다.
+  // 디자인(BoardChangeConfirmModal)대로 확인을 받은 뒤 처음 상태로 되돌린다.
+  const applyBoardChange = useCallback((nextBoardId: number) => {
+    setBoardId(nextBoardId);
+    reset();
+    setAttachments([]);
+    setSelectedParticipants([]);
+    setParticipantQuery("");
+    setActivitySourcePostId(null);
+    setEvidenceLink("");
+    setEvidenceMode(null);
+    setMissingRequiredAttachment(false);
+    setMissingBoard(false);
+    unsavedBaseline.current = { attachmentIds: "", participantIds: "", evidenceLink: "" };
+  }, [reset]);
+
+  const selectBoard = useCallback((nextBoardId: number) => {
+    setSelectionSheet(null);
+    if (nextBoardId === boardId) return;
+    // 아직 아무것도 안 썼으면 물어볼 것이 없다.
+    if (!hasUnsavedChanges) {
+      applyBoardChange(nextBoardId);
+      return;
+    }
+    setPendingBoardId(nextBoardId);
+  }, [applyBoardChange, boardId, hasUnsavedChanges]);
 
   const leaveCreateScreen = useCallback(() => {
     const decision = postCreateFormBackDecision({
@@ -1992,11 +2016,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         emptyText={isBoardsLoading ? "게시판을 불러오는 중입니다." : "선택할 수 있는 게시판이 없습니다."}
         selectedKey={board ? String(board.id) : undefined}
         onClose={() => setSelectionSheet(null)}
-        onSelect={(option) => {
-          setBoardId(Number(option.key));
-          setMissingBoard(false);
-          setSelectionSheet(null);
-        }}
+        onSelect={(option) => selectBoard(Number(option.key))}
       />
       <SelectionSheet
         visible={selectionSheet === "activity"}
@@ -2041,6 +2061,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         mode={postId ? "edit" : "create"}
         onKeep={() => setDiscardPromptOpen(false)}
         onDiscard={handleDiscardConfirm}
+      />
+      <DiscardWriteModal
+        visible={pendingBoardId !== null}
+        mode="boardChange"
+        onKeep={() => setPendingBoardId(null)}
+        onDiscard={() => {
+          if (pendingBoardId !== null) applyBoardChange(pendingBoardId);
+          setPendingBoardId(null);
+        }}
       />
       <NoticeModal notice={notice} onClose={() => setNotice(null)} />
       <Toast toast={toast} onHide={hideToast} />

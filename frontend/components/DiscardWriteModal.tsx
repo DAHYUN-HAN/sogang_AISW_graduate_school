@@ -1,7 +1,9 @@
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 // Figma: Screen/Common/DiscardWriteModal (node 1344:45)
-// 값은 게시물 삭제 확인창과 같은 디자인 시스템을 따른다.
+//        Screen/Common/BoardChangeConfirmModal (node 1527:54)
+// 두 디자인은 카드·버튼 규격이 같고 문구만 다르다. 값은 게시물 삭제 확인창과
+// 같은 디자인 시스템을 따른다.
 const COLORS = {
   surface: "#FFFFFF",
   text: "#15171C",
@@ -10,7 +12,7 @@ const COLORS = {
   danger: "#D64545",
 };
 
-export type DiscardWriteMode = "create" | "edit";
+export type DiscardWriteMode = "create" | "edit" | "boardChange";
 
 const COPY: Record<DiscardWriteMode, { title: string; body: string; keep: string; discard: string }> = {
   create: {
@@ -24,6 +26,13 @@ const COPY: Record<DiscardWriteMode, { title: string; body: string; keep: string
     body: "수정 중인 내용은 저장되지 않아요.",
     keep: "계속 수정",
     discard: "수정 취소",
+  },
+  // Screen/Common/BoardChangeConfirmModal
+  boardChange: {
+    title: "게시판을 변경하시겠어요?",
+    body: "작성 중인 내용이 모두 사라져요.",
+    keep: "취소",
+    discard: "변경",
   },
 };
 

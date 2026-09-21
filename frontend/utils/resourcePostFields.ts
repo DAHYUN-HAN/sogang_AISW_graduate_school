@@ -43,6 +43,15 @@ const METADATA_KEYS = {
   satisfaction: "lecture_satisfaction",
 } as const;
 
+/**
+ * 등급 입력은 표시 라벨만 다르고 동작이 같다. 작성·수정 화면이 같은 순서와
+ * 문구를 쓰도록 여기서 한 번만 선언한다.
+ */
+export const RESOURCE_RATING_FIELDS = [
+  { name: "difficulty", label: "강의 난이도" },
+  { name: "satisfaction", label: "강의 만족도" },
+] as const;
+
 export function resourcePostFields(boardSlug?: string | null): ResourcePostFields | null {
   if (!boardSlug) return null;
   return RESOURCE_POST_FIELDS[boardSlug] ?? null;
@@ -125,4 +134,19 @@ export function resourcePostFieldValues(
     difficulty: fields.difficulty ? ratingLevel(metadata[METADATA_KEYS.difficulty]) ?? "" : "",
     satisfaction: fields.satisfaction ? ratingLevel(metadata[METADATA_KEYS.satisfaction]) ?? "" : "",
   };
+}
+
+/**
+ * 기존 metadata에 과목정보를 갱신해 얹는다. 먼저 과목정보 키를 모두 지우므로,
+ * 강의후기 글을 시험족보로 옮기면 새 게시판이 쓰지 않는 난이도·만족도가 남지
+ * 않는다. 과목정보와 무관한 키(application_url 등)는 그대로 둔다.
+ */
+export function withResourcePostMetadata(
+  existing: Record<string, unknown> | null | undefined,
+  fields: ResourcePostFields | null,
+  values: ResourcePostFieldValues,
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...(existing ?? {}) };
+  for (const key of Object.values(METADATA_KEYS)) delete next[key];
+  return { ...next, ...resourcePostMetadata(fields, values) };
 }
