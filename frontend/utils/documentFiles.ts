@@ -25,3 +25,17 @@ export function inferDocumentContentType(filename: string, declaredType?: string
   const extension = dotIndex >= 0 ? normalizedName.slice(dotIndex) : "";
   return CONTENT_TYPE_BY_EXTENSION[extension] ?? (declaredType?.trim() || "application/octet-stream");
 }
+
+export function assertAllowedDocumentContentTypes(
+  files: readonly { name: string; type?: string | null }[],
+  allowedTypes?: string | readonly string[],
+) {
+  if (!allowedTypes) return;
+  const allowed = typeof allowedTypes === "string" ? [allowedTypes] : allowedTypes;
+  if (allowed.includes("*/*")) return;
+
+  const unsupported = files.find((file) => !allowed.includes(inferDocumentContentType(file.name, file.type)));
+  if (unsupported) {
+    throw new Error(`UNSUPPORTED_DOCUMENT_TYPE:${unsupported.name}`);
+  }
+}

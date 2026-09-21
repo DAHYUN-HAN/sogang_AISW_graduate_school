@@ -6,6 +6,7 @@ import ts from "typescript";
 
 const edit = ts.createSourceFile("edit.tsx", readFileSync("app/(tabs)/board/post/edit/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const create = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const mediaPickerSource = readFileSync("utils/mediaPicker.ts", "utf8");
 function expression(source: ts.SourceFile, find: (node: ts.Node) => boolean) {
   let found: ts.Node | undefined;
   function visit(node: ts.Node) {
@@ -69,17 +70,66 @@ test("reopening edit waits for fresh data before hydrating cached attachments", 
   assert.deepEqual(hook(9, true, true).data.attachments, [2]);
 });
 
-test("mutual-aid file mode renders the existing evidence in a private attachment editor", () => {
-  const code = expression(create, (node) => ts.isConditionalExpression(node) && node.condition.getText(create) === 'evidenceMode === "file"');
-  const attachments = [{ id: 20, content_type: "image/png" }, { id: 21, content_type: "application/pdf" }];
-  const rendered = runInNewContext(code, {
-    evidenceMode: "file", attachments, setAttachments: () => {}, setIsUploading: () => {},
-    createMutation: { isPending: false }, updateMutation: { isPending: false }, PostAttachmentEditor: "AttachmentEditor",
-    element: (type: string, props: Record<string, unknown>) => ({ type, props }),
+test("mutual-aid image mode uses the approved hint and removable thumbnail design", () => {
+  let found: ts.ConditionalExpression | undefined;
+  function visit(node: ts.Node) {
+    if (!found && ts.isConditionalExpression(node) && node.condition.getText(create) === 'evidenceMode === "file"') found = node;
+    ts.forEachChild(node, visit);
+  }
+  visit(create);
+  assert.ok(found);
+  const source = found.getText(create);
+
+  assert.match(source, /※ 청첩장, 부고장 이미지를 첨부할 수 있어요 \(JPG, PNG\)/);
+  assert.match(source, /MediaImageBackground/);
+  assert.match(source, /original_filename} 삭제/);
+  assert.equal((source.match(/accessibilityRole="button"/g) ?? []).length, 2);
+  assert.doesNotMatch(source, /PostAttachmentEditor/);
+});
+
+test("mutual-aid evidence controls expose button roles, selected state, and picker guidance", () => {
+  const source = create.getText();
+  assert.match(source, /accessibilityState=\{\{ selected: active \}\}/);
+  assert.match(source, /accessibilityHint=\{mode\.key === "file"/);
+  assert.match(source, /key=\{mode\.key\}[\s\S]{0,300}accessibilityRole="button"/);
+});
+
+test("mutual-aid evidence starts neutral and image selection opens the private JPG/PNG picker", async () => {
+  assert.match(create.getText(), /useState<"file" \| "link" \| null>\(null\)/);
+  const pickerCode = expression(create, (node) => ts.isArrowFunction(node) && ts.isVariableDeclaration(node.parent) && node.parent.name.getText(create) === "selectMutualAidEvidenceImages");
+  let pickerArgs: unknown[] = [];
+  const selectImages = runInNewContext(pickerCode, {
+    uploadAttachments: async (pick: () => Promise<unknown[]>) => pick(),
+    pickAndUploadDocuments: (...args: unknown[]) => { pickerArgs = args; return Promise.resolve([]); },
   });
-  assert.equal(rendered.type, "AttachmentEditor");
-  assert.equal(rendered.props.isPrivate, true);
-  assert.equal(rendered.props.attachments, attachments);
+  await selectImages();
+  assert.equal(pickerArgs[1], true);
+  assert.deepEqual(JSON.parse(JSON.stringify(pickerArgs[2])), {
+    multiple: true,
+    accept: ".jpg,.jpeg,.png,image/jpeg,image/png",
+    types: ["image/jpeg", "image/png"],
+  });
+});
+
+test("document picker enforces allowed MIME types before both web and native uploads", () => {
+  assert.equal((mediaPickerSource.match(/assertAllowedDocumentContentTypes\(/g) ?? []).length, 2);
+});
+
+test("mutual-aid evidence tabs keep image upload and link input mutually exclusive", () => {
+  const code = expression(create, (node) => ts.isArrowFunction(node) && ts.isVariableDeclaration(node.parent) && node.parent.name.getText(create) === "handleEvidenceModeSelect");
+  const events: string[] = [];
+  const selectMode = runInNewContext(code, {
+    setEvidenceMode: (mode: string) => events.push(`mode:${mode}`),
+    setEvidenceLink: (value: string) => events.push(`link:${value}`),
+    setAttachments: (value: unknown[]) => events.push(`attachments:${value.length}`),
+    selectMutualAidEvidenceImages: () => events.push("pick:image"),
+  });
+
+  selectMode("file");
+  assert.deepEqual(events, ["mode:file", "link:", "pick:image"]);
+  events.length = 0;
+  selectMode("link");
+  assert.deepEqual(events, ["mode:link", "attachments:0"]);
 });
 
 test("mutual-aid saves explicit replacement with remaining file IDs and clears an old proof link", () => {
