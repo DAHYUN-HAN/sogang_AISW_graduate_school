@@ -45,7 +45,7 @@ import { formatCohortName } from "../../../../utils/userLabel";
 import { activityCertificationBadgeLabel } from "../../../../utils/activityCertification";
 import { activityCertificationDetailHeading } from "../../../../utils/activityDetailPresentation";
 import { activityImageLayoutFromMetadata } from "../../../../utils/activityImageLayout";
-import { photoIndexAfterSwipe, shouldClaimPhotoSwipe } from "../../../../utils/photoCarouselSwipe";
+import { createPhotoSwipeConfig } from "../../../../utils/photoCarouselSwipe";
 import { COMMENT_DELETE_COPY } from "../../../../utils/commentPresentation";
 import {
   noticeAttachmentFrameAspectRatio,
@@ -289,13 +289,7 @@ export default function PostDetailScreen() {
   // 훅은 아래 early return보다 먼저 있어야 해서, 개수는 ref로 넘긴다.
   const gallerySwipeCountRef = useRef(0);
   const gallerySwipe = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_event, gesture) =>
-          gallerySwipeCountRef.current > 1 && shouldClaimPhotoSwipe(gesture.dx, gesture.dy),
-        onPanResponderRelease: (_event, gesture) =>
-          setGalleryIndex((prev) => photoIndexAfterSwipe(prev, gallerySwipeCountRef.current, gesture.dx)),
-      }),
+    () => PanResponder.create(createPhotoSwipeConfig(() => gallerySwipeCountRef.current, setGalleryIndex)),
     []
   );
 

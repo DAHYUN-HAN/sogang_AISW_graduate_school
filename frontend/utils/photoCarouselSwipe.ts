@@ -22,3 +22,40 @@ export function photoIndexAfterSwipe(index: number, count: number, dx: number) {
   const bounded = Math.min(Math.max(index, 0), count - 1);
   return (bounded + (dx < 0 ? 1 : -1) + count) % count;
 }
+
+type SwipeGesture = { dx: number; dy: number };
+
+export type PhotoSwipeConfig = {
+  onMoveShouldSetPanResponder: (event: unknown, gesture: SwipeGesture) => boolean;
+  onPanResponderRelease: (event: unknown, gesture: SwipeGesture) => void;
+};
+
+/**
+ * PanResponder 설정을 만든다. 화면에서 직접 짜지 않고 여기 모아 둔 이유는 아래
+ * 되돌림 처리 때문이다.
+ *
+ * PanResponder는 제스처를 가져오는 순간 `gestureState.dx`를 0으로 되돌린다
+ * (react-native/Libraries/Interaction/PanResponder.js `onResponderGrant`).
+ * 그래서 release에서 받는 dx는 '가져온 뒤부터' 움직인 거리다. 그대로 쓰면
+ * CLAIM_DX를 넘기는 데 쓴 거리가 빠져 실제로는 8 + 48 = 56px을 넘겨야 사진이
+ * 넘어가고, 한 번에 안 넘어가서 두 번 쓸어야 하는 것처럼 느껴진다.
+ *
+ * 가져오기 직전까지의 dx를 기억해 두었다가 release에서 더해, MIN_DX가 손가락이
+ * 처음 닿은 지점부터의 총 이동 거리를 뜻하도록 맞춘다.
+ */
+export function createPhotoSwipeConfig(
+  getCount: () => number,
+  setIndex: (update: (prev: number) => number) => void
+): PhotoSwipeConfig {
+  let claimedDx = 0;
+  return {
+    onMoveShouldSetPanResponder: (_event, gesture) => {
+      if (getCount() < 2 || !shouldClaimPhotoSwipe(gesture.dx, gesture.dy)) return false;
+      claimedDx = gesture.dx;
+      return true;
+    },
+    onPanResponderRelease: (_event, gesture) => {
+      setIndex((prev) => photoIndexAfterSwipe(prev, getCount(), claimedDx + gesture.dx));
+    },
+  };
+}

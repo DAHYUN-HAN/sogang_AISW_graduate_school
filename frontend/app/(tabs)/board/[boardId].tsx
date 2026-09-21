@@ -34,7 +34,7 @@ import {
 } from "../../../utils/councilIntroductions";
 import { toAbsoluteMediaUrl } from "../../../utils/mediaAccess";
 import { pastCouncilActivitiesFromMetadata } from "../../../utils/pastCouncil";
-import { photoIndexAfterSwipe, shouldClaimPhotoSwipe } from "../../../utils/photoCarouselSwipe";
+import { createPhotoSwipeConfig } from "../../../utils/photoCarouselSwipe";
 import {
   boardFeedFooterState,
   boardFeedMode,
@@ -520,12 +520,7 @@ function PhotoSlider({ photos }: { photos: string[] }) {
   const countRef = useRef(photos.length);
   countRef.current = photos.length;
   const swipe = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_event, gesture) => countRef.current > 1 && shouldClaimPhotoSwipe(gesture.dx, gesture.dy),
-        onPanResponderRelease: (_event, gesture) =>
-          setIndex((prev) => photoIndexAfterSwipe(prev, countRef.current, gesture.dx)),
-      }),
+    () => PanResponder.create(createPhotoSwipeConfig(() => countRef.current, setIndex)),
     []
   );
   return (
