@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { Alert, BackHandler, Image, Keyboard, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, BackHandler, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CommentItem from "../../../../components/CommentItem";
@@ -45,6 +45,7 @@ import { formatCohortName } from "../../../../utils/userLabel";
 import { activityCertificationBadgeLabel } from "../../../../utils/activityCertification";
 import { activityCertificationDetailHeading } from "../../../../utils/activityDetailPresentation";
 import { activityImageLayoutFromMetadata } from "../../../../utils/activityImageLayout";
+import { photoIndexAfterSwipe, shouldClaimPhotoSwipe } from "../../../../utils/photoCarouselSwipe";
 import { COMMENT_DELETE_COPY } from "../../../../utils/commentPresentation";
 import {
   noticeAttachmentFrameAspectRatio,
@@ -282,6 +283,22 @@ export default function PostDetailScreen() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
+  // 사진을 좌우로 쓸어 넘긴다. 제스처를 '움직였을 때만' 가져오므로 그냥 탭하면
+  // 지금처럼 확대 보기가 열리고, 쓸기 시작하면 그 누름이 취소되어 확대 보기가
+  // 열리지 않는다. 갤러리가 아닌 화면(공지·참여활동 안내)에서는 0을 넣어 끈다.
+  // 훅은 아래 early return보다 먼저 있어야 해서, 개수는 ref로 넘긴다.
+  const gallerySwipeCountRef = useRef(0);
+  const gallerySwipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          gallerySwipeCountRef.current > 1 && shouldClaimPhotoSwipe(gesture.dx, gesture.dy),
+        onPanResponderRelease: (_event, gesture) =>
+          setGalleryIndex((prev) => photoIndexAfterSwipe(prev, gallerySwipeCountRef.current, gesture.dx)),
+      }),
+    []
+  );
+
   const likeMutation = useToggleLike(postId, post?.board_id ?? 0, board);
   const bookmarkMutation = useToggleBookmark(postId);
   const createCommentMutation = useCreateComment(postId);
@@ -492,6 +509,8 @@ export default function PostDetailScreen() {
   const galleryTotal = Math.max(imageAttachments.length, 1);
   const isPhotoAlbum = board?.board_type === "album";
   const hasVisualHero = board?.board_type === "album" || isActivityCertification || isCouncilActivityEntry;
+  // 갤러리가 있는 화면에서만 스와이프를 켠다.
+  gallerySwipeCountRef.current = hasVisualHero ? imageAttachments.length : 0;
   const heroImagePresentation = postDetailImagePresentation({
     placement: "hero",
     boardType: board?.board_type,
@@ -710,10 +729,13 @@ export default function PostDetailScreen() {
       styles.visualHeroBlock,
       isAdminParticipationGuide ? styles.visualHeroBlockInset : null,
     ]}>
-      <View style={[
-        hasNaturalHero ? styles.visualHeroNatural : styles.visualHero,
-        isPhotoAlbum ? styles.visualHeroAlbum : null,
-      ]}>
+      <View
+        {...gallerySwipe.panHandlers}
+        style={[
+          hasNaturalHero ? styles.visualHeroNatural : styles.visualHero,
+          isPhotoAlbum ? styles.visualHeroAlbum : null,
+        ]}
+      >
         {heroAttachment ? (
           <Pressable disabled={isNotice} accessibilityRole={isNotice ? undefined : "button"}
             accessibilityLabel={isNotice ? undefined : `${normalizedGalleryIndex + 1}번째 사진 크게 보기`}

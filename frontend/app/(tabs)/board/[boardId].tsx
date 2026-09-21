@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import MediaImage, { MediaImageBackground } from "../../../components/MediaImage";
@@ -34,6 +34,7 @@ import {
 } from "../../../utils/councilIntroductions";
 import { toAbsoluteMediaUrl } from "../../../utils/mediaAccess";
 import { pastCouncilActivitiesFromMetadata } from "../../../utils/pastCouncil";
+import { photoIndexAfterSwipe, shouldClaimPhotoSwipe } from "../../../utils/photoCarouselSwipe";
 import {
   boardFeedFooterState,
   boardFeedMode,
@@ -514,8 +515,21 @@ function pastCouncilsFromMetadata(metadata?: Record<string, unknown> | null): Pa
 function PhotoSlider({ photos }: { photos: string[] }) {
   const [index, setIndex] = useState(0);
   const current = Math.min(index, Math.max(photos.length - 1, 0));
+  // 화살표 없이도 좌우로 쓸어 넘길 수 있게 한다. 세로 이동이 더 크면 제스처를
+  // 가져가지 않아 화면 스크롤은 그대로 동작한다.
+  const countRef = useRef(photos.length);
+  countRef.current = photos.length;
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) => countRef.current > 1 && shouldClaimPhotoSwipe(gesture.dx, gesture.dy),
+        onPanResponderRelease: (_event, gesture) =>
+          setIndex((prev) => photoIndexAfterSwipe(prev, countRef.current, gesture.dx)),
+      }),
+    []
+  );
   return (
-    <View style={styles.pastPhotoSlider}>
+    <View {...swipe.panHandlers} style={styles.pastPhotoSlider}>
       {photos.length > 0 ? (
         <MediaImage media={{ url: photos[current] }} resizeMode="contain" style={styles.pastPhoto} />
       ) : (
