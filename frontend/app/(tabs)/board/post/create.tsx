@@ -400,6 +400,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [evidenceLink, setEvidenceLink] = useState("");
   const [activitySourcePostId, setActivitySourcePostId] = useState<number | null>(null);
   const [createdPostId, setCreatedPostId] = useState<number | null>(null);
+  // 등록·저장에 성공해 떠나는 이동은 막으면 안 된다. 완료 화면을 쓰는
+  // 활동인증·상조회·건의만 createdPostId가 채워지므로, 나머지 게시판과 수정
+  // 저장은 이 표시로 usePreventRemove 잠금을 먼저 푼다.
+  const [submitted, setSubmitted] = useState(false);
+  const pendingSubmitNavigation = useRef<(() => void) | null>(null);
   const [notice, setNotice] = useState<NoticeModalContent | null>(null);
   // 업로드 실패 원인에 따라 토스트와 모달을 나눠 보여준다.
   const showUploadFailure = useCallback((error: unknown, imagesOnly = false) => {
@@ -841,10 +846,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             params.fromBoardId,
             params.returnTo,
           );
-          navigateAfterPostEdit(decision, {
+          pendingSubmitNavigation.current = () => navigateAfterPostEdit(decision, {
             back: () => router.back(),
             replace: (route) => router.replace(route as never),
           });
+          setSubmitted(true);
         },
         onError: handleMutationError,
       });
@@ -857,9 +863,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           setCreatedPostId(res.data.id);
           return;
         }
-        router.replace(
-          postCreateCompletionRoute(boardType, res.data.id, boardId, params.returnTo) as never,
-        );
+        const route = postCreateCompletionRoute(boardType, res.data.id, boardId, params.returnTo);
+        pendingSubmitNavigation.current = () => router.replace(route as never);
+        setSubmitted(true);
       },
       onError: handleMutationError,
     });
@@ -1076,10 +1082,19 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const pendingRemoveAction = useRef<NavigationAction | null>(null);
 
-  usePreventRemove(hasUnsavedChanges && !createdPostId && !removeConfirmed, ({ data }) => {
+  usePreventRemove(hasUnsavedChanges && !createdPostId && !submitted && !removeConfirmed, ({ data }) => {
     pendingRemoveAction.current = data.action;
     setDiscardPromptOpen(true);
   });
+
+  useEffect(() => {
+    if (!submitted) return;
+    // 잠금이 풀린 렌더 뒤에 옮긴다. 같은 틱에 옮기면 usePreventRemove가 아직
+    // 이전 값을 들고 있어 등록에도 작성 취소 확인창이 뜬다.
+    const go = pendingSubmitNavigation.current;
+    pendingSubmitNavigation.current = null;
+    go?.();
+  }, [submitted]);
 
   useEffect(() => {
     if (!removeConfirmed) return;

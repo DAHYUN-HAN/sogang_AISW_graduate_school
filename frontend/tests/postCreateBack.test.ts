@@ -42,7 +42,7 @@ const code = ts.transpileModule(`${backStatements.map((node) => node.getText(sou
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
 
-function harness(options: { platform?: string; returnTo?: string; canGoBack?: boolean; postId?: string; editOrigin?: string; createdPostId?: number; boardType?: string; selectionSheet?: string; datePickerOpen?: boolean; hasUnsavedChanges?: boolean } = {}) {
+function harness(options: { platform?: string; returnTo?: string; canGoBack?: boolean; postId?: string; editOrigin?: string; createdPostId?: number; boardType?: string; selectionSheet?: string; datePickerOpen?: boolean; hasUnsavedChanges?: boolean; submitted?: boolean } = {}) {
   const routes: string[] = [];
   const cleared: string[] = [];
   const state = { selectionSheet: options.selectionSheet ?? null, datePickerOpen: options.datePickerOpen ?? false, discardPromptOpen: false, removeConfirmed: false };
@@ -66,6 +66,8 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
     postCreateCompletionRoute,
     postId: options.postId ? Number(options.postId) : null,
     hasUnsavedChanges: options.hasUnsavedChanges ?? false,
+    // 등록·저장에 성공하면 화면이 이 표시로 잠금을 먼저 푼다.
+    submitted: options.submitted ?? false,
     setSelectionSheet: (value: string | null) => { state.selectionSheet = value; },
     setDatePickerOpen: (value: boolean) => { state.datePickerOpen = value; },
     setDiscardPromptOpen: (value: boolean) => { state.discardPromptOpen = value; },
@@ -279,6 +281,13 @@ test("iOS 스와이프로 나가려 해도 확인창을 먼저 띄운다", () =>
 
 test("작성 중인 내용이 없으면 스와이프를 막지 않는다", () => {
   const h = harness({ returnTo: COMMUNITY_TAB_ROUTE });
+  assert.equal(h.preventRemove()?.prevent, false);
+});
+
+test("등록에 성공하면 잠금이 풀려 확인창 없이 이동한다", () => {
+  // 완료 화면을 쓰지 않는 게시판은 createdPostId가 비어 있어, 이 표시가 없으면
+  // 등록 직후의 router.replace까지 붙잡혀 작성 취소 확인창이 떴다.
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true, submitted: true });
   assert.equal(h.preventRemove()?.prevent, false);
 });
 
