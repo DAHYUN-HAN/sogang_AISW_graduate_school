@@ -1067,36 +1067,40 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               />
             </View>
 
-            <Controller
-              control={control}
-              name="activityDate"
-              render={({ field, fieldState }) => (
-                <>
-                  <Pressable
-                    accessibilityHint="달력에서 실제 활동 날짜를 선택합니다"
-                    accessibilityLabel="활동일 선택"
-                    accessibilityRole="button"
-                    onPress={() => setDatePickerOpen((open) => !open)}
-                    style={styles.activityInputWithIcon}
-                  >
-                    <Text style={styles.activityDateValue}>{field.value ? formatBoardDate(field.value) : "활동일을 선택하세요"}</Text>
-                    <CalendarSmallIcon size={15} color="#6B7280" />
-                  </Pressable>
-                  {datePickerOpen ? (
-                    <InlineCalendar
-                      maximumDate={maximumActivityCertificationDate()}
-                      value={field.value}
-                      onSelect={(dateStr) => {
-                        field.onChange(dateStr);
-                        clearErrors("activityDate");
-                        setDatePickerOpen(false);
-                      }}
-                    />
-                  ) : null}
-                  {fieldState.error?.message ? <Text style={styles.errorText}>{fieldState.error.message}</Text> : null}
-                </>
-              )}
-            />
+            {/* Figma 날짜래퍼: 소제목 13/16 + gap 6 + 41h 날짜선택, 다음 그룹까지 16. */}
+            <View style={styles.activityFieldGroup}>
+              <Text style={styles.activityFieldTitle}>활동한 날짜</Text>
+              <Controller
+                control={control}
+                name="activityDate"
+                render={({ field, fieldState }) => (
+                  <>
+                    <Pressable
+                      accessibilityHint="달력에서 실제 활동 날짜를 선택합니다"
+                      accessibilityLabel="활동일 선택"
+                      accessibilityRole="button"
+                      onPress={() => setDatePickerOpen((open) => !open)}
+                      style={styles.activityInputWithIcon}
+                    >
+                      <Text style={styles.activityDateValue}>{field.value ? formatBoardDate(field.value) : "활동일을 선택하세요"}</Text>
+                      <CalendarSmallIcon size={15} color="#A6ACB7" />
+                    </Pressable>
+                    {datePickerOpen ? (
+                      <InlineCalendar
+                        maximumDate={maximumActivityCertificationDate()}
+                        value={field.value}
+                        onSelect={(dateStr) => {
+                          field.onChange(dateStr);
+                          clearErrors("activityDate");
+                          setDatePickerOpen(false);
+                        }}
+                      />
+                    ) : null}
+                    {fieldState.error?.message ? <Text style={styles.errorText}>{fieldState.error.message}</Text> : null}
+                  </>
+                )}
+              />
+            </View>
 
             <View style={styles.activityFieldGroup}>
               <Text style={styles.activityFieldTitle}>활동비 받을 계좌번호</Text>

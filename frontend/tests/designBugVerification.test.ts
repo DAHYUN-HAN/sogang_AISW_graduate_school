@@ -218,6 +218,19 @@ test("본문 반응행의 댓글 수를 누르면 하단 댓글 입력창에 커
   assert.doesNotMatch(detail, /<View style=\{styles\.iconAction\}>\s*\n\s*<Ionicons name="chatbubble-outline"/);
 });
 
+test("활동 인증 날짜 필드는 '활동한 날짜' 소제목과 41h 날짜선택을 갖는다", () => {
+  // Figma 날짜래퍼: 소제목 13/16 500 + gap 6 + 0.5px 테두리 41h 필드, 캘린더 아이콘 15px #A6ACB7.
+  assert.match(postCreateSource, /<Text style=\{styles\.activityFieldTitle\}>활동한 날짜<\/Text>[\s\S]{0,400}name="activityDate"/);
+  assert.match(postCreateSource, /<CalendarSmallIcon size=\{15\} color="#A6ACB7" \/>/);
+  // 달력 아이콘은 디자인 원본 15x15 — 몸통 라운드 사각형 + 상단 걸이 2개 + 6.25 구분선, stroke 1.22.
+  const icons = source("components/icons.tsx");
+  assert.match(icons, /export function CalendarSmallIcon[\s\S]{0,200}viewBox="0 0 15 15"/);
+  assert.match(icons, /d="M10 1\.875V4\.375M5 1\.875V4\.375M1\.875 6\.25H13\.125"/);
+  assert.match(icons, /export function CalendarSmallIcon[\s\S]{0,700}strokeWidth=\{1\.22\}/);
+  assert.match(postCreateSource, /activityFieldGroup:\s*\{\s*\n\s*gap: 6,/);
+  assert.match(postCreateSource, /activityInputWithIcon:\s*\{\s*\n\s*minHeight: 41,/);
+});
+
 test("스터디 모집 댓글은 구분선 없이 12px 간격으로만 이어진다", () => {
   // Figma 스터디 모집 본문: 댓글 = padding 0 0 12, gap 4, height 80 (27 + 4 + 20 + 4 + 13 + 12).
   // 일반 게시판의 댓글스레드(padding 16/0 + 구분선)와 달리 스레드 래퍼가 없다.
