@@ -66,6 +66,21 @@ export function calendarMonthRange(month: Date) {
   };
 }
 
+/**
+ * 보고 있는 달의 앞뒤까지 한 번에 받아오는 범위.
+ *
+ * 달력은 이전 응답을 들고 있다가 새 달 응답이 오면 갈아끼운다(placeholderData).
+ * 한 달치만 받으면 옆 달로 넘어간 직후 들고 있는 데이터에 그 달이 없어 날짜 점이
+ * 잠깐 사라진다. 앞뒤 한 달을 더 받아두면 한 칸 이동은 항상 들고 있는 데이터
+ * 안에 들어와서 점이 끊기지 않는다.
+ */
+export function calendarMonthWindowRange(month: Date, padMonths = 1) {
+  return {
+    start: calendarMonthRange(shiftCalendarMonth(month, -padMonths)).start,
+    end: calendarMonthRange(shiftCalendarMonth(month, padMonths)).end,
+  };
+}
+
 export function shiftCalendarMonth(month: Date, delta: number) {
   return new Date(month.getFullYear(), month.getMonth() + delta, 1);
 }

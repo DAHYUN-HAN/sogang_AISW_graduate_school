@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { router, useFocusEffect } from "expo-router";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
@@ -36,7 +36,7 @@ import { COMMUNITY_TAB_ROUTE, HOME_TAB_ROUTE, NOTICES_TAB_ROUTE, eventDayRoute, 
 import { formatBoardDate, formatHomeScheduleDate } from "../../utils/dateFormat";
 import {
   calendarDateKey,
-  calendarMonthRange,
+  calendarMonthWindowRange,
   currentKoreaMonth,
   eventDaysForMonth,
   eventIsCurrentOrUpcoming,
@@ -625,8 +625,18 @@ export default function HomeScreen() {
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const { openDrawer } = useMyPageDrawer();
   const [month, setMonth] = useState(() => currentKoreaMonth());
+  // 홈 탭은 떠나도 마운트가 유지돼서 보던 달이 그대로 남는다. 돌아올 때마다
+  // 오늘이 있는 달로 되돌린다. 같은 달이면 상태를 건드리지 않아 다시 불러오지 않는다.
+  useFocusEffect(useCallback(() => {
+    setMonth((current) => {
+      const thisMonth = currentKoreaMonth();
+      return current.getTime() === thisMonth.getTime() ? current : thisMonth;
+    });
+  }, []));
   const compact = false;
-  const monthRange = useMemo(() => calendarMonthRange(month), [month]);
+  // 앞뒤 한 달까지 같이 받는다. 옆 달로 넘어가는 순간 들고 있는 응답 안에 그 달이
+  // 이미 있어서 날짜 점이 끊기지 않는다.
+  const monthRange = useMemo(() => calendarMonthWindowRange(month), [month]);
   const {
     data: boardGroups,
     isError: boardsError,
@@ -651,6 +661,10 @@ export default function HomeScreen() {
   const eventsQuery = useQuery({
     queryKey: ["home", "events", monthRange.start, monthRange.end],
     queryFn: () => eventApi.getEvents({ from_date: monthRange.start, to_date: monthRange.end }),
+    // 달을 넘길 때마다 달력이 통째로 "불러오는 중"으로 바뀌지 않게 이전 응답을
+    // 그대로 두고 받아온다. 날짜 점은 보고 있는 달로 걸러지므로 범위 밖 일정이
+    // 잘못 찍히지 않는다.
+    placeholderData: keepPreviousData,
   });
   const albumQuery = useQuery({
     queryKey: ["home", "album", albumBoardId],
