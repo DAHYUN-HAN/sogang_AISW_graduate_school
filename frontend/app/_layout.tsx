@@ -12,7 +12,6 @@ import KeyboardViewport from "../components/KeyboardViewport";
 import { useUserStore } from "../stores/userStore";
 import { APP_FONTS, patchDefaultFontFamily } from "../utils/fonts";
 import { isAdminUser } from "../utils/permissions";
-import { queryRetryDelay, shouldRetryQuery } from "../utils/queryRetry";
 import { MINIMUM_SPLASH_DURATION_MS, shouldShowSplash } from "../utils/splash";
 
 // Keep the native launch screen until the ready navigator has laid out.
@@ -24,13 +23,7 @@ if (Platform.OS !== "web") {
 patchDefaultFontFamily();
 
 export default function RootLayout() {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        // 네트워크 오류만 짧게 재시도하고 서버 오류(4xx/5xx)는 바로 실패시킨다.
-        defaultOptions: { queries: { retry: shouldRetryQuery, retryDelay: queryRetryDelay } },
-      }),
-  );
+  const [queryClient] = useState(() => new QueryClient());
   const [minimumSplashDurationElapsed, setMinimumSplashDurationElapsed] = useState(false);
   const { width } = useWindowDimensions();
   const [fontsLoaded] = useFonts(APP_FONTS);

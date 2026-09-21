@@ -57,7 +57,6 @@ function layoutHarness(platform: "android" | "ios" | "web") {
     "../stores/userStore": { useUserStore: (select: (store: typeof state) => unknown) => select(state) },
     "../utils/fonts": { APP_FONTS: {}, patchDefaultFontFamily: () => {} },
     "../utils/permissions": { isAdminUser: () => false },
-    "../utils/queryRetry": { shouldRetryQuery: () => false, queryRetryDelay: () => 0 },
     "../utils/splash": { MINIMUM_SPLASH_DURATION_MS, shouldShowSplash },
     "../assets/splash-logo.png": "splash-artwork",
   };

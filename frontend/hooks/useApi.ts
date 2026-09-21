@@ -7,6 +7,7 @@ export function useBoardsQuery() {
   return useQuery({
     queryKey: ["boards"],
     queryFn: boardApi.getBoards,
+    retry: false,
   });
 }
 
@@ -16,6 +17,7 @@ export function useMeQuery() {
     queryKey: ["me"],
     queryFn: userApi.getMe,
     enabled: isAuthenticated,
+    retry: false,
   });
 }
 

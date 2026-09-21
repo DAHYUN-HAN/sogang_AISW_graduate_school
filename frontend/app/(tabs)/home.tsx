@@ -646,6 +646,7 @@ export default function HomeScreen() {
   const noticesQuery = useQuery({
     queryKey: ["home", "notices"],
     queryFn: () => loadHomeNoticePreview(postApi.getFeed),
+    retry: false,
   });
   const eventsQuery = useQuery({
     queryKey: ["home", "events", monthRange.start, monthRange.end],

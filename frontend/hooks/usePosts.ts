@@ -78,6 +78,7 @@ export function boardPostInfiniteQueryOptions(
     queryFn: ({ pageParam }) => postApi.getPosts(boardId, pageParam, PAGE_SIZE, filters),
     initialPageParam: 1,
     enabled: enabled && Number.isFinite(boardId) && boardId > 0,
+    retry: false,
     getNextPageParam: nextPostPage,
   };
 }
@@ -92,6 +93,7 @@ export function aggregatePostInfiniteQueryOptions(
     queryFn: ({ pageParam }) => postApi.getFeed({ scope, page: pageParam, size: PAGE_SIZE, ...filters }),
     initialPageParam: 1,
     enabled,
+    retry: false,
     getNextPageParam: nextPostPage,
   };
 }
@@ -396,6 +398,7 @@ export function useMultiBoardPosts(
       return responses.flatMap((response) => response.data);
     },
     enabled: boardIds.length > 0,
+    retry: false,
   });
 }
 
