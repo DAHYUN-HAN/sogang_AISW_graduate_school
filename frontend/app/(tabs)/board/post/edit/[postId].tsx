@@ -16,6 +16,7 @@ import ClubOperationStatusField from "../../../../../components/ClubOperationSta
 import { clubOperationStatus } from "../../../../../utils/participationGuide";
 import DiscardWriteModal from "../../../../../components/DiscardWriteModal";
 import NoticeModal, { type NoticeModalContent } from "../../../../../components/NoticeModal";
+import SelectionSheet from "../../../../../components/SelectionSheet";
 import PostAttachmentEditor from "../../../../../components/PostAttachmentEditor";
 import Toast from "../../../../../components/Toast";
 import {
@@ -70,6 +71,21 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+// reset()에 값을 넘기면 그 값이 새 기본값이 된다. 저장된 글을 채운 뒤에는
+// 인자 없는 reset()이 빈 폼이 아니라 그 글로 되돌아가므로, 비울 때는 이
+// 값을 직접 넘긴다.
+const EMPTY_FORM: FormValues = {
+  title: "",
+  category: "",
+  content: "",
+  contact: "",
+  applicationUrl: "",
+  professor: "",
+  difficulty: "",
+  satisfaction: "",
+  clubOperationStatus: "active",
+};
 
 export default function PostEditScreen() {
   const insets = useSafeAreaInsets();
@@ -126,10 +142,7 @@ export default function PostEditScreen() {
 
   const { control, clearErrors, formState, handleSubmit, reset, setError } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      title: "", category: "", content: "", contact: "", applicationUrl: "",
-      professor: "", difficulty: "", satisfaction: "", clubOperationStatus: "active",
-    },
+    defaultValues: EMPTY_FORM,
   });
 
   // 인증 화면처럼 값을 고치는 즉시 빨간 테두리를 푼다. 스키마가 모두 optional이라
@@ -203,7 +216,7 @@ export default function PostEditScreen() {
   // 게시판을 바꾸면 쓰던 내용을 비운다. 작성 화면과 같은 규칙이다.
   const clearForBoardChange = useCallback((nextBoardId: number) => {
     setSelectedBoardId(nextBoardId);
-    reset();
+    reset(EMPTY_FORM);
     setAttachments([]);
     clearErrors();
   }, [clearErrors, reset]);
@@ -498,31 +511,12 @@ export default function PostEditScreen() {
               accessibilityLabel="게시판 선택"
               accessibilityRole="button"
               accessibilityState={{ expanded: isBoardMenuOpen }}
-              onPress={() => setIsBoardMenuOpen((current) => !current)}
+              onPress={() => { Keyboard.dismiss(); setIsBoardMenuOpen(true); }}
               style={styles.boardSelect}
             >
               <Text numberOfLines={1} style={styles.readOnlyText}>{selectedBoard?.name ?? "게시판 선택"}</Text>
-              <Ionicons name={isBoardMenuOpen ? "chevron-up" : "chevron-down"} size={18} color={COLORS.muted} />
+              <Ionicons name="chevron-down" size={18} color={COLORS.muted} />
             </Pressable>
-            {isBoardMenuOpen ? (
-              <View style={styles.boardMenu}>
-                {resourceBoardOptions.map((option) => {
-                  const selected = option.id === selectedBoardId;
-                  return (
-                    <Pressable
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: selected }}
-                      key={option.id}
-                      onPress={() => selectBoard(option.id)}
-                      style={[styles.boardOption, selected ? styles.boardOptionSelected : null]}
-                    >
-                      <Text style={[styles.boardOptionText, selected ? styles.boardOptionTextSelected : null]}>{option.name}</Text>
-                      {selected ? <Ionicons name="checkmark" size={18} color={COLORS.primary} /> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
           </View>
         ) : isStudyRecruit ? null : (
           <View style={styles.readOnlyField}>
@@ -799,6 +793,15 @@ export default function PostEditScreen() {
           <Text style={styles.submitText}>{updateMutation.isPending || isUploading ? "저장 중" : "완료"}</Text>
         </Pressable>
       </ScrollView>
+      <SelectionSheet
+        visible={isBoardMenuOpen}
+        title="게시판을 선택하세요"
+        options={resourceBoardOptions.map((option) => ({ key: String(option.id), label: option.name }))}
+        emptyText="옮길 수 있는 게시판이 없습니다."
+        selectedKey={String(selectedBoardId)}
+        onClose={() => setIsBoardMenuOpen(false)}
+        onSelect={(option) => selectBoard(Number(option.key))}
+      />
       <DiscardWriteModal
         visible={discardPromptOpen}
         mode="edit"
@@ -902,32 +905,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surface,
     paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  boardMenu: {
-    marginTop: 6,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    backgroundColor: COLORS.surface,
-  },
-  boardOption: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-  },
-  boardOptionSelected: {
-    backgroundColor: "#EDF2FE",
-  },
-  boardOptionText: {
-    color: COLORS.text,
-    fontSize: 14,
-  },
-  boardOptionTextSelected: {
-    color: COLORS.primary,
-    fontWeight: "700",
   },
   // Figma: 작성 화면과 동일한 세그먼트 컨트롤 (46h 트랙 + 38h 옵션)
   statusRow: {

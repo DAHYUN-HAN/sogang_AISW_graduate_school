@@ -19,6 +19,7 @@ import ClubOperationStatusField from "../../../../components/ClubOperationStatus
 import { clubOperationStatus } from "../../../../utils/participationGuide";
 import LoadingState from "../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
+import SelectionSheet, { type SelectionOption } from "../../../../components/SelectionSheet";
 import NoticeModal, { type NoticeModalContent } from "../../../../components/NoticeModal";
 import Toast from "../../../../components/Toast";
 import { MediaImageBackground } from "../../../../components/MediaImage";
@@ -223,49 +224,6 @@ function activitySelectPlaceholder(slug?: string) {
   if (slug?.includes("study")) return "모집글을 선택하세요";
   if (slug?.includes("networking")) return "네트워킹을 선택하세요";
   return "동아리명을 선택하세요";
-}
-
-type SelectionOption = { key: string; label: string };
-
-function SelectionSheet({
-  visible,
-  title,
-  options,
-  emptyText,
-  selectedKey,
-  onClose,
-  onSelect,
-}: {
-  visible: boolean;
-  title: string;
-  options: SelectionOption[];
-  emptyText: string;
-  selectedKey?: string;
-  onClose: () => void;
-  onSelect: (option: SelectionOption) => void;
-}) {
-  return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={styles.sheetBackdrop}>
-        <Pressable onPress={() => undefined} style={styles.sheetCard}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{title}</Text>
-          <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-            {options.length === 0 ? <Text style={styles.sheetEmpty}>{emptyText}</Text> : null}
-            {options.map((option) => {
-              const active = option.key === selectedKey;
-              return (
-                <Pressable key={option.key} onPress={() => onSelect(option)} style={styles.sheetOption}>
-                  <Text style={[styles.sheetOptionText, active ? styles.sheetOptionTextActive : null]}>{option.label}</Text>
-                  {active ? <Ionicons name="checkmark" size={16} color={COLORS.primary} /> : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
 }
 
 const CAL_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -2386,63 +2344,6 @@ const styles = StyleSheet.create({
   },
   recruitmentStatusTextDisabled: {
     color: COLORS.subtle,
-  },
-  sheetBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    backgroundColor: "rgba(17, 24, 39, 0.42)",
-  },
-  sheetCard: {
-    width: "100%",
-    maxWidth: 405,
-    maxHeight: "70%",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    backgroundColor: COLORS.bg,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 28,
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    alignSelf: "center",
-    borderRadius: 2,
-    backgroundColor: "#C7CCD4",
-    marginBottom: 16,
-  },
-  sheetTitle: {
-    color: COLORS.text,
-    fontSize: 17,
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  sheetEmpty: {
-    color: COLORS.muted,
-    fontSize: 14,
-    fontWeight: "700",
-    paddingVertical: 24,
-  },
-  sheetOption: {
-    minHeight: 50,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EAECEF",
-  },
-  sheetOptionText: {
-    flex: 1,
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "400",
-  },
-  sheetOptionTextActive: {
-    color: COLORS.primary,
-    fontWeight: "500",
   },
   activityPhotoBox: {
     height: 200,

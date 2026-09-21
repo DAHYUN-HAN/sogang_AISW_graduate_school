@@ -43,12 +43,32 @@ test("수정 화면은 늘 물어본다", () => {
 
 test("수정 화면도 변경을 누르면 작성 화면처럼 내용을 비운다", () => {
   assert.match(editSource, /const clearForBoardChange = useCallback\(\(nextBoardId: number\) => \{/);
-  for (const call of ["setSelectedBoardId(nextBoardId)", "reset()", "setAttachments([])", "clearErrors()"]) {
+  for (const call of ["setSelectedBoardId(nextBoardId)", "reset(EMPTY_FORM)", "setAttachments([])", "clearErrors()"]) {
     assert.ok(editSource.includes(call), `${call} 누락`);
   }
   assert.match(editSource, /if \(pendingBoardId !== null\) clearForBoardChange\(pendingBoardId\);/);
   // 저장된 글로 되돌리던 예전 동작은 남기지 않는다.
   assert.doesNotMatch(editSource, /hydrateFromPost\(\);\s*setSelectedBoardId\(pendingBoardId\)/);
+});
+
+test("비울 때는 빈 값을 직접 넘긴다", () => {
+  // reset(values)는 그 값을 새 기본값으로 삼는다. 저장된 글을 채운 뒤에
+  // 인자 없는 reset()을 부르면 빈 폼이 아니라 그 글로 되돌아간다.
+  assert.match(editSource, /const EMPTY_FORM: FormValues = \{/);
+  assert.match(editSource, /defaultValues: EMPTY_FORM,/);
+  assert.doesNotMatch(editSource, /^\s+reset\(\);$/m);
+});
+
+test("수정 화면의 게시판 선택도 아래에서 올라오는 시트를 쓴다", () => {
+  // 작성 화면과 같은 컴포넌트를 쓴다. 각자 그리면 모양이 갈라진다.
+  assert.match(editSource, /import SelectionSheet from "\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/components\/SelectionSheet"/);
+  assert.match(editSource, /<SelectionSheet\s+visible=\{isBoardMenuOpen\}/);
+  assert.match(createSource, /import SelectionSheet, \{ type SelectionOption \} from "\.\.\/\.\.\/\.\.\/\.\.\/components\/SelectionSheet"/);
+  // 칸 아래 펼치던 옛 목록은 남기지 않는다.
+  assert.doesNotMatch(editSource, /styles\.boardMenu/);
+  assert.doesNotMatch(editSource, /styles\.boardOption/);
+  // 시트를 쓰므로 트리거 화살표는 늘 아래를 본다.
+  assert.doesNotMatch(editSource, /isBoardMenuOpen \? "chevron-up"/);
 });
 
 test("나갈 때 확인은 내용·첨부와 게시판 이동을 모두 센다", () => {
