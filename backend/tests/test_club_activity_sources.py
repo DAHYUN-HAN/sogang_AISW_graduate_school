@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pytest
+
 from app.models.board import Board
 from app.models.dues_payer import DuesPayer
 from app.models.media import PostAttachment
@@ -69,6 +71,7 @@ def _setup_club_sources(api) -> dict[str, int]:
         db.commit()
         return {
             "payer": payer.id,
+            "promo_board": promo_board.id,
             "activity_board": activity_board.id,
             "published": published.id,
             "hidden": hidden.id,
@@ -111,6 +114,57 @@ def test_club_activity_create_uses_the_admin_source_title(api) -> None:
         assert post.category == "SG_LLM"
         assert post.metadata_json is not None
         assert post.metadata_json["activity_source_post_id"] == str(source["published"])
+
+
+def test_admin_created_club_is_selectable_and_can_be_used_by_a_member(api) -> None:
+    source = _setup_club_sources(api)
+    guide_payload = {
+        "title": "파인튜닝 (커피)",
+        "content": "관리자가 등록한 신규 동아리",
+        "metadata": {"application_url": "https://example.com/coffee-club"},
+        "attachment_ids": [1],
+    }
+    guide_response = api.client.post(
+        f"/api/boards/{source['promo_board']}/posts",
+        headers=api.headers["admin"],
+        json=guide_payload,
+    )
+    assert guide_response.status_code == 200
+    guide_id = guide_response.json()["data"]["id"]
+
+    for role in ("owner", "admin"):
+        options_response = api.client.get(
+            f"/api/boards/{source['promo_board']}/posts",
+            headers=api.headers[role],
+            params={"status": "published", "sort": "latest"},
+        )
+        assert options_response.status_code == 200
+        options = {post["id"]: post["title"] for post in options_response.json()["data"]}
+        assert options[guide_id] == "파인튜닝 (커피)"
+        assert source["hidden"] not in options
+        assert source["deleted"] not in options
+
+    response = api.client.post(
+        f"/api/boards/{source['activity_board']}/posts",
+        headers=api.headers["owner"],
+        json=_create_payload(source["payer"], str(guide_id)),
+    )
+    assert response.status_code == 200
+    activity_id = response.json()["data"]["id"]
+    detail = api.client.get(f"/api/posts/{activity_id}", headers=api.headers["owner"])
+    assert detail.status_code == 200
+    assert detail.json()["data"]["category"] == "파인튜닝 (커피)"
+    assert detail.json()["data"]["activity_source_title"] == "파인튜닝 (커피)"
+    assert detail.json()["data"]["metadata"]["activity_source_post_id"] == str(guide_id)
+
+    rename = api.client.put(
+        f"/api/posts/{guide_id}",
+        headers=api.headers["admin"],
+        json={**guide_payload, "title": "파인튜닝 커피 연구회"},
+    )
+    assert rename.status_code == 200
+    renamed_detail = api.client.get(f"/api/posts/{activity_id}", headers=api.headers["owner"])
+    assert renamed_detail.json()["data"]["activity_source_title"] == "파인튜닝 커피 연구회"
 
 
 def test_club_activity_create_rejects_missing_malformed_or_inactive_sources(api) -> None:
@@ -203,3 +257,52 @@ def test_club_activity_reads_current_title_and_keeps_retired_history(api) -> Non
         linked = db.get(Post, linked_id)
         assert linked is not None
         assert linked.category == "SG AI Lab"
+
+
+def test_club_operation_end_blocks_new_certifications_but_preserves_existing_edits(api) -> None:
+    source = _setup_club_sources(api)
+    guide_payload = {
+        "title": "파인튜닝 (커피)", "content": "운영 상태 검증",
+        "category": "마감", "attachment_ids": [1],
+        "metadata": {"application_url": "https://example.com/join", "club_operation_status": "active"},
+    }
+    guide = api.client.post(f"/api/boards/{source['promo_board']}/posts", headers=api.headers["admin"], json=guide_payload)
+    assert guide.status_code == 200
+    guide_id = guide.json()["data"]["id"]
+    activity_payload = _create_payload(source["payer"], str(guide_id))
+    created = api.client.post(f"/api/boards/{source['activity_board']}/posts", headers=api.headers["owner"], json=activity_payload)
+    assert created.status_code == 200, "Recruitment closure does not end club operations"
+    activity_id = created.json()["data"]["id"]
+
+    ended = api.client.put(f"/api/posts/{guide_id}", headers=api.headers["admin"], json={
+        **guide_payload, "metadata": {**guide_payload["metadata"], "club_operation_status": "ended"},
+    })
+    assert ended.status_code == 200
+    rejected = api.client.post(f"/api/boards/{source['activity_board']}/posts", headers=api.headers["owner"], json=activity_payload)
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "INVALID_ACTIVITY_SOURCE"
+    edited = api.client.put(f"/api/posts/{activity_id}", headers=api.headers["owner"], json={**activity_payload, "content": "과거 인증 내용 수정"})
+    assert edited.status_code == 200
+
+    legacy_edit = api.client.put(f"/api/posts/{guide_id}", headers=api.headers["admin"], json={
+        **guide_payload, "metadata": {"application_url": "https://example.com/updated"},
+    })
+    assert legacy_edit.status_code == 200
+    detail = api.client.get(f"/api/posts/{guide_id}", headers=api.headers["owner"])
+    assert detail.json()["data"]["metadata"]["club_operation_status"] == "ended"
+
+    resumed = api.client.put(f"/api/posts/{guide_id}", headers=api.headers["admin"], json=guide_payload)
+    assert resumed.status_code == 200
+    reopened = api.client.post(f"/api/boards/{source['activity_board']}/posts", headers=api.headers["owner"], json=activity_payload)
+    assert reopened.status_code == 200
+
+
+@pytest.mark.parametrize("invalid_status", ["closed", "", None, True, {}])
+def test_club_operation_status_rejects_invalid_values(api, invalid_status) -> None:
+    source = _setup_club_sources(api)
+    response = api.client.post(f"/api/boards/{source['promo_board']}/posts", headers=api.headers["admin"], json={
+        "title": "Club", "content": "Invalid operation status", "attachment_ids": [1],
+        "metadata": {"application_url": "https://example.com/join", "club_operation_status": invalid_status},
+    })
+    assert response.status_code == 422
+    assert response.json()["code"] == "INVALID_CLUB_OPERATION_STATUS"

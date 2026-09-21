@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type { PostListItem } from "../types";
 
 import {
   ACTIVITY_PARTICIPANT_GUIDANCE,
-  CURRENT_CLUB_NAMES,
   activityBankAccountFieldState,
   activityCertificationBadgeLabel,
   activityCertificationPreview,
@@ -11,7 +11,6 @@ import {
   activityParticipantsFromMetadata,
   activitySourcePostFilters,
   activityCertificationCardTitle,
-  currentClubActivitySourcePosts,
   loadAllPublishedActivitySourcePosts,
   loadPublishedActivitySourcePosts,
   shouldShowActivityCertificationBadge,
@@ -265,36 +264,6 @@ test("활동 인증의 원본 선택 목록은 공개된 운영진 게시글만 
   assert.deepEqual(activitySourcePostFilters(), { sort: "latest", status: "published" });
 });
 
-test("동아리 활동 인증 선택창은 현재 8개 동아리만 공식 순서로 반환한다", () => {
-  const posts = [
-    { id: 90, title: "예전 볼링 동아리" },
-    { id: 18, title: "파인튜닝 (커피)" },
-    { id: 17, title: "FC리턴윈 (풋살)" },
-    { id: 16, title: "인간지능투자 (주식/코인)" },
-    { id: 15, title: "서강와인 (와인/위스키)" },
-    { id: 14, title: "서뽈링 (볼링)" },
-    { id: 13, title: "서강의 봄(등산)" },
-    { id: 12, title: "알바트로스냅(사진)" },
-    { id: 11, title: "SG_LLM (LLM구축)" },
-  ];
-
-  assert.deepEqual(CURRENT_CLUB_NAMES, [
-    "파인튜닝", "SG_LLM", "알바트로스냅", "서강의 봄", "서뽈링", "서강와인", "인간지능투자", "FC리턴윈",
-  ]);
-  assert.deepEqual(currentClubActivitySourcePosts(posts).map((post) => post.id), [18, 11, 12, 13, 14, 15, 16, 17]);
-});
-
-test("현재 동아리 이름의 경계를 확인하고 최신 글 하나만 선택한다", () => {
-  const posts = [
-    { id: 31, title: "서뽈링 (현재)" },
-    { id: 30, title: "서뽈링 (이전 중복)" },
-    { id: 29, title: "서뽈링연합" },
-    { id: 28, title: "[종료] 서뽈링" },
-  ];
-
-  assert.deepEqual(currentClubActivitySourcePosts(posts), [{ id: 31, title: "서뽈링 (현재)" }]);
-});
-
 test("동아리 원본 글은 실제 pagination 계약을 따라 공개 글의 모든 페이지를 읽는다", async () => {
   const calls: { boardId: number; page: number; size: number; filters?: object }[] = [];
   const pages = new Map([
@@ -372,17 +341,6 @@ test("비어 있는 페이지를 받으면 잘못된 다음 페이지 수와 무
   assert.deepEqual(posts, []);
 });
 
-test("고정된 예전 글보다 created_at이 최신인 중복 글을 선택하고 같은 시각에는 큰 ID를 사용한다", () => {
-  const posts = [
-    { id: 70, title: "서뽈링 (고정된 예전 글)", created_at: "2025-03-01T00:00:00Z", is_pinned: true },
-    { id: 71, title: "서뽈링 (새 안내)", created_at: "2026-08-01T00:00:00Z", is_pinned: false },
-    { id: 80, title: "FC리턴윈 (낮은 ID)", created_at: "2026-08-02T00:00:00Z", is_pinned: true },
-    { id: 81, title: "FC리턴윈 (높은 ID)", created_at: "2026-08-02T00:00:00Z", is_pinned: false },
-  ];
-
-  assert.deepEqual(currentClubActivitySourcePosts(posts).map((post) => post.id), [71, 81]);
-});
-
 test("스터디·네트워킹 원본 선택은 기존처럼 첫 페이지만 조회한다", async () => {
   const calls: number[] = [];
   const posts = await loadPublishedActivitySourcePosts(
@@ -400,4 +358,18 @@ test("스터디·네트워킹 원본 선택은 기존처럼 첫 페이지만 조
 
   assert.deepEqual(calls, [1]);
   assert.deepEqual(posts.map((post) => post.id), [91]);
+});
+
+test("운영 종료만 제외하고 모집 마감·기존 동아리는 모든 페이지에서 선택할 수 있다", async () => {
+  const posts = await loadPublishedActivitySourcePosts<Pick<PostListItem, "id" | "title" | "created_at" | "category" | "metadata">>(9, "club-promo", async (_id, page) => ({
+    status: "success",
+    data: page === 1
+      ? [{ id: 1, title: "운영이 종료된 동아리", created_at: "2026-09-17", category: "모집중", metadata: { club_operation_status: "ended" } }]
+      : [
+          { id: 2, title: "모집 마감 후 활동 중", created_at: "2026-09-16", category: "마감", metadata: { club_operation_status: "active", recruitment_status: "closed" } },
+          { id: 3, title: "설정 전부터 운영 중인 동아리", created_at: "2026-09-15", category: "상시", metadata: {} },
+        ],
+    pagination: { page, size: 2, total: 3, total_pages: 2 },
+  }));
+  assert.deepEqual(posts.map((post) => post.id), [2, 3]);
 });

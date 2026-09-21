@@ -10,6 +10,8 @@ import { z } from "zod";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import LoadingState from "../../../../../components/LoadingState";
+import ClubOperationStatusField from "../../../../../components/ClubOperationStatusField";
+import { clubOperationStatus } from "../../../../../utils/participationGuide";
 import PostAttachmentEditor from "../../../../../components/PostAttachmentEditor";
 import type { MediaAsset } from "../../../../../types";
 import { pickAndUploadImages } from "../../../../../utils/mediaPicker";
@@ -45,6 +47,7 @@ const schema = z.object({
   content: z.string().optional(),
   contact: z.string().optional(),
   applicationUrl: z.string().optional(),
+  clubOperationStatus: z.enum(["active", "ended"]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -87,7 +90,7 @@ export default function PostEditScreen() {
 
   const { control, handleSubmit, reset, setError } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { title: "", category: "", content: "", contact: "", applicationUrl: "" },
+    defaultValues: { title: "", category: "", content: "", contact: "", applicationUrl: "", clubOperationStatus: "active" },
   });
 
   useEffect(() => {
@@ -99,6 +102,7 @@ export default function PostEditScreen() {
       content: post.content,
       contact: typeof post.metadata?.contact === "string" ? post.metadata.contact : "",
       applicationUrl: typeof post.metadata?.application_url === "string" ? post.metadata.application_url : "",
+      clubOperationStatus: clubOperationStatus(post.metadata),
     });
     setAttachments(post.attachments);
     hydratedPostId.current = post.id;
@@ -225,6 +229,7 @@ export default function PostEditScreen() {
             ? {
                 ...(post.metadata ?? {}),
                 application_url: values.applicationUrl?.trim() ?? "",
+                ...(board?.slug === "club-promo" ? { club_operation_status: values.clubOperationStatus } : {}),
               }
           : post.metadata,
         attachment_ids: attachments.map((attachment) => attachment.id),
@@ -421,6 +426,14 @@ export default function PostEditScreen() {
             </View>
           )}
         />
+
+        {board?.slug === "club-promo" ? (
+          <Controller
+            control={control}
+            name="clubOperationStatus"
+            render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} />}
+          />
+        ) : null}
 
         {!isAlbum ? (
           <Controller

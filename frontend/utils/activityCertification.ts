@@ -1,4 +1,5 @@
 import type { ApiSuccess, PostListItem } from "../types";
+import { clubOperationStatus } from "./participationGuide";
 
 export type ActivityParticipant = {
   id: number;
@@ -17,52 +18,7 @@ type ActivityBadgePost = {
 
 const GENERIC_CLUB_ACTIVITY_LABELS = new Set(["동아리 활동 인증", "활동 인증", "안내"]);
 
-export const CURRENT_CLUB_NAMES = [
-  "파인튜닝",
-  "SG_LLM",
-  "알바트로스냅",
-  "서강의 봄",
-  "서뽈링",
-  "서강와인",
-  "인간지능투자",
-  "FC리턴윈",
-] as const;
-
-function normalizedClubSourceTitle(value: string): string {
-  return value.normalize("NFKC").replace(/\s+/g, " ").trim();
-}
-
-function titleMatchesCurrentClub(title: string, clubName: string): boolean {
-  const normalizedTitle = normalizedClubSourceTitle(title);
-  const normalizedName = normalizedClubSourceTitle(clubName);
-  if (!normalizedTitle.startsWith(normalizedName)) return false;
-  const suffix = normalizedTitle.slice(normalizedName.length);
-  return suffix === "" || suffix.startsWith(" ") || suffix.startsWith("(") || suffix.startsWith("（");
-}
-
-export function currentClubActivitySourcePosts<
-  T extends Pick<PostListItem, "id" | "title"> & Partial<Pick<PostListItem, "created_at">>,
->(posts: readonly T[]): T[] {
-  const selected = new Map<string, T>();
-  for (const post of posts) {
-    const clubName = CURRENT_CLUB_NAMES.find((name) => titleMatchesCurrentClub(post.title, name));
-    if (!clubName) continue;
-    const current = selected.get(clubName);
-    const postCreatedAt = post.created_at ? Date.parse(post.created_at) : Number.NEGATIVE_INFINITY;
-    const currentCreatedAt = current?.created_at ? Date.parse(current.created_at) : Number.NEGATIVE_INFINITY;
-    const postTime = Number.isFinite(postCreatedAt) ? postCreatedAt : Number.NEGATIVE_INFINITY;
-    const currentTime = Number.isFinite(currentCreatedAt) ? currentCreatedAt : Number.NEGATIVE_INFINITY;
-    if (!current || postTime > currentTime || (postTime === currentTime && post.id > current.id)) {
-      selected.set(clubName, post);
-    }
-  }
-  return CURRENT_CLUB_NAMES.flatMap((name) => {
-    const post = selected.get(name);
-    return post ? [post] : [];
-  });
-}
-
-type ActivitySourcePost = Pick<PostListItem, "id" | "title" | "created_at">;
+type ActivitySourcePost = Pick<PostListItem, "id" | "title" | "created_at" | "metadata">;
 type ActivitySourcePageLoader<T extends ActivitySourcePost> = (
   boardId: number,
   page: number,
@@ -103,7 +59,8 @@ export async function loadPublishedActivitySourcePosts<T extends ActivitySourceP
   pageSize = 50,
 ): Promise<T[]> {
   if (boardSlug === "club-promo") {
-    return loadAllPublishedActivitySourcePosts(boardId, loadPage, pageSize);
+    const posts = await loadAllPublishedActivitySourcePosts(boardId, loadPage, pageSize);
+    return posts.filter((post) => clubOperationStatus(post.metadata) === "active");
   }
   const response = await loadPage(boardId, 1, pageSize, activitySourcePostFilters());
   return response.data;

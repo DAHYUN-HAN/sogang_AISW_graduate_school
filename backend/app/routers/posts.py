@@ -132,6 +132,8 @@ def _canonical_club_activity_source(
     source = db.scalar(select(Post).join(Board, Board.id == Post.board_id).where(*filters))
     if source is None:
         raise _invalid_activity_source()
+    if source_id != existing_source_id and (source.metadata_json or {}).get("club_operation_status") == "ended":
+        raise _invalid_activity_source()
 
     canonical["activity_source_post_id"] = str(source_id)
     return canonical, source.title
@@ -248,6 +250,13 @@ def _metadata_for_update(
 ) -> dict | None:
     metadata = dict(incoming_metadata or {})
     existing_metadata = dict(post.metadata_json or {})
+    if (
+        board is not None
+        and board.slug == "club-promo"
+        and "club_operation_status" in existing_metadata
+        and "club_operation_status" not in metadata
+    ):
+        metadata["club_operation_status"] = existing_metadata["club_operation_status"]
     if (
         board is not None
         and board.board_type == "activity_certification"
@@ -871,6 +880,14 @@ def _validate_admin_participation_post(board: Board, metadata: dict | None, curr
         return
     if current_user.role != "admin":
         raise AppException(status_code=403, message="Only admins can manage participation guide posts.", code="FORBIDDEN")
+
+    if board.slug == "club-promo" and "club_operation_status" in (metadata or {}):
+        if metadata["club_operation_status"] not in ("active", "ended"):
+            raise AppException(
+                status_code=422,
+                message="Club operation status must be active or ended.",
+                code="INVALID_CLUB_OPERATION_STATUS",
+            )
 
     application_url = str((metadata or {}).get("application_url") or "").strip()
     parsed = urlparse(application_url)

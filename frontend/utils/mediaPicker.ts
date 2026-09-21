@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 
 import { mediaApi } from "../services/api";
 import type { MediaAsset } from "../types";
-import { inferDocumentContentType } from "./documentFiles";
+import { assertAllowedDocumentContentTypes, inferDocumentContentType } from "./documentFiles";
 import { nativeMultiImagePickerOptions, uploadAttachmentBatch } from "./postAttachments";
 import { selectAndUploadProfileImage } from "./profileImagePicker";
 
@@ -89,43 +89,50 @@ function pickLocalFiles({ accept, multiple }: { accept?: string; multiple?: bool
   });
 }
 
-export async function pickAndUploadDocuments(onProgress?: UploadProgress, isPrivate = false, options?: { multiple?: boolean }): Promise<MediaAsset[]> {
+type DocumentUploadOptions = {
+  multiple?: boolean;
+  accept?: string;
+  types?: string | string[];
+};
+
+export async function pickAndUploadDocuments(onProgress?: UploadProgress, isPrivate = false, options?: DocumentUploadOptions): Promise<MediaAsset[]> {
   if (Platform.OS === "web") {
-    const files = await pickLocalFiles({ multiple: options?.multiple ?? true });
+    const files = await pickLocalFiles({ accept: options?.accept, multiple: options?.multiple ?? true });
+    const normalizedFiles = files.map((file) => {
+      const type = inferDocumentContentType(file.name, file.type);
+      return file.type === type
+        ? file
+        : new File([file], file.name, { type, lastModified: file.lastModified });
+    });
+    assertAllowedDocumentContentTypes(normalizedFiles, options?.types);
     return Promise.all(
-      files.map((file) => {
-        const type = inferDocumentContentType(file.name, file.type);
-        const normalizedFile = file.type === type
-          ? file
-          : new File([file], file.name, { type, lastModified: file.lastModified });
-        return uploadPickedFile(normalizedFile, onProgress, isPrivate);
-      })
+      normalizedFiles.map((file) => uploadPickedFile(file, onProgress, isPrivate))
     );
   }
 
   const result = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
     multiple: options?.multiple ?? true,
+    type: options?.types ?? "*/*",
   });
   if (result.canceled) {
     return [];
   }
 
+  const pickedFiles = result.assets.map((asset) => ({
+    uri: asset.uri,
+    name: asset.name || fileNameFromUri(asset.uri, "upload"),
+    type: inferDocumentContentType(
+      asset.name || fileNameFromUri(asset.uri, "upload"),
+      asset.mimeType,
+    ),
+  }));
+  assertAllowedDocumentContentTypes(pickedFiles, options?.types);
+
   const uploaded: MediaAsset[] = [];
-  for (const asset of result.assets) {
+  for (const file of pickedFiles) {
     uploaded.push(
-      await uploadPickedFile(
-        {
-          uri: asset.uri,
-          name: asset.name || fileNameFromUri(asset.uri, "upload"),
-          type: inferDocumentContentType(
-            asset.name || fileNameFromUri(asset.uri, "upload"),
-            asset.mimeType,
-          ),
-        },
-        onProgress,
-        isPrivate
-      )
+      await uploadPickedFile(file, onProgress, isPrivate)
     );
   }
   return uploaded;

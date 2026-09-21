@@ -95,8 +95,9 @@ test("강의후기는 교수명·난이도·만족도가 필수다", () => {
 test("비어 있는 필수 칸은 문구 없이 테두리만 빨갛게 한다", () => {
   // setError의 message가 비어 있어야 칸 아래 문구가 뜨지 않는다.
   assert.match(createSource, /setError\(name, \{ message: "" \}\)/);
-  // 폼 밖의 첨부·증빙은 별도 상태로 테두리를 켠다.
-  assert.match(createSource, /missingRequiredAttachment \? styles\.inputError : null/);
+  // 폼 밖의 첨부는 별도 상태로 테두리를 켠다. 상조회 증빙 링크 칸은 main의
+  // 첨부 에디터 디자인 복원(38ad036)으로 테두리 대상에서 빠졌다.
+  assert.match(createSource, /missingRequiredAttachment \? styles\.borderOnlyError : null/);
 });
 
 test("도달할 수 없던 상조회 날짜 제한 안내를 제거했다", () => {

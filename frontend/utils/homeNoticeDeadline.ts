@@ -8,13 +8,17 @@ function deadlineDayOffset(value?: string | null, now = new Date()): number | nu
   return Math.round((targetDay.getTime() - today.getTime()) / 86_400_000);
 }
 
-export function homeNoticeDeadlineSuffix(value?: string | null, now = new Date()) {
+export function noticeDeadlineLabel(value?: string | null, now = new Date()) {
   const days = deadlineDayOffset(value, now);
-  if (days === null) return "";
+  if (days === null || days < 0) return "";
 
-  if (days < 0) return " · 마감";
-  if (days === 0) return " · 마감 D-day";
-  return ` · 마감 D-${days}`;
+  if (days === 0) return "마감 D-day";
+  return `마감 D-${days}`;
+}
+
+export function homeNoticeDeadlineSuffix(value?: string | null, now = new Date()) {
+  const label = noticeDeadlineLabel(value, now);
+  return label ? ` · ${label}` : "";
 }
 
 export function homeScheduleDdayLabel(value?: string | null, now = new Date()) {

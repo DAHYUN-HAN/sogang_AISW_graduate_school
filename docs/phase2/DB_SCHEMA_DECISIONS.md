@@ -621,3 +621,5 @@ Checked on 2026-08-02: a clean isolated PostgreSQL database upgraded to `0022`, 
 Checked on 2026-08-04: the local backend suite passes 203 tests and Alembic reports the single
 `0024_faq_attachments` head. The `0024` migration has SQLite create/drop regression coverage and
 an isolated PostgreSQL database passed clean upgrade plus `0023`→`0024`→`0023`→`0024` rehearsal.
+
+- 2026-09-17 WP5/WP9: club operational lifecycle uses the existing `posts.metadata` JSONB field on `club-promo` guides: `club_operation_status` is `active` or `ended`, independent of recruitment category/status. Missing legacy values mean active; no table, column, migration, or bulk backfill is required. The API validates explicit writes and preserves the value when older clients omit the key. Existing `activity_source_post_id` links retain historical certification access after operation ends.
