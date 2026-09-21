@@ -1209,10 +1209,12 @@ export default function PostDetailScreen() {
             {comments.length === 0 ? <Text style={styles.emptyComment}>아직 댓글이 없어요. 첫 댓글을 남겨보세요!</Text> : null}
             {comments.map((comment, index) => (
               <Fragment key={comment.id}>
-                {index > 0 ? <View style={styles.commentThreadDivider} /> : null}
+                {/* 스터디 모집 댓글은 Figma에서 구분선 없이 12px 간격으로만 이어진다. */}
+                {index > 0 && !isStudyRecruit ? <View style={styles.commentThreadDivider} /> : null}
               <CommentItem
                 comment={comment}
                 currentUserId={userId}
+                flat={isStudyRecruit}
                 onDelete={handleDeleteComment}
                 onEdit={async (commentId, content) => {
                   try {

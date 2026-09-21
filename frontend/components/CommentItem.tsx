@@ -23,6 +23,8 @@ type Props = {
   reportedTargets?: Record<string, boolean>;
   /** 첫 대댓글은 부모 댓글의 하단 여백(12)까지 더해 20px 아래에 놓인다. */
   isFirstReply?: boolean;
+  /** 스터디 모집처럼 대댓글도 스레드 구분선도 없는 목록. 댓글 하나가 padding-bottom 12만 갖는다. */
+  flat?: boolean;
 };
 
 function formatCommentDate(value: string) {
@@ -39,6 +41,7 @@ export default function CommentItem({
   onReport,
   reportedTargets = {},
   isFirstReply = false,
+  flat = false,
 }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(comment.content);
@@ -56,6 +59,7 @@ export default function CommentItem({
     || actionState.showDelete
     || actionState.showSave
     || actionState.showCancel;
+  const hasReplies = comment.children.length > 0;
 
   const saveEdit = async () => {
     const next = commentEditSubmissionValue(draft, isSaving);
@@ -74,18 +78,28 @@ export default function CommentItem({
   return (
     <View
       style={{
-        marginLeft: depth * 14,
+        // Figma 댓글스레드는 댓글·대댓글을 같은 320px 폭으로 stretch 한다 — 대댓글은 들여쓰지 않고 배경/라운드로 구분한다.
         marginTop: depth > 0 ? (isFirstReply ? 20 : 8) : 0,
         // Figma 대댓글: padding 10/12, radius 10, 배경 #F7F7F5.
-        paddingTop: depth > 0 ? 10 : 16,
-        paddingBottom: depth === 0 ? 28 : 10,
+        paddingTop: depth > 0 ? 10 : flat ? 0 : 16,
+        // 스레드형은 댓글 여백 12 + 스레드 하단 16 = 28. 대댓글이 있으면 12는 첫 대댓글까지의 20에 이미 들어가 있다.
+        // flat(스터디 모집)은 스레드 래퍼가 없어 댓글 여백 12만 남는다.
+        paddingBottom: depth === 0 ? (flat ? 12 : hasReplies ? 16 : 28) : 10,
         paddingHorizontal: depth > 0 ? 12 : 0,
         // 스레드 사이 구분선은 상세 화면이 그린다 — 마지막 댓글 밑에 줄이 남지 않도록 자체 밑줄은 없앤다.
         borderRadius: depth > 0 ? 10 : 0,
         backgroundColor: depth > 0 ? "#F7F7F5" : undefined,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: depth > 0 ? 16 : 27 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          // Figma 작성자 영역: 댓글은 center, 대댓글은 flex-start 정렬.
+          alignItems: depth > 0 ? "flex-start" : "center",
+          justifyContent: "space-between",
+          minHeight: depth > 0 ? 16 : 27,
+        }}
+      >
         <Text style={{ color: "#15171C", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>
           {formatCohortName(comment.author_cohort, comment.author_nickname)}
         </Text>
@@ -130,8 +144,9 @@ export default function CommentItem({
               color: "#15171C",
               fontSize: 13,
               lineHeight: 16,
-              paddingHorizontal: 12,
-              paddingVertical: 10,
+              // Figma 답글수정입력: padding 8/10.
+              paddingHorizontal: 10,
+              paddingVertical: 8,
               textAlignVertical: "top",
             },
             { outlineStyle: "none" } as never,

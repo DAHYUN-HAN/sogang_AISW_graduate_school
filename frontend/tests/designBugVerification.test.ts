@@ -188,14 +188,49 @@ test("댓글 액션행과 저장·취소행은 padding 8/0, gap 16, 라벨 13/16
   assert.doesNotMatch(commentItem, /fontSize: depth > 0 \? 13 : 12/);
 });
 
-test("댓글 수정 입력은 1.3px 파란 테두리에 13\/16 본문과 10\/12 여백을 쓴다", () => {
+test("댓글 수정 입력은 1.3px 파란 테두리에 13\/16 본문과 8\/10 여백을 쓴다", () => {
   const commentItem = source("components/CommentItem.tsx");
   assert.match(commentItem, /borderWidth: 1\.3,\s*\n\s*borderColor: "#2761FF"/);
-  assert.match(commentItem, /fontSize: 13,\s*\n\s*lineHeight: 16,\s*\n\s*paddingHorizontal: 12,\s*\n\s*paddingVertical: 10,/);
+  // Figma 답글수정입력: padding 8px 10px.
+  assert.match(commentItem, /fontSize: 13,\s*\n\s*lineHeight: 16,[\s\S]{0,120}paddingHorizontal: 10,\s*\n\s*paddingVertical: 8,/);
+});
+
+test("대댓글은 들여쓰기 없이 320px 폭을 채우고 배경·라운드로만 구분된다", () => {
+  const commentItem = source("components/CommentItem.tsx");
+  // Figma 댓글스레드: 댓글도 대댓글도 align-self stretch — 좌측 들여쓰기가 없다.
+  assert.doesNotMatch(commentItem, /marginLeft: depth \* \d+/);
+  assert.match(commentItem, /borderRadius: depth > 0 \? 10 : 0/);
+  assert.match(commentItem, /backgroundColor: depth > 0 \? "#F7F7F5" : undefined/);
+  assert.match(commentItem, /alignItems: depth > 0 \? "flex-start" : "center"/);
+});
+
+test("스레드 하단 여백은 대댓글 유무에 따라 28\/16으로 갈린다", () => {
+  const commentItem = source("components/CommentItem.tsx");
+  // 댓글 여백 12 + 스레드 하단 16 = 28. 대댓글이 있으면 12는 첫 대댓글까지의 20에 이미 포함된다.
+  assert.match(commentItem, /const hasReplies = comment\.children\.length > 0;/);
+  assert.match(commentItem, /paddingBottom: depth === 0 \? \(flat \? 12 : hasReplies \? 16 : 28\) : 10/);
+  assert.match(commentItem, /marginTop: depth > 0 \? \(isFirstReply \? 20 : 8\) : 0/);
 });
 
 test("본문 반응행의 댓글 수를 누르면 하단 댓글 입력창에 커서가 간다", () => {
   const detail = source("app/(tabs)/board/post/[postId].tsx");
   assert.match(detail, /accessibilityLabel="댓글 쓰기"[\s\S]{0,260}commentInputRef\.current\?\.focus\(\)/);
   assert.doesNotMatch(detail, /<View style=\{styles\.iconAction\}>\s*\n\s*<Ionicons name="chatbubble-outline"/);
+});
+
+test("스터디 모집 댓글은 구분선 없이 12px 간격으로만 이어진다", () => {
+  // Figma 스터디 모집 본문: 댓글 = padding 0 0 12, gap 4, height 80 (27 + 4 + 20 + 4 + 13 + 12).
+  // 일반 게시판의 댓글스레드(padding 16/0 + 구분선)와 달리 스레드 래퍼가 없다.
+  assert.match(postDetailSource, /index > 0 && !isStudyRecruit \? <View style=\{styles\.commentThreadDivider\} \/> : null/);
+  assert.match(postDetailSource, /flat=\{isStudyRecruit\}/);
+  const commentItem = source("components/CommentItem.tsx");
+  assert.match(commentItem, /paddingTop: depth > 0 \? 10 : flat \? 0 : 16/);
+  assert.match(commentItem, /paddingBottom: depth === 0 \? \(flat \? 12 : hasReplies \? 16 : 28\) : 10/);
+});
+
+test("스터디 모집 댓글에는 답글을 제공하지 않는다", () => {
+  // 운영 정책: 스터디 모집만 대댓글을 막는다. onReply가 없으면 CommentItem이 답글 버튼을 숨긴다.
+  assert.match(postDetailSource, /onReply=\{\s*\n\s*isStudyRecruit\s*\n\s*\? undefined/);
+  assert.match(postDetailSource, /: \(comment\) => \{[\s\S]{0,240}createReplyTarget\(comment\)/);
+  assert.match(source("components/CommentItem.tsx"), /actionState\.showReply && onReply \?/);
 });
