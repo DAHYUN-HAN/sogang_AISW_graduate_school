@@ -34,7 +34,7 @@ import {
 } from "../../../utils/councilIntroductions";
 import { toAbsoluteMediaUrl } from "../../../utils/mediaAccess";
 import { pastCouncilActivitiesFromMetadata } from "../../../utils/pastCouncil";
-import { createPhotoSwipeConfig } from "../../../utils/photoCarouselSwipe";
+import PhotoPager from "../../../components/PhotoPager";
 import {
   boardFeedFooterState,
   boardFeedMode,
@@ -515,18 +515,19 @@ function pastCouncilsFromMetadata(metadata?: Record<string, unknown> | null): Pa
 function PhotoSlider({ photos }: { photos: string[] }) {
   const [index, setIndex] = useState(0);
   const current = Math.min(index, Math.max(photos.length - 1, 0));
-  // 화살표 없이도 좌우로 쓸어 넘길 수 있게 한다. 세로 이동이 더 크면 제스처를
-  // 가져가지 않아 화면 스크롤은 그대로 동작한다.
-  const countRef = useRef(photos.length);
-  countRef.current = photos.length;
-  const swipe = useMemo(
-    () => PanResponder.create(createPhotoSwipeConfig(() => countRef.current, setIndex)),
-    []
-  );
+  // 화살표는 양 끝에서 순환하지만, 쓸어 넘기기는 네이티브 스크롤이라 순환하지 않는다.
+  // 끝에서 더 밀면 제자리로 돌아온다.
+  const step = (delta: number) => setIndex((prev) => (prev + delta + photos.length) % photos.length);
   return (
-    <View {...swipe.panHandlers} style={styles.pastPhotoSlider}>
+    <View style={styles.pastPhotoSlider}>
       {photos.length > 0 ? (
-        <MediaImage media={{ url: photos[current] }} resizeMode="contain" style={styles.pastPhoto} />
+        <PhotoPager
+          index={current}
+          items={photos}
+          itemKey={(url, itemIndex) => `${url}:${itemIndex}`}
+          onIndexChange={setIndex}
+          renderItem={(url) => <MediaImage media={{ url }} resizeMode="contain" style={styles.pastPhoto} />}
+        />
       ) : (
         <LinearGradient colors={["#534AB7", "#AFA9EC"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.pastPhoto} />
       )}
@@ -534,14 +535,14 @@ function PhotoSlider({ photos }: { photos: string[] }) {
         <>
           <Pressable
             accessibilityLabel="이전 사진"
-            onPress={() => setIndex((prev) => (prev - 1 + photos.length) % photos.length)}
+            onPress={() => step(-1)}
             style={[styles.pastPhotoNav, { left: 10 }]}
           >
             <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
           </Pressable>
           <Pressable
             accessibilityLabel="다음 사진"
-            onPress={() => setIndex((prev) => (prev + 1) % photos.length)}
+            onPress={() => step(1)}
             style={[styles.pastPhotoNav, { right: 10 }]}
           >
             <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />

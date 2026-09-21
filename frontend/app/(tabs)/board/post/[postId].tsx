@@ -10,6 +10,7 @@ import ActivityCertificationMediaImage from "../../../../components/ActivityCert
 import LoadingState from "../../../../components/LoadingState";
 import ImageViewerModal from "../../../../components/ImageViewerModal";
 import MediaImage from "../../../../components/MediaImage";
+import PhotoPager from "../../../../components/PhotoPager";
 import NaturalAspectMediaImage from "../../../../components/NaturalAspectMediaImage";
 import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../components/icons";
 import { useBoardsQuery } from "../../../../hooks/useApi";
@@ -44,7 +45,7 @@ import { isAdminUser } from "../../../../utils/permissions";
 import { formatCohortName } from "../../../../utils/userLabel";
 import { activityCertificationBadgeLabel } from "../../../../utils/activityCertification";
 import { activityCertificationDetailHeading } from "../../../../utils/activityDetailPresentation";
-import { activityImageLayoutFromMetadata } from "../../../../utils/activityImageLayout";
+import { activityImageLayoutFromMetadata, resolveActivityImageRule } from "../../../../utils/activityImageLayout";
 import { createPhotoSwipeConfig } from "../../../../utils/photoCarouselSwipe";
 import { COMMENT_DELETE_COPY } from "../../../../utils/commentPresentation";
 import {
@@ -287,6 +288,17 @@ export default function PostDetailScreen() {
   // 지금처럼 확대 보기가 열리고, 쓸기 시작하면 그 누름이 취소되어 확대 보기가
   // 열리지 않는다. 갤러리가 아닌 화면(공지·참여활동 안내)에서는 0을 넣어 끈다.
   // 훅은 아래 early return보다 먼저 있어야 해서, 개수는 ref로 넘긴다.
+  // 활동인증은 사진 방향에 따라 프레임이 240(가로)/400(세로)으로 갈린다. 넘기는
+  // 동안 높이가 출렁이지 않도록 이 글에서 가장 큰 프레임에 맞춘다. 방향은 사진을
+  // 불러와야 알 수 있어, 각 장이 알려준 높이의 최댓값을 쓴다.
+  const [activityFrameHeight, setActivityFrameHeight] = useState<number | null>(null);
+  const reportActivityFrameHeight = useCallback((height: number) => {
+    setActivityFrameHeight((prev) => (prev === null || height > prev ? height : prev));
+  }, []);
+  useEffect(() => {
+    setActivityFrameHeight(null);
+  }, [postId]);
+
   const gallerySwipeCountRef = useRef(0);
   const gallerySwipe = useMemo(
     () => PanResponder.create(createPhotoSwipeConfig(() => gallerySwipeCountRef.current, setGalleryIndex)),
@@ -503,8 +515,15 @@ export default function PostDetailScreen() {
   const galleryTotal = Math.max(imageAttachments.length, 1);
   const isPhotoAlbum = board?.board_type === "album";
   const hasVisualHero = board?.board_type === "album" || isActivityCertification || isCouncilActivityEntry;
-  // 갤러리가 있는 화면에서만 스와이프를 켠다.
-  gallerySwipeCountRef.current = hasVisualHero ? imageAttachments.length : 0;
+  // 사진첩·활동인증은 PhotoPager가 네이티브 스크롤로 처리하므로 여기서는 끈다.
+  // 원우회 활동만 사진 원래 비율로 보여 주는 디자인이라 아직 PanResponder를 쓴다.
+  const usesPhotoPager = isPhotoAlbum || isActivityCertification;
+  gallerySwipeCountRef.current = hasVisualHero && !usesPhotoPager ? imageAttachments.length : 0;
+  // 페이저는 모든 페이지가 같은 높이여야 한다. 활동인증은 이 글에서 가장 큰
+  // 프레임에 맞추고, 아직 모를 때는 기본 규칙 높이로 시작한다.
+  const activityPagerHeight = activityFrameHeight
+    ?? resolveActivityImageRule(activityImageLayout, "default").height
+    ?? undefined;
   const heroImagePresentation = postDetailImagePresentation({
     placement: "hero",
     boardType: board?.board_type,
@@ -728,9 +747,54 @@ export default function PostDetailScreen() {
         style={[
           hasNaturalHero ? styles.visualHeroNatural : styles.visualHero,
           isPhotoAlbum ? styles.visualHeroAlbum : null,
+          isActivityCertification && imageAttachments.length > 0 && activityPagerHeight !== undefined
+            ? { height: activityPagerHeight }
+            : null,
         ]}
       >
-        {heroAttachment ? (
+        {isPhotoAlbum && imageAttachments.length > 0 ? (
+          // 사진첩은 높이가 240으로 고정이라 페이지마다 높이가 같다. 그래서 네이티브
+          // 가로 스크롤 페이징을 쓸 수 있고, 손가락을 따라 사진이 밀린다.
+          <PhotoPager
+            index={normalizedGalleryIndex}
+            items={imageAttachments}
+            itemKey={(attachment) => String(attachment.id)}
+            onIndexChange={setGalleryIndex}
+            renderItem={(attachment, itemIndex) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${itemIndex + 1}번째 사진 크게 보기`}
+                onPress={() => setViewerIndex(itemIndex)}
+                style={styles.albumPage}
+              >
+                <MediaImage media={attachment} resizeMode="contain" style={styles.visualHeroImage} />
+              </Pressable>
+            )}
+          />
+        ) : isActivityCertification && imageAttachments.length > 0 ? (
+          // 활동인증도 고정 프레임 안에 사진이 들어가는 디자인이라 사진첩과 같은
+          // 방식으로 넘긴다. 프레임 높이만 이 글 기준으로 맞춰 준다.
+          <PhotoPager
+            index={normalizedGalleryIndex}
+            items={imageAttachments}
+            itemKey={(attachment) => String(attachment.id)}
+            onIndexChange={setGalleryIndex}
+            renderItem={(attachment, itemIndex) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${itemIndex + 1}번째 사진 크게 보기`}
+                onPress={() => setViewerIndex(itemIndex)}
+                style={styles.albumPage}
+              >
+                <ActivityCertificationMediaImage
+                  layout={activityImageLayout}
+                  media={attachment}
+                  onFrameHeight={reportActivityFrameHeight}
+                />
+              </Pressable>
+            )}
+          />
+        ) : heroAttachment ? (
           <Pressable disabled={isNotice} accessibilityRole={isNotice ? undefined : "button"}
             accessibilityLabel={isNotice ? undefined : `${normalizedGalleryIndex + 1}번째 사진 크게 보기`}
             onPress={() => setViewerIndex(normalizedGalleryIndex)}
@@ -1848,6 +1912,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEF2F7",
   },
   visualHeroImage: {
+    width: "100%",
+    height: "100%",
+  },
+  // 사진첩 페이저의 한 장. 페이지 크기를 그대로 채운다.
+  albumPage: {
     width: "100%",
     height: "100%",
   },

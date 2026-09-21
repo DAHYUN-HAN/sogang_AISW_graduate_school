@@ -12,21 +12,36 @@
 export const PHOTO_SWIPE_CLAIM_DX = 8;
 export const PHOTO_SWIPE_MIN_DX = 48;
 
+// 사진은 달력처럼 끌어서 넘기기보다 툭 튕겨서(flick) 넘기는 동작이 자연스럽다.
+// 거리만 보면 짧고 빠른 플릭이 무시되어 "잘 안 넘어간다"가 된다. 그래서 거리와
+// 속도 중 하나만 넘어도 넘긴다.
+// - MIN_VX: px/ms. 0.3이면 1초에 300px 정도로, 의도한 플릭에서는 쉽게 넘는다.
+// - FLICK_MIN_DX: 속도로 넘길 때도 최소한 이만큼은 움직여야 한다. 손가락을 떼는
+//   순간의 미세한 튐으로 사진이 바뀌는 걸 막는다.
+export const PHOTO_SWIPE_MIN_VX = 0.3;
+export const PHOTO_SWIPE_FLICK_MIN_DX = 16;
+
 export function shouldClaimPhotoSwipe(dx: number, dy: number) {
   return Math.abs(dx) > PHOTO_SWIPE_CLAIM_DX && Math.abs(dx) > Math.abs(dy) * 2;
 }
 
 // 화살표 버튼과 같게 양 끝에서 순환한다. 넘길 수 없으면 현재 값을 그대로 돌려준다.
-export function photoIndexAfterSwipe(index: number, count: number, dx: number) {
-  if (count < 2 || Math.abs(dx) < PHOTO_SWIPE_MIN_DX) return index;
+export function photoIndexAfterSwipe(index: number, count: number, dx: number, vx = 0) {
+  if (count < 2) return index;
+  const farEnough = Math.abs(dx) >= PHOTO_SWIPE_MIN_DX;
+  const fastEnough = Math.abs(vx) >= PHOTO_SWIPE_MIN_VX && Math.abs(dx) >= PHOTO_SWIPE_FLICK_MIN_DX;
+  if (!farEnough && !fastEnough) return index;
+  // 방향은 움직인 거리로 정한다. 거리가 0이면 속도 부호를 쓴다.
+  const direction = (dx !== 0 ? dx : vx) < 0 ? 1 : -1;
   const bounded = Math.min(Math.max(index, 0), count - 1);
-  return (bounded + (dx < 0 ? 1 : -1) + count) % count;
+  return (bounded + direction + count) % count;
 }
 
-type SwipeGesture = { dx: number; dy: number };
+type SwipeGesture = { dx: number; dy: number; vx?: number };
 
 export type PhotoSwipeConfig = {
   onMoveShouldSetPanResponder: (event: unknown, gesture: SwipeGesture) => boolean;
+  onPanResponderTerminationRequest: () => boolean;
   onPanResponderRelease: (event: unknown, gesture: SwipeGesture) => void;
 };
 
@@ -54,8 +69,13 @@ export function createPhotoSwipeConfig(
       claimedDx = gesture.dx;
       return true;
     },
+    // 기본값은 true라, 가로 스와이프를 가져간 뒤에도 바깥 세로 ScrollView가 도로
+    // 가져갈 수 있다. 그러면 release가 불리지 않아 그 스와이프가 통째로 사라진다
+    // (PanResponder.js `onResponderTerminationRequest`). 한 번 가져왔으면 놓지 않는다.
+    onPanResponderTerminationRequest: () => false,
     onPanResponderRelease: (_event, gesture) => {
-      setIndex((prev) => photoIndexAfterSwipe(prev, getCount(), claimedDx + gesture.dx));
+      // vx는 grant에서 되돌리지 않으므로 그대로 쓴다.
+      setIndex((prev) => photoIndexAfterSwipe(prev, getCount(), claimedDx + gesture.dx, gesture.vx ?? 0));
     },
   };
 }
