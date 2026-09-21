@@ -73,16 +73,17 @@ export default function CommentItem({
       style={{
         marginLeft: depth * 14,
         marginTop: depth > 0 ? 8 : 0,
-        paddingTop: 12,
-        paddingBottom: depth === 0 ? 16 : 12,
+        // Figma 대댓글: padding 10/12, radius 10, 배경 #F7F7F5.
+        paddingTop: depth > 0 ? 10 : 12,
+        paddingBottom: depth === 0 ? 16 : 10,
         paddingHorizontal: depth > 0 ? 12 : 0,
         // 스레드 사이 구분선은 상세 화면이 그린다 — 마지막 댓글 밑에 줄이 남지 않도록 자체 밑줄은 없앤다.
-        borderRadius: depth > 0 ? 8 : 0,
-        backgroundColor: depth > 0 ? "#F7F7F8" : undefined,
+        borderRadius: depth > 0 ? 10 : 0,
+        backgroundColor: depth > 0 ? "#F7F7F5" : undefined,
       }}
     >
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: depth > 0 ? 16 : 27 }}>
-        <Text style={{ color: "#15171C", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>
+        <Text style={{ color: "#15171C", fontSize: depth > 0 ? 13 : 14, fontWeight: "500", lineHeight: depth > 0 ? 16 : 17 }}>
           {formatCohortName(comment.author_cohort, comment.author_nickname)}
         </Text>
         {actionState.showReport ? (
@@ -98,7 +99,8 @@ export default function CommentItem({
             <Text
               style={{
                 color: actionState.reportAction === "none" ? "#15803D" : "#A6ACB7",
-                fontSize: 11,
+                fontSize: depth > 0 ? 11 : 12,
+                lineHeight: depth > 0 ? 13 : 15,
                 fontWeight: "400",
               }}
             >
@@ -123,8 +125,8 @@ export default function CommentItem({
               borderRadius: 8,
               backgroundColor: "#FFFFFF",
               color: "#15171C",
-              fontSize: 13,
-              lineHeight: 16,
+              fontSize: 14,
+              lineHeight: 20,
               paddingHorizontal: depth > 0 ? 10 : 12,
               paddingVertical: depth > 0 ? 8 : 10,
               textAlignVertical: "top",
@@ -134,7 +136,7 @@ export default function CommentItem({
           value={draft}
         />
       ) : (
-        <Text style={{ marginTop: 4, color: "#6B7280", fontSize: 13, lineHeight: depth > 0 ? 16 : 20 }}>
+        <Text style={{ marginTop: 4, color: "#6B7280", fontSize: depth > 0 ? 13 : 14, lineHeight: depth > 0 ? 16 : 22 }}>
           {comment.content}
         </Text>
       )}
@@ -143,8 +145,8 @@ export default function CommentItem({
         style={{
           marginTop: 4,
           color: "#A6ACB7",
-          fontSize: 11,
-          lineHeight: 13,
+          fontSize: depth > 0 ? 11 : 12,
+          lineHeight: depth > 0 ? 13 : 14,
           alignSelf: "flex-start",
         }}
       >
@@ -152,16 +154,16 @@ export default function CommentItem({
       </Text>
 
       {hasActionRow ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: depth > 0 ? 16 : 10, marginTop: 4, paddingVertical: depth > 0 ? 8 : 0 }}>
           {actionState.showReply && onReply ? (
             <Pressable onPress={() => onReply(comment)}>
-              <Text style={{ color: "#2761FF", fontSize: 11, fontWeight: "500", lineHeight: 13 }}>답글</Text>
+              <Text style={{ color: "#2761FF", fontSize: depth > 0 ? 13 : 12, fontWeight: "500", lineHeight: depth > 0 ? 16 : 15 }}>답글</Text>
             </Pressable>
           ) : null}
 
           {actionState.showSave ? (
             <Pressable disabled={isSaving} onPress={saveEdit}>
-              <Text style={{ color: "#2761FF", fontSize: depth > 0 ? 11 : 12, fontWeight: "500", lineHeight: depth > 0 ? 13 : 15 }}>
+              <Text style={{ color: "#2761FF", fontSize: depth > 0 ? 13 : 12, fontWeight: "500", lineHeight: depth > 0 ? 16 : 15 }}>
                 {isSaving ? "저장 중" : "저장"}
               </Text>
             </Pressable>
@@ -175,7 +177,7 @@ export default function CommentItem({
                 setIsEditing(false);
               }}
             >
-              <Text style={{ color: "#A6ACB7", fontSize: depth > 0 ? 11 : 12, fontWeight: "500", lineHeight: depth > 0 ? 13 : 15 }}>취소</Text>
+              <Text style={{ color: "#A6ACB7", fontSize: depth > 0 ? 13 : 12, fontWeight: "500", lineHeight: depth > 0 ? 16 : 15 }}>취소</Text>
             </Pressable>
           ) : null}
 
@@ -186,13 +188,13 @@ export default function CommentItem({
                 setIsEditing(true);
               }}
             >
-              <Text style={{ color: "#A6ACB7", fontSize: 11, fontWeight: "500", lineHeight: 13 }}>수정</Text>
+              <Text style={{ color: "#A6ACB7", fontSize: depth > 0 ? 13 : 12, fontWeight: "500", lineHeight: depth > 0 ? 16 : 15 }}>수정</Text>
             </Pressable>
           ) : null}
 
           {actionState.showDelete ? (
             <Pressable onPress={() => onDelete?.(comment.id)}>
-              <Text style={{ color: "#D64545", fontSize: 11, fontWeight: "500", lineHeight: 13 }}>삭제</Text>
+              <Text style={{ color: "#D64545", fontSize: depth > 0 ? 13 : 12, fontWeight: "500", lineHeight: depth > 0 ? 16 : 15 }}>삭제</Text>
             </Pressable>
           ) : null}
         </View>

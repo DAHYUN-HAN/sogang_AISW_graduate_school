@@ -5,6 +5,7 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 
 import * as navigation from "../utils/myPageNavigation";
+import * as userLabel from "../utils/userLabel";
 
 type Element = { type: string; props: Record<string, unknown> };
 type Context = { openDrawer: () => void; closeDrawer: () => void; returnToDrawer: () => void;
@@ -73,7 +74,8 @@ function harness(origin = "/home") {
     "../stores/userStore": { useUserStore: (select: (state: object) => unknown) => select({ isAuthenticated: true }) },
     "../services/api": {}, "../utils/pushTokenStorage": {},
     "../utils/myPageNavigation": navigation,
-    "./ProfileAvatar": { default: "Avatar" }, "./icons": { BackIcon: "BackIcon" },
+    "../utils/userLabel": userLabel,
+    "./ProfileAvatar": { default: "Avatar" }, "./icons": { BackIcon: "BackIcon", ChevronRightIcon: "ChevronRightIcon" },
     "./MyPageDrawerOverlay": { default: "Overlay" },
   };
   const exports = {} as { MyPageDrawerProvider: (props: object) => Element };
