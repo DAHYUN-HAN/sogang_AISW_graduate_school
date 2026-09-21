@@ -1074,7 +1074,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               control={control}
               name="category"
               render={({ field, fieldState }) => (
-                <Pressable onPress={() => setSelectionSheet("activity")} style={[styles.activitySelect, fieldState.error ? styles.inputError : null]}>
+                <Pressable onPress={() => { Keyboard.dismiss(); setSelectionSheet("activity"); }} style={[styles.activitySelect, fieldState.error ? styles.inputError : null]}>
                   <Text style={[styles.activitySelectValue, !field.value ? styles.activitySelectPlaceholder : null]}>
                     {field.value || activitySelectPlaceholder(board?.slug)}
                   </Text>
@@ -1144,7 +1144,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                     accessibilityHint="달력에서 실제 활동 날짜를 선택합니다"
                     accessibilityLabel="활동일 선택"
                     accessibilityRole="button"
-                    onPress={() => setDatePickerOpen((open) => !open)}
+                    onPress={() => { Keyboard.dismiss(); setDatePickerOpen((open) => !open); }}
                     style={[styles.activityInputWithIcon, fieldState.error ? styles.inputError : null]}
                   >
                     <Text style={styles.activityDateValue}>{field.value ? formatBoardDate(field.value) : "활동일을 선택하세요"}</Text>
@@ -1268,7 +1268,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         {canPickBoard ? (
           <View style={styles.boardSelectWrap}>
             <Pressable
-              onPress={() => setSelectionSheet(selectionSheet === "board" ? null : "board")}
+              onPress={() => { Keyboard.dismiss(); setSelectionSheet(selectionSheet === "board" ? null : "board"); }}
               style={styles.selectLike}
             >
               <Text style={[styles.selectText, !board ? styles.selectPlaceholder : null]} numberOfLines={1}>
@@ -1442,7 +1442,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           render={({ field, fieldState }) => (
             <FormField label={compactCreate ? "" : labels.category} requiredStar={isMutualAid} helper={isSuggestion ? "운영, 행사, 시설 등 필요한 경우만 입력하세요." : undefined}>
               {isMutualAid ? (
-                <Pressable onPress={() => setSelectionSheet("mutualType")} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
+                <Pressable onPress={() => { Keyboard.dismiss(); setSelectionSheet("mutualType"); }} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>{field.value || labels.categoryPlaceholder}</Text>
                   <Ionicons name="chevron-down" size={17} color={COLORS.subtle} />
                 </Pressable>
@@ -1557,7 +1557,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             name="eventDate"
             render={({ field, fieldState }) => (
               <FormField error={fieldState.error?.message} label="날짜" requiredStar>
-                <Pressable onPress={() => setDatePickerOpen((open) => !open)} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
+                <Pressable onPress={() => { Keyboard.dismiss(); setDatePickerOpen((open) => !open); }} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>
                     {field.value ? formatBoardDate(field.value) : "경조사 날짜를 선택하세요"}
                   </Text>
@@ -1582,7 +1582,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             name="relation"
             render={({ field, fieldState }) => (
               <FormField label="관계" requiredStar>
-                <Pressable onPress={() => setSelectionSheet("mutualRelation")} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
+                <Pressable onPress={() => { Keyboard.dismiss(); setSelectionSheet("mutualRelation"); }} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>
                     {field.value || "본인 / 배우자 / 부모 등 선택"}
                   </Text>
