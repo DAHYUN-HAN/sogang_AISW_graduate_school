@@ -30,9 +30,11 @@ test("resource edit exposes existing mixed attachments and writes the user's rem
     board: { board_type: "resource", category: "resources", write_permission: "user" },
     attachments, PostAttachmentEditor: "AttachmentEditor", updateMutation: { isPending: false },
     setAttachments: (next: typeof attachments) => { attachments = next; }, setIsUploading: () => {},
+    showUploadFailure: () => {},
     element: (type: string, props: Record<string, unknown>) => ({ type, props }),
   });
   assert.ok(rendered, "Resource edits must render an attachment editor");
+  assert.equal(typeof rendered.props.onError, "function", "Upload and open failures reach the screen's toast/modal");
   assert.equal(rendered.type, "AttachmentEditor");
   assert.deepEqual(rendered.props.attachments.map((item: { id: number }) => item.id), [12, 34]);
   rendered.props.onChange([attachments[1]]);

@@ -12,7 +12,11 @@ import { usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import LoadingState from "../../../../../components/LoadingState";
 import ClubOperationStatusField from "../../../../../components/ClubOperationStatusField";
 import { clubOperationStatus } from "../../../../../utils/participationGuide";
+import NoticeModal, { type NoticeModalContent } from "../../../../../components/NoticeModal";
 import PostAttachmentEditor from "../../../../../components/PostAttachmentEditor";
+import Toast from "../../../../../components/Toast";
+import { nextToastState, type ToastState } from "../../../../../utils/toast";
+import { uploadFailureFeedback } from "../../../../../utils/uploadFeedback";
 import type { MediaAsset } from "../../../../../types";
 import { pickAndUploadImages } from "../../../../../utils/mediaPicker";
 import {
@@ -87,6 +91,16 @@ export default function PostEditScreen() {
   } = participationGuideImageSections(attachments);
   const albumImageSelectionLimit = postImageSelectionLimit(board?.board_type, attachments.length);
   const isAlbumImageLimitReached = isAlbum && albumImageSelectionLimit === 0;
+
+  const [toast, setToast] = useState<ToastState>(null);
+  const [notice, setNotice] = useState<NoticeModalContent | null>(null);
+  // 작성 화면과 같은 규칙으로 업로드 실패를 나눠 보여준다.
+  const showUploadFailure = useCallback((error: unknown) => {
+    const feedback = uploadFailureFeedback(error);
+    if (feedback.kind === "modal") setNotice(feedback.notice);
+    else setToast((current) => nextToastState(current, feedback.message));
+  }, []);
+  const hideToast = useCallback(() => setToast(null), []);
 
   const { control, handleSubmit, reset, setError } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -589,7 +603,7 @@ export default function PostEditScreen() {
             {uploadNotice ? <Text style={styles.errorText}>{uploadNotice}</Text> : null}
           </>
         ) : isResourceEdit || board?.category === "community" ? (
-          <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} disabled={updateMutation.isPending} />
+          <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} onError={showUploadFailure} disabled={updateMutation.isPending} />
         ) : null}
 
         <Pressable
@@ -601,6 +615,8 @@ export default function PostEditScreen() {
           <Text style={styles.submitText}>{updateMutation.isPending || isUploading ? "저장 중" : "완료"}</Text>
         </Pressable>
       </ScrollView>
+      <NoticeModal notice={notice} onClose={() => setNotice(null)} />
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }

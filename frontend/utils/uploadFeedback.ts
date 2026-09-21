@@ -41,18 +41,28 @@ function codeOf(error: unknown): string | undefined {
 }
 
 /**
+ * 올리기 전에 앱이 직접 막은 경우. 서버 응답이 없으므로 코드를 메시지에서 읽는다.
+ * 파일명을 붙여 던지므로 앞부분만 본다.
+ */
+function localCodeOf(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  return error.message.split(":")[0];
+}
+
+/**
  * 업로드 중 발생한 오류를 화면 표시로 옮긴다.
  * `imagesOnly`는 사진만 받는 자리인지로, 형식 안내 문구가 달라진다.
  */
 export function uploadFailureFeedback(error: unknown, imagesOnly = false): UploadFeedback {
   const status = statusOf(error);
+  const localCode = localCodeOf(error);
   if (status === 429 || codeOf(error) === "RATE_LIMITED") {
     return { kind: "modal", notice: RATE_LIMIT_NOTICE };
   }
-  if (status === 413 || codeOf(error) === "FILE_TOO_LARGE") {
+  if (status === 413 || codeOf(error) === "FILE_TOO_LARGE" || localCode === "FILE_TOO_LARGE") {
     return { kind: "toast", message: UPLOAD_TOAST_MESSAGES.size };
   }
-  if (status === 415) {
+  if (status === 415 || localCode === "UNSUPPORTED_DOCUMENT_TYPE") {
     return {
       kind: "toast",
       message: imagesOnly ? UPLOAD_TOAST_MESSAGES.imageFormat : UPLOAD_TOAST_MESSAGES.fileFormat,

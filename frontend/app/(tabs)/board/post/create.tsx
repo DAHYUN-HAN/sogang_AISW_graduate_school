@@ -1786,7 +1786,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       ) : null}
 
       {isStudyRecruit || isSuggestion || isMutualAid ? null : compactCreate && !isAlbum && !isAdminParticipationPost ? (
-        <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} disabled={createMutation.isPending || updateMutation.isPending} />
+        <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} onError={showUploadFailure} disabled={createMutation.isPending || updateMutation.isPending} />
       ) : compactCreate ? (
         <View style={styles.compactAttachWrap}>
           {!isAdminParticipationPost ? (
