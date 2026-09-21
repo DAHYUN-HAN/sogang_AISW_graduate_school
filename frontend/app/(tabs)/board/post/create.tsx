@@ -2651,6 +2651,9 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   activityWarningText: {
+    // 가로 flex 안의 Text는 RN 기본 flexShrink가 0이라 남은 폭에 맞지 않고
+    // 줄 끝 글자가 배경 밖으로 밀려난다. 다른 안내 박스와 같게 맞춘다.
+    flex: 1,
     color: "#854F0B",
     fontSize: 12,
     fontWeight: "400",
