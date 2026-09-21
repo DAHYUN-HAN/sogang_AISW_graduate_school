@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Keyboard, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Linking, Platform, Pressable, StyleSheet, Text, View, type ViewProps } from "react-native";
 
 import { resolveMediaAccessUrl } from "../hooks/useMediaAccessUrl";
 import type { MediaAsset } from "../types";
@@ -23,9 +23,12 @@ type Props = {
    * uploadFailureFeedback을 쓰는 화면이 정한다.
    */
   onError?: (error: unknown) => void;
+  /** 첨부 영역과 첨부 버튼 행의 위치. 키보드 위로 버튼을 드러내려는 화면이 쓴다. */
+  onLayout?: ViewProps["onLayout"];
+  onActionsLayout?: ViewProps["onLayout"];
 };
 
-export default function PostAttachmentEditor({ attachments, onChange, onUploadingChange, isPrivate = false, disabled = false, title = "첨부파일", onError }: Props) {
+export default function PostAttachmentEditor({ attachments, onChange, onUploadingChange, isPrivate = false, disabled = false, title = "첨부파일", onError, onLayout, onActionsLayout }: Props) {
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<MediaAsset | null>(null);
   const busy = useRef(false);
@@ -117,8 +120,8 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
   }
 
   return (
-    <View style={styles.section}>
-      <View style={styles.addActions}>
+    <View style={styles.section} onLayout={onLayout}>
+      <View style={styles.addActions} onLayout={onActionsLayout}>
         <Pressable accessibilityRole="button" accessibilityLabel="파일 첨부" disabled={unavailable} onPress={() => upload()} style={[styles.add, unavailable && styles.disabled]}>
           <View style={styles.addVisual}>
             <AttachFileIcon size={16} color="#6B7280" />

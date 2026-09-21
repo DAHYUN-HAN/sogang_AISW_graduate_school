@@ -418,6 +418,30 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   // 수정 모드는 기존 글 값이 기준선이 된다. 작성 모드는 빈 문자열로 시작한다.
   const unsavedBaseline = useRef({ attachmentIds: "", participantIds: "", evidenceLink: "" });
   const hydratedPostId = useRef<number | null>(null);
+  // 키보드가 뜨면 입력칸 바로 아래에 붙은 안내문구나 버튼이 가려진다. 드러내야 할
+  // 블록을 기억해 두었다가, 포커스 시점과 키보드 때문에 높이가 줄어드는 시점
+  // (ScrollView onLayout) 양쪽에서 그만큼 스크롤한다.
+  const formScrollRef = useRef<ScrollView>(null);
+  const formScrollHeight = useRef(0);
+  const bankGroupBottom = useRef(0);
+  const attachSectionTop = useRef(0);
+  const attachActionsBottom = useRef(0);
+  const revealTarget = useRef<"end" | "bank" | "attach" | null>(null);
+  const revealFocusedBlock = () => {
+    const target = revealTarget.current;
+    if (!target) return;
+    const bottom = target === "bank"
+      ? bankGroupBottom.current
+      : target === "attach"
+        ? attachSectionTop.current + attachActionsBottom.current
+        : 0;
+    // 드러낼 블록을 모르거나(첨부가 없는 게시판) 아직 재본 적이 없으면 맨 아래까지 내린다.
+    if (bottom <= 0 || formScrollHeight.current <= 0) {
+      formScrollRef.current?.scrollToEnd({ animated: true });
+      return;
+    }
+    formScrollRef.current?.scrollTo({ y: Math.max(0, bottom - formScrollHeight.current + 16), animated: true });
+  };
   const boards = useMemo(() => boardsRes?.data.flatMap((group) => group.boards) ?? [], [boardsRes?.data]);
   const board = useMemo(
     () => boards.find((item) => item.id === boardId),
@@ -1134,10 +1158,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       </View>
 
       <ScrollView
+        ref={formScrollRef}
         style={styles.formScroller}
         contentContainerStyle={[styles.content, isActivity ? styles.activityContent : null]}
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
+        onLayout={(event) => {
+          formScrollHeight.current = event.nativeEvent.layout.height;
+          revealFocusedBlock();
+        }}
       >
         {isActivity ? (
           <>
@@ -1237,13 +1266,18 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               )}
             />
 
-            <View style={styles.activityFieldGroup}>
+            <View
+              style={styles.activityFieldGroup}
+              onLayout={(event) => { bankGroupBottom.current = event.nativeEvent.layout.y + event.nativeEvent.layout.height; }}
+            >
               <Text style={styles.activityFieldTitle}>활동비 받을 계좌번호</Text>
               <Controller
                 control={control}
                 name="bankAccount"
                 render={({ field, fieldState }) => (
                   <FormTextInput
+                    onBlur={() => { revealTarget.current = null; }}
+                    onFocus={() => { revealTarget.current = "bank"; revealFocusedBlock(); }}
                     onChangeText={clearOnChange("bankAccount", field.onChange)}
                     placeholder={bankAccountField.placeholder}
                     placeholderTextColor="#A6ACB7"
@@ -1270,9 +1304,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                       <View style={[styles.activityInputWithIcon, participantSearchFocused ? styles.activityInputWithIconFocused : null, fieldState.error ? styles.inputError : null]}>
                         <Ionicons name="search-outline" size={16} color="#A6ACB7" />
                         <TextInput
-                          onBlur={() => setParticipantSearchFocused(false)}
+                          onBlur={() => { setParticipantSearchFocused(false); revealTarget.current = null; }}
                           onChangeText={setParticipantQuery}
-                          onFocus={() => setParticipantSearchFocused(true)}
+                          onFocus={() => { setParticipantSearchFocused(true); revealTarget.current = "end"; revealFocusedBlock(); }}
                           placeholder="이름으로 검색"
                           placeholderTextColor="#A6ACB7"
                           style={[styles.activityInlineInput, { outlineStyle: "none" } as never]}
@@ -1744,6 +1778,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               <FormField label="비고" optional>
                 <FormTextInput
                   multiline
+                  onBlur={() => { revealTarget.current = null; }}
+                  onFocus={() => { revealTarget.current = "end"; revealFocusedBlock(); }}
                   onChangeText={field.onChange}
                   placeholder="전달하고 싶은 내용이 있다면 적어주세요"
                   placeholderTextColor="#A6ACB7"
@@ -1765,6 +1801,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             <FormField label={compactCreate || isStudyRecruit ? "" : labels.content} required={!isMutualAid} error={fieldState.error?.message}>
               <FormTextInput
                 multiline
+                onBlur={() => { revealTarget.current = null; }}
+                onFocus={() => { revealTarget.current = "attach"; revealFocusedBlock(); }}
                 onChangeText={clearOnChange("content", field.onChange)}
                 placeholder={labels.contentPlaceholder}
                 placeholderTextColor="#A6ACB7"
@@ -1820,7 +1858,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       ) : null}
 
       {isStudyRecruit || isSuggestion || isMutualAid ? null : compactCreate && !isAlbum && !isAdminParticipationPost ? (
-        <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} onError={showUploadFailure} disabled={createMutation.isPending || updateMutation.isPending} />
+        <PostAttachmentEditor
+          attachments={attachments}
+          onChange={setAttachments}
+          onUploadingChange={setIsUploading}
+          onError={showUploadFailure}
+          disabled={createMutation.isPending || updateMutation.isPending}
+          onLayout={(event) => { attachSectionTop.current = event.nativeEvent.layout.y; }}
+          onActionsLayout={(event) => { attachActionsBottom.current = event.nativeEvent.layout.y + event.nativeEvent.layout.height; }}
+        />
       ) : compactCreate ? (
         <View style={styles.compactAttachWrap}>
           {!isAdminParticipationPost ? (
