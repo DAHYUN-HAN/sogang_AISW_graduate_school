@@ -359,9 +359,11 @@ export default function PostDetailScreen() {
 
   const navigationHeader = (
     <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
-      <BackButton onPress={handlePostBack} />
-      <Text numberOfLines={1} style={styles.appBarTitle}>{board?.name ?? "게시글"}</Text>
-      <View style={styles.iconButton} />
+      <View style={styles.appBarRow}>
+        <BackButton onPress={handlePostBack} />
+        <Text numberOfLines={1} style={styles.appBarTitle}>{board?.name ?? "게시글"}</Text>
+        <View style={styles.iconButton} />
+      </View>
     </View>
   );
 
@@ -812,30 +814,34 @@ export default function PostDetailScreen() {
         <ImageViewerModal key={postId} images={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
       ) : null}
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
-        <BackButton onPress={handlePostBack} />
-        {/* 제목은 아이콘 줄과 같은 높이에 중앙 정렬한다. 상단 safe-area padding 아래에서 시작해야
-            상태바(카메라 컷아웃 포함) 영역에 겹치지 않는다. */}
-        <View pointerEvents="none" style={[styles.appBarTitleWrap, { top: Math.max(insets.top, 10) }]}>
-          <Text numberOfLines={1} style={styles.appBarTitle}>
-            {appBarTitle}
-          </Text>
-        </View>
-        {isPhotoAlbum ? (
-          <View style={styles.iconButton} />
-        ) : (
-          <View style={styles.appBarActions}>
-            {!isAdminParticipationGuide && !isActivityCertification && !isStudyRecruit && !isCouncilActivity && !isMutualAidRequest ? (
-              <Pressable accessibilityLabel="북마크" onPress={handleBookmark} style={[styles.iconButton, styles.appBarActionButton]}>
-                <BookmarkIcon filled={isBookmarked} color={isBookmarked ? COLORS.primary : COLORS.text} size={20} />
-              </Pressable>
-            ) : null}
-            {hasPostMenu && !isCouncilActivity ? (
-              <Pressable accessibilityLabel="더보기" onPress={() => setShowPostMenu(true)} style={[styles.iconButton, styles.appBarActionButton]}>
-                <MoreIcon color={COLORS.text} />
-              </Pressable>
-            ) : null}
+        <View style={styles.appBarRow}>
+          <BackButton onPress={handlePostBack} />
+          {/* 제목은 오른쪽 버튼 수와 무관하게 화면 정중앙에 와야 해서 좌우를 고정한 절대
+              배치를 쓴다. 다만 세로는 계산하지 않고 이 행을 꽉 채워, 뒤로 버튼과 같은
+              중심을 공유하게 한다. safe-area 값을 더해 세로 위치를 잡으면 노치가 있는
+              기기에서만 어긋난다. */}
+          <View pointerEvents="none" style={styles.appBarTitleWrap}>
+            <Text numberOfLines={1} style={styles.appBarTitle}>
+              {appBarTitle}
+            </Text>
           </View>
-        )}
+          {isPhotoAlbum ? (
+            <View style={styles.iconButton} />
+          ) : (
+            <View style={styles.appBarActions}>
+              {!isAdminParticipationGuide && !isActivityCertification && !isStudyRecruit && !isCouncilActivity && !isMutualAidRequest ? (
+                <Pressable accessibilityLabel="북마크" onPress={handleBookmark} style={[styles.iconButton, styles.appBarActionButton]}>
+                  <BookmarkIcon filled={isBookmarked} color={isBookmarked ? COLORS.primary : COLORS.text} size={20} />
+                </Pressable>
+              ) : null}
+              {hasPostMenu && !isCouncilActivity ? (
+                <Pressable accessibilityLabel="더보기" onPress={() => setShowPostMenu(true)} style={[styles.iconButton, styles.appBarActionButton]}>
+                  <MoreIcon color={COLORS.text} />
+                </Pressable>
+              ) : null}
+            </View>
+          )}
+        </View>
       </View>
 
       <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroller} contentContainerStyle={[styles.content, isAdminParticipationGuide || isCouncilActivityEntry || isPhotoAlbum || commentsDisabled ? styles.contentWithoutCommentBar : null]}>
@@ -1446,12 +1452,17 @@ const styles = StyleSheet.create({
   },
   appBar: {
     minHeight: 62,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: COLORS.surface,
     paddingHorizontal: 16,
     paddingBottom: 10,
+  },
+  // 제목의 절대 배치 기준이 되는 행. 여백이 없어야 left/right/top/bottom이
+  // 플랫폼과 무관하게 같은 뜻을 갖는다.
+  appBarRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   iconButton: {
     width: 42,
@@ -1462,9 +1473,10 @@ const styles = StyleSheet.create({
   },
   appBarTitleWrap: {
     position: "absolute",
-    left: 88,
-    right: 88,
-    bottom: 10, // appBar paddingBottom과 동일
+    left: 72, // appBar paddingHorizontal 16을 더해 화면 기준 88
+    right: 72,
+    top: 0,
+    bottom: 0,
     justifyContent: "center",
     alignItems: "center",
   },
