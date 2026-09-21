@@ -173,3 +173,23 @@ test("스터디 모집 카드 메타는 작성자·날짜 뒤에 댓글 수를 �
   assert.match(postCardSource, /const showLikeCount = !isWorkflowRequest && !isStudyRecruit;/);
   assert.match(postCardSource, /showCommentCount \? `댓글 \$\{post\.comment_count\}` : null/);
 });
+
+test("댓글과 대댓글은 Figma 타이포그래피(작성자 13/16, 본문 13, 날짜 11/13)를 공유한다", () => {
+  const commentItem = source("components/CommentItem.tsx");
+  assert.match(commentItem, /color: "#15171C", fontSize: 13, fontWeight: "500", lineHeight: 16/);
+  assert.match(commentItem, /fontSize: 13, lineHeight: depth > 0 \? 16 : 20/);
+  assert.match(commentItem, /fontSize: 11,\s*\n\s*lineHeight: 13,/);
+});
+
+test("댓글 액션행과 저장·취소행은 padding 8/0, gap 16, 라벨 13/16으로 같은 크기다", () => {
+  const commentItem = source("components/CommentItem.tsx");
+  assert.match(commentItem, /flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 4, paddingVertical: 8/);
+  assert.equal((commentItem.match(/fontSize: 13, fontWeight: "500", lineHeight: 16/g) ?? []).length, 6);
+  assert.doesNotMatch(commentItem, /fontSize: depth > 0 \? 13 : 12/);
+});
+
+test("댓글 수정 입력은 1.3px 파란 테두리에 13\/16 본문과 10\/12 여백을 쓴다", () => {
+  const commentItem = source("components/CommentItem.tsx");
+  assert.match(commentItem, /borderWidth: 1\.3,\s*\n\s*borderColor: "#2761FF"/);
+  assert.match(commentItem, /fontSize: 13,\s*\n\s*lineHeight: 16,\s*\n\s*paddingHorizontal: 12,\s*\n\s*paddingVertical: 10,/);
+});

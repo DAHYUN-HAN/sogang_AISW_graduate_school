@@ -2453,6 +2453,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 17,
+    marginBottom: 10, // Figma 댓글 라벨: padding 16/0/10
   },
   commentThreadDivider: {
     height: 1,
