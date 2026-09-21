@@ -1698,7 +1698,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 ) : null}
               </View>
             ) : evidenceMode === "link" ? (
-              <View style={[styles.evidenceLinkField, evidenceLinkFocused ? styles.evidenceLinkFieldFocused : null]}>
+              <View style={[styles.evidenceLinkField, evidenceLinkFocused ? styles.evidenceLinkFieldFocused : null, missingRequiredAttachment ? styles.inputError : null]}>
                 <AttachLinkIcon size={16} color={COLORS.muted} />
                 <TextInput
                   autoCapitalize="none"
