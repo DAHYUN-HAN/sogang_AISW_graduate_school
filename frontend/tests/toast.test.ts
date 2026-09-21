@@ -63,3 +63,55 @@ test("나머지 안내는 아직 기존 팝업을 쓴다", () => {
   assert.match(createSource, /<FormNoticeModal notice=\{formNotice\}/);
   assert.match(createSource, /<Toast toast=\{toast\} onHide=\{hideToast\} \/>/);
 });
+
+test("필수 항목은 첫 항목에서 멈추지 않고 전부 모아 한 번에 표시한다", () => {
+  // 디자인은 비어 있는 칸을 동시에 빨갛게 칠한다. 옛 requireValue(...) || requireValue(...)
+  // 단락 구조로는 첫 항목만 알 수 있었다.
+  assert.match(createSource, /const missing: \(keyof FormValues\)\[\] = \[\]/);
+  assert.match(createSource, /for \(const name of missing\) setError\(name, \{ message: "" \}\)/);
+  assert.doesNotMatch(createSource, /requireValue\(values\./);
+});
+
+test("강의후기는 교수명·난이도·만족도가 필수다", () => {
+  assert.match(createSource, /if \(resourceFields\?\.professor\) requireField\("professor"/);
+  assert.match(createSource, /if \(resourceFields\?\.difficulty\) requireField\("difficulty"/);
+  assert.match(createSource, /if \(resourceFields\?\.satisfaction\) requireField\("satisfaction"/);
+  // 필수라서 같은 등급을 다시 눌러 해제할 수 없다.
+  assert.doesNotMatch(createSource, /field\.onChange\(selected \? "" : level\)/);
+});
+
+test("비어 있는 필수 칸은 문구 없이 테두리만 빨갛게 한다", () => {
+  // setError의 message가 비어 있어야 칸 아래 문구가 뜨지 않는다.
+  assert.match(createSource, /setError\(name, \{ message: "" \}\)/);
+  // 폼 밖의 첨부·증빙은 별도 상태로 테두리를 켠다.
+  assert.match(createSource, /missingRequiredAttachment \? styles\.inputError : null/);
+});
+
+test("도달할 수 없던 상조회 날짜 제한 안내를 제거했다", () => {
+  // MUTUAL_AID_MIN_LEAD_DAYS가 0이라 달력이 과거 날짜를 이미 막는다.
+  assert.doesNotMatch(createSource, /오늘 기준 2일 후인/);
+  assert.doesNotMatch(createSource, /MUTUAL_AID_DATE_TOO_SOON/);
+});
+
+test("값을 고치면 인증 화면처럼 빨간 테두리가 바로 풀린다", () => {
+  // register.tsx / login.tsx 는 onChangeText 에서 해당 오류를 지운다. 같은 감각을 맞춘다.
+  assert.match(createSource, /const clearOnChange = \(name: keyof FormValues/);
+  for (const name of ["title", "content", "professor", "bankAccount", "contact"]) {
+    assert.ok(createSource.includes(`clearOnChange("${name}"`), `${name} 해제 누락`);
+  }
+  // 고르는 방식(시트·등급 버튼·참가자)도 같은 시점에 푼다.
+  assert.match(createSource, /clearErrors\("category"\)/);
+  assert.match(createSource, /clearErrors\("relation"\)/);
+  assert.match(createSource, /clearErrors\("participants"\)/);
+  assert.match(createSource, /clearErrors\(rating\.name\)/);
+  // 첨부·증빙은 값이 생기는 시점에 해제한다.
+  assert.match(createSource, /setMissingRequiredAttachment\(false\)/);
+});
+
+test("오류 테두리는 1.5px #D64545 이고 포커스보다 우선한다", () => {
+  // Figma Write-LectureReview-Error: 입력칸·등급 버튼 모두 border-[1.5px] #d64545
+  assert.match(createSource, /inputError: \{\r?\n\s+borderWidth: 1\.5,\r?\n\s+borderColor: "#D64545"/);
+  assert.match(createSource, /borderOnlyError: \{\r?\n\s+borderWidth: 1\.5,\r?\n\s+borderColor: "#D64545"/);
+  // FormTextInput 안에서 오류 스타일이 포커스 스타일보다 뒤에 온다.
+  assert.match(createSource, /focused \? styles\.inputFocused : null,\r?\n\s+hasError \? styles\.inputError : null,/);
+});
