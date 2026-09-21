@@ -1710,8 +1710,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             <View style={styles.evidenceModeRow}>
               {EVIDENCE_MODES.map((mode) => {
                 const active = evidenceMode === mode.key;
-                // 증빙이 비었다는 표시는 고른 쪽 탭에만 띄운다.
-                const showsError = active && missingRequiredAttachment;
+                // 증빙이 비었다는 표시는 고른 쪽 탭에 띄운다. 아직 아무 쪽도
+                // 고르지 않았으면 어디를 채워야 하는지 알 수 없으므로 양쪽에 띄운다.
+                const showsError = missingRequiredAttachment && (active || evidenceMode === null);
                 return (
                   <Pressable
                     key={mode.key}

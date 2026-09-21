@@ -103,6 +103,16 @@ test("비어 있는 필수 칸은 문구 없이 테두리만 빨갛게 한다", 
   assert.doesNotMatch(createSource, /missingRequiredAttachment \? styles\.inputError : null/);
 });
 
+test("증빙을 아무 쪽도 고르지 않았으면 두 탭 모두 빨갛게 한다", () => {
+  // 처음 들어오면 evidenceMode가 null이라 어느 탭도 active가 아니다. 고른 쪽에만
+  // 띄우면 토스트만 뜨고 빨간 테두리는 어디에도 안 그려진다.
+  assert.match(
+    createSource,
+    /const showsError = missingRequiredAttachment && \(active \|\| evidenceMode === null\);/,
+  );
+  assert.match(createSource, /const \[evidenceMode, setEvidenceMode\] = useState<"file" \| "link" \| null>\(null\)/);
+});
+
 test("도달할 수 없던 상조회 날짜 제한 안내를 제거했다", () => {
   // MUTUAL_AID_MIN_LEAD_DAYS가 0이라 달력이 과거 날짜를 이미 막는다.
   assert.doesNotMatch(createSource, /오늘 기준 2일 후인/);
