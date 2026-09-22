@@ -74,7 +74,7 @@ export function activityBankAccountFieldState(postId: number | null) {
     return {
       required: false,
       placeholder: "은행 / 계좌번호를 입력하세요",
-      guidance: "계좌를 변경할 때만 수정해주세요. 비워두면 기존 계좌가 유지돼요.",
+      guidance: "계좌는 본인 명의로만 등록 가능해요",
     } as const;
   }
   return {

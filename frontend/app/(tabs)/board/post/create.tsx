@@ -621,7 +621,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           }
         : null;
   const submitLabel = postId
-    ? (isMutualAid ? "수정 완료" : "변경사항 저장")
+    ? (isMutualAid || isActivity ? "수정 완료" : "변경사항 저장")
     : isAlbum
       ? "사진 등록"
     : isSuggestion
@@ -1114,6 +1114,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               />
             </View>
 
+            <Text style={styles.activityFieldTitle}>활동한 날짜</Text>
             <Controller
               control={control}
               name="activityDate"
@@ -1160,16 +1161,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   />
                 )}
               />
-              {!postId ? (
-                <View style={styles.activityWarning}>
-                  <View style={styles.activityWarningIcon}>
-                    <NoticeAlertIcon size={14} color="#854F0B" />
-                  </View>
-                  <View style={styles.activityWarningBody}>
-                    <Text style={styles.activityWarningText}>{bankAccountField.guidance}</Text>
-                  </View>
+              <View style={styles.activityWarning}>
+                <View style={styles.activityWarningIcon}>
+                  <NoticeAlertIcon size={14} color="#854F0B" />
                 </View>
-              ) : null}
+                <View style={styles.activityWarningBody}>
+                  <Text style={styles.activityWarningText}>{bankAccountField.guidance}</Text>
+                </View>
+              </View>
             </View>
 
             <View style={[styles.activityFieldGroup, styles.activityParticipantGroup]}>
