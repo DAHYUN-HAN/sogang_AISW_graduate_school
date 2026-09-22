@@ -67,7 +67,7 @@ export async function loadPublishedActivitySourcePosts<T extends ActivitySourceP
 }
 
 export const ACTIVITY_PARTICIPANT_GUIDANCE =
-  "원우회비 미납자, 졸업자는 검색되지 않아요. 지원금은 참가자 목록 기준 지급되니 본인도 검색해서 추가해주세요.";
+  "참가자 이름 색상 구분: 검정 납부 · 회색 미납 · 주황 1회 납부(5만원). 지원금은 참가자 목록 기준 지급되니 본인도 검색해서 추가해주세요.";
 
 export function activityBankAccountFieldState(postId: number | null) {
   if (postId) {
@@ -90,7 +90,8 @@ export function formatActivityParticipant(participant: ActivityParticipant): str
   // 규칙에 안 걸리면 아래 fallback(이름 전공 학번)으로 표시된다. 새 형식 확정 시 갱신.
   const cohortMatch = participant.student_number?.match(/^A(\d{2})\d{3}$/i);
   if (cohortMatch) return `${Number(cohortMatch[1])}기 ${participant.name}`;
-  return [participant.name, participant.major, participant.student_number].filter(Boolean).join(" ");
+  // 학번은 개인정보라 화면에 노출하지 않는다. 기수를 못 읽으면 이름과 전공만 표시한다.
+  return [participant.name, participant.major].filter(Boolean).join(" ");
 }
 
 function positiveInteger(value: unknown): number | undefined {

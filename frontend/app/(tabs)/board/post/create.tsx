@@ -10,7 +10,7 @@ import { BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
-import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon } from "../../../../components/icons";
+import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon, ImagePlaceholderIcon, NoticeAlertIcon, ParticipantAddIcon } from "../../../../components/icons";
 import { useBoardsQuery } from "../../../../hooks/useApi";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/usePosts";
 import CompletionState from "../../../../components/CompletionState";
@@ -120,7 +120,7 @@ function FormField({ label, required, requiredStar, optional, helper, error, chi
               <Text style={styles.requiredText}>필수</Text>
             </View>
           ) : null}
-          {optional ? <Text style={styles.optionalMark}> (선택)</Text> : null}
+          {optional ? <Text style={styles.optionalMark}>(선택)</Text> : null}
         </View>
       ) : null}
       {children}
@@ -621,7 +621,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           }
         : null;
   const submitLabel = postId
-    ? "변경사항 저장"
+    ? (isMutualAid ? "수정 완료" : "변경사항 저장")
     : isAlbum
       ? "사진 등록"
     : isSuggestion
@@ -1024,21 +1024,27 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   return (
     <View style={styles.screen}>
       {/* Figma Verify-PhotoPreview: 활동 인증 상단바에는 구분선이 없다 */}
-      <View style={[styles.appBar, isActivity ? styles.appBarNoDivider : null, { paddingTop: Math.max(insets.top, 10) }]}>
+      {/* Figma 상조회 신청 TopBar: padding 18/16/14, 구분선 없음, 닫기 20×20(stroke 1.8), 제목 18/21, 우측 spacer 20. */}
+      <View style={[styles.appBar, isActivity ? styles.appBarNoDivider : null, isMutualAid ? styles.appBarMutualAid : null, { paddingTop: Math.max(insets.top, 10) + (isMutualAid ? 18 : 0) }]}>
         <Pressable
           accessibilityLabel="닫기"
+          hitSlop={isMutualAid ? 11 : undefined}
           onPress={handleCreateBack}
-          style={styles.iconButton}
+          style={isMutualAid ? styles.appBarIconMutualAid : styles.iconButton}
         >
-          <Ionicons name={isActivity ? "chevron-back" : "close"} size={24} color={COLORS.text} />
+          {isMutualAid ? (
+            <CloseIcon size={20} color={COLORS.text} />
+          ) : (
+            <Ionicons name={isActivity ? "chevron-back" : "close"} size={24} color={COLORS.text} />
+          )}
         </Pressable>
-        <Text style={styles.appBarTitle}>{labels.screenTitle}</Text>
-        <View style={styles.iconButton} />
+        <Text style={[styles.appBarTitle, isMutualAid ? styles.appBarTitleMutualAid : null]}>{labels.screenTitle}</Text>
+        <View style={isMutualAid ? styles.appBarIconMutualAid : styles.iconButton} />
       </View>
 
       <ScrollView
         style={styles.formScroller}
-        contentContainerStyle={[styles.content, isActivity ? styles.activityContent : null]}
+        contentContainerStyle={[styles.content, isActivity ? styles.activityContent : null, isMutualAid ? styles.contentMutualAid : null]}
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
       >
@@ -1155,8 +1161,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 )}
               />
               <View style={styles.activityWarning}>
-                <Ionicons name="alert-circle-outline" size={14} color="#854F0B" style={styles.activityWarningIcon} />
-                <Text style={styles.activityWarningText}>{bankAccountField.guidance}</Text>
+                <View style={styles.activityWarningIcon}><NoticeAlertIcon size={14} color="#854F0B" /></View>
+                <View style={styles.activityWarningBody}>
+                  <Text style={styles.activityWarningText}>{bankAccountField.guidance}</Text>
+                </View>
               </View>
             </View>
 
@@ -1198,17 +1206,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                                   <Ionicons name="person" size={22} color="#FFFFFF" />
                                 </View>
                                 <View style={styles.participantTextBlock}>
-                                  <Text style={styles.participantName}>{participant.name}</Text>
-                                  {participant.major || participant.student_number ? (
-                                    <Text style={styles.participantMeta}>{[participant.major, participant.student_number].filter(Boolean).join(" ")}</Text>
-                                  ) : null}
+                                  {/* Figma 참가자검색행: 학번은 노출하지 않고 "72기 이름" + 전공만 표시한다. */}
+                                  <Text style={styles.participantName}>{formatActivityParticipant(participant)}</Text>
+                                  {participant.major ? <Text style={styles.participantMeta}>{participant.major}</Text> : null}
                                 </View>
                                 {selected ? (
                                   <Ionicons name="checkmark-circle" size={28} color={COLORS.primary} />
                                 ) : (
-                                  <View style={styles.participantAddButton}>
-                                    <Ionicons name="add" size={16} color={COLORS.primary} />
-                                  </View>
+                                  <ParticipantAddIcon size={28} color={COLORS.primary} />
                                 )}
                               </Pressable>
                             );
@@ -1230,8 +1235,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 }}
               />
               <View style={styles.activityWarning}>
-                <Ionicons name="alert-circle-outline" size={14} color="#854F0B" style={styles.activityWarningIcon} />
-                <Text style={styles.activityWarningText}>{ACTIVITY_PARTICIPANT_GUIDANCE}</Text>
+                <View style={styles.activityWarningIcon}><NoticeAlertIcon size={14} color="#854F0B" /></View>
+                {/* Android(Fabric)에서는 행 안의 Text가 flex:1로도 줄어들지 않아 View로 감싸 폭을 제한한다. */}
+                <View style={styles.activityWarningBody}>
+                  <Text style={styles.activityWarningText}>{ACTIVITY_PARTICIPANT_GUIDANCE}</Text>
+                </View>
               </View>
             </View>
           </>
@@ -1349,7 +1357,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               {isMutualAid ? (
                 <Pressable onPress={() => setSelectionSheet("mutualType")} style={styles.selectionField}>
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>{field.value || labels.categoryPlaceholder}</Text>
-                  <Ionicons name="chevron-down" size={17} color={COLORS.subtle} />
+                  <Ionicons name="chevron-down" size={16} color={COLORS.subtle} />
                 </Pressable>
               ) : isStudyRecruit ? (
                 <View style={styles.recruitmentStatusRow}>
@@ -1474,7 +1482,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>
                     {field.value ? formatBoardDate(field.value) : "경조사 날짜를 선택하세요"}
                   </Text>
-                  <Feather name="calendar" size={14} color={COLORS.subtle} />
+                  <Feather name="calendar" size={15} color={COLORS.subtle} />
                 </Pressable>
                 {datePickerOpen ? (
                   <InlineCalendar
@@ -1499,7 +1507,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>
                     {field.value || "본인 / 배우자 / 부모 등 선택"}
                   </Text>
-                  <Ionicons name="chevron-down" size={17} color={COLORS.subtle} />
+                  <Ionicons name="chevron-down" size={16} color={COLORS.subtle} />
                 </Pressable>
               </FormField>
             )}
@@ -1585,7 +1593,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   onBlur={() => setEvidenceLinkFocused(false)}
                   onChangeText={setEvidenceLink}
                   onFocus={() => setEvidenceLinkFocused(true)}
-                  placeholder="청첩장·부고장 링크를 입력해주세요"
+                  placeholder="청첩장, 부고장 링크(URL)를 입력해주세요"
                   placeholderTextColor={COLORS.muted}
                   style={[styles.evidenceLinkInput, { outlineStyle: "none" } as never]}
                   value={evidenceLink}
@@ -1860,7 +1868,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       <Pressable
         disabled={isSubmitting}
         onPress={handleSubmit(onSubmit)}
-        style={[styles.submitButton, isActivity ? styles.activitySubmitButton : null, isSubmitting ? styles.submitButtonDisabled : null]}
+        style={[styles.submitButton, isActivity ? styles.activitySubmitButton : null, isMutualAid ? styles.submitButtonMutualAid : null, isSubmitting ? styles.submitButtonDisabled : null]}
       >
         <Text style={[styles.submitText, isActivity ? styles.activitySubmitText : null]}>{createMutation.isPending || updateMutation.isPending ? "저장 중" : submitLabel}</Text>
       </Pressable>
@@ -1993,6 +2001,20 @@ const styles = StyleSheet.create({
   appBarNoDivider: {
     borderBottomWidth: 0,
   },
+  appBarMutualAid: {
+    minHeight: 0,
+    borderBottomWidth: 0,
+    paddingBottom: 14, // Figma TopBar padding 18/16/14
+  },
+  appBarIconMutualAid: {
+    width: 20,
+    height: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  appBarTitleMutualAid: {
+    lineHeight: 21, // Figma 18/21
+  },
   iconButton: {
     width: 42,
     height: 42,
@@ -2014,6 +2036,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 40,
+  },
+  contentMutualAid: {
+    paddingTop: 14, // Figma 작성본문 padding 14/20/16 + 신청버튼래퍼 padding 12/20/24
+    paddingBottom: 24,
   },
   activityContent: {
     gap: 16,
@@ -2406,27 +2432,16 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   participantName: {
-    color: COLORS.text,
+    color: "#212429", // Figma 참가자검색행: 납부자 이름색
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 17,
   },
-  participantAddButton: {
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    // Android(Fabric)에서는 크기를 크게 넘는 radius가 원으로 잘리지 않으므로 정확히 절반 값을 쓴다.
-    borderRadius: 14,
-    borderWidth: 1.3,
-    borderColor: COLORS.primary,
-  },
   participantMeta: {
-    color: COLORS.muted,
+    color: "#6B7280", // Figma 참가자검색행: 전공 12/14
     fontSize: 12,
-    lineHeight: 15,
+    lineHeight: 14,
     fontWeight: "400",
-    marginTop: 2,
   },
   participantNoResultText: {
     color: "#8A919C",
@@ -2457,14 +2472,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  // Figma 참가자안내: 14×15 프레임, padding-top 1.
   activityWarningIcon: {
     marginTop: 1,
+    width: 14,
+    height: 14,
+  },
+  // Figma 참가자안내: 상자 320 안에서 여백 12·아이콘 14·간격 8을 빼면 274가 남지만
+  // 본문 폭은 254로 잡혀 있어 오른쪽에 20의 여유가 더 있다. 그 여유를 paddingRight로 재현한다.
+  activityWarningBody: {
+    flex: 1,
+    minWidth: 0,
+    paddingRight: 20,
   },
   activityWarningText: {
     color: "#854F0B",
     fontSize: 12,
     fontWeight: "400",
-    lineHeight: 17,
+    lineHeight: 17, // 12px × 145%
   },
   activityChipRow: {
     flexDirection: "row",
@@ -2485,7 +2510,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   activityMemberChipText: {
-    color: COLORS.text,
+    color: "#212429", // Figma 참가자칩: 납부자 이름색
     fontSize: 13,
     fontWeight: "400",
     lineHeight: 16,
@@ -2615,7 +2640,7 @@ const styles = StyleSheet.create({
     color: "#E24B4A", // Figma 64:13 required asterisk
     fontSize: 13,
     fontWeight: "500",
-    marginLeft: -4, // 라벨 글씨에 붙이기 (labelRow gap 상쇄)
+    lineHeight: 16, // 라벨과 간격은 labelRow gap 7을 그대로 쓴다(디자인 화면 기준).
   },
   evidenceModeRow: {
     flexDirection: "row",
@@ -2719,40 +2744,84 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   evidenceFileButton: {
-    // 파일·링크 증빙 입력 박스는 동일한 40px 규격을 사용한다.
+    // Figma 첨부버튼: 36h, padding 10/0, 테두리 없음, radius 8.
     width: "100%",
-    height: 40,
-    paddingHorizontal: 14,
-    paddingVertical: 0,
+    minHeight: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderRadius: 8,
+    paddingVertical: 10,
   },
   evidenceFileButtonText: {
     flex: 1,
     flexShrink: 1,
     minWidth: 0,
     flexWrap: "wrap",
-    color: COLORS.muted,
-    fontSize: 12,
+    color: "#999EA8", // Figma 13/16 #999EA8
+    fontSize: 13,
     fontWeight: "400",
-    lineHeight: 15,
+    lineHeight: 16,
+  },
+  evidenceThumbArea: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    paddingTop: 12, // Figma 첨부영역 padding 12/0/0
+  },
+  evidenceThumbWrap: {
+    width: 80,
+    height: 80,
+  },
+  evidenceThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#EDF0F5",
+  },
+  evidenceThumbImageFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  evidenceThumbImage: {
+    borderRadius: 8,
+  },
+  evidenceThumbRemove: {
+    position: "absolute",
+    top: -6,
+    right: -2, // Figma: left 60 of 80 → 우측으로 2px 돌출
+    width: 22,
+    height: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 11,
+    backgroundColor: "rgba(33, 36, 41, 0.8)",
   },
   evidenceLinkField: {
-    // Figma: 링크입력필드 40h, padding 12/14, gap 8
+    // Figma: 링크입력필드 36h, padding 10/12, gap 8
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    height: 40,
+    height: 36,
     borderWidth: 0.5,
     borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.bg,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
   },
   evidenceLinkInput: {
     flex: 1,
     color: COLORS.text,
     fontSize: 12,
     fontWeight: "400",
-    lineHeight: 15,
+    lineHeight: 14, // Figma 12/14
+    paddingVertical: 0,
   },
   evidenceLinkFieldFocused: {
     borderWidth: 1.5, // Figma focus: 1.5px #21262E
@@ -2779,7 +2848,8 @@ const styles = StyleSheet.create({
   calWeekRow: { flexDirection: "row", marginBottom: 4 },
   calWeekday: { flex: 1, textAlign: "center", color: COLORS.subtle, fontSize: 12, fontWeight: "500" },
   calGrid: { flexDirection: "row", flexWrap: "wrap" },
-  calCell: { width: `${100 / 7}%`, alignItems: "center", justifyContent: "center", paddingVertical: 4 },
+  // 100/7%(14.2857…)는 7칸 합이 100%를 넘어 마지막 칸이 줄바꿈된다. 홈 캘린더와 같이 14.285%를 쓴다.
+  calCell: { width: "14.285%", alignItems: "center", justifyContent: "center", paddingVertical: 4 },
   calDay: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 18 },
   calDaySelected: { backgroundColor: COLORS.primary },
   calDayDisabled: { backgroundColor: "#F7F8FA" },
@@ -2790,6 +2860,7 @@ const styles = StyleSheet.create({
     color: "#A6ACB7",
     fontSize: 12,
     fontWeight: "400",
+    lineHeight: 14, // Figma (선택) 12/14, 라벨과 간격은 labelRow gap 7
   },
   input: {
     width: "100%",
@@ -3031,6 +3102,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: COLORS.primary,
     marginTop: 10,
+  },
+  submitButtonMutualAid: {
+    marginTop: 14, // gap 14 + 14 = 본문 하단 16 + 래퍼 상단 12
   },
   activitySubmitButton: {
     height: 45, // Figma: 인증버튼 45h

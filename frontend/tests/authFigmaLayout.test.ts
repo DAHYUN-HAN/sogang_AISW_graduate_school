@@ -58,13 +58,14 @@ test("signup typography, code input, steps, and action match the Figma signup fr
 });
 
 test("login and password reset keep the Figma primary action type scale", () => {
-  for (const screen of ["app/auth/login.tsx", "app/auth/password-reset.tsx"]) {
-    const source = readSource(screen);
-    const actionText = styleBlock(source, "primaryButtonText");
+  const loginAction = styleBlock(readSource("app/auth/login.tsx"), "primaryButtonText");
+  assert.match(loginAction, /fontSize: 16/);
+  assert.match(loginAction, /lineHeight: 24/);
 
-    assert.match(actionText, /fontSize: 16/);
-    assert.match(actionText, /lineHeight: 24/);
-  }
+  // 비밀번호 찾기 최신 Figma: 인증코드 받기 버튼은 14/24.
+  const resetAction = styleBlock(readSource("app/auth/password-reset.tsx"), "primaryButtonText");
+  assert.match(resetAction, /fontSize: 14/);
+  assert.match(resetAction, /lineHeight: 24/);
 });
 
 test("auth controls do not add the browser default black focus outline", () => {

@@ -19,8 +19,8 @@ import {
   formatActivityParticipant,
 } from "../utils/activityCertification";
 
-test("참가자 안내는 미납자·졸업자 제외와 본인 추가를 설명한다", () => {
-  assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /원우회비 미납자, 졸업자는 검색되지 않아요/);
+test("참가자 안내는 이름 색상 구분과 본인 추가를 설명한다", () => {
+  assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /검정 납부 · 회색 미납 · 주황 1회 납부\(5만원\)/);
   assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /본인도 검색해서 추가해주세요/);
 });
 
@@ -129,10 +129,10 @@ test("납부자 칩은 학번 앞 두 자리를 기수로 읽어 '기수 이름'
   );
 });
 
-test("기수 규칙에 맞지 않는 학번은 이름 전공 학번 표기로 대체한다", () => {
+test("기수 규칙에 맞지 않는 학번은 학번을 숨기고 이름 전공 표기로 대체한다", () => {
   assert.equal(
     formatActivityParticipant({ id: 5, name: "김서강", major: "AI", student_number: "B74001" }),
-    "김서강 AI B74001",
+    "김서강 AI",
   );
 });
 

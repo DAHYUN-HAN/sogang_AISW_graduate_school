@@ -40,7 +40,8 @@ def search_dues_payers(
     keyword = f"%{trimmed}%"
     payers = db.scalars(
         select(DuesPayer)
-        .where(or_(DuesPayer.name.ilike(keyword), DuesPayer.student_number.ilike(keyword)))
+        # 참가자 검색은 이름으로만 매칭한다. 학번 매칭은 다른 원우의 학번을 유추하는 통로가 된다.
+        .where(DuesPayer.name.ilike(keyword))
         .order_by(DuesPayer.name.asc(), DuesPayer.student_number.asc(), DuesPayer.id.asc())
         .limit(size)
     ).all()

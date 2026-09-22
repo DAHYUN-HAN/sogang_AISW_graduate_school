@@ -68,10 +68,9 @@ def test_admin_import_upserts_by_student_number_and_members_search_name_or_numbe
     assert by_name.json()["data"] == [
         {"id": 1, "name": "김민준", "major": "인공지능", "student_number": "A74003"}
     ]
+    # 학번으로는 검색되지 않아야 한다(이름 전용).
     assert by_number.status_code == 200
-    assert by_number.json()["data"] == [
-        {"id": 2, "name": "이현화", "major": "정보처리", "student_number": "A34011"}
-    ]
+    assert by_number.json()["data"] == []
 
 
 def test_admin_roster_search_is_paginated_and_not_available_to_members(api) -> None:
