@@ -21,6 +21,10 @@ type Props = {
   onDelete?: (commentId: number) => void;
   onReport?: (target: CommentReportTarget) => void;
   reportedTargets?: Record<string, boolean>;
+  /** 첫 대댓글은 부모 댓글의 하단 여백(12)까지 더해 20px 아래에 놓인다. */
+  isFirstReply?: boolean;
+  /** 스터디 모집처럼 대댓글도 스레드 구분선도 없는 목록. 댓글 하나가 padding-bottom 12만 갖는다. */
+  flat?: boolean;
 };
 
 function formatCommentDate(value: string) {
@@ -36,6 +40,8 @@ export default function CommentItem({
   onDelete,
   onReport,
   reportedTargets = {},
+  isFirstReply = false,
+  flat = false,
 }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(comment.content);
@@ -53,6 +59,7 @@ export default function CommentItem({
     || actionState.showDelete
     || actionState.showSave
     || actionState.showCancel;
+  const hasReplies = comment.children.length > 0;
 
   const saveEdit = async () => {
     const next = commentEditSubmissionValue(draft, isSaving);
@@ -71,17 +78,28 @@ export default function CommentItem({
   return (
     <View
       style={{
-        marginLeft: depth * 14,
-        marginTop: depth > 0 ? 8 : 0,
-        paddingTop: 12,
-        paddingBottom: depth === 0 ? 16 : 12,
+        // Figma 댓글스레드는 댓글·대댓글을 같은 320px 폭으로 stretch 한다 — 대댓글은 들여쓰지 않고 배경/라운드로 구분한다.
+        marginTop: depth > 0 ? (isFirstReply ? 20 : 8) : 0,
+        // Figma 대댓글: padding 10/12, radius 10, 배경 #F7F7F5.
+        paddingTop: depth > 0 ? 10 : flat ? 0 : 16,
+        // 스레드형은 댓글 여백 12 + 스레드 하단 16 = 28. 대댓글이 있으면 12는 첫 대댓글까지의 20에 이미 들어가 있다.
+        // flat(스터디 모집)은 스레드 래퍼가 없어 댓글 여백 12만 남는다.
+        paddingBottom: depth === 0 ? (flat ? 12 : hasReplies ? 16 : 28) : 10,
         paddingHorizontal: depth > 0 ? 12 : 0,
         // 스레드 사이 구분선은 상세 화면이 그린다 — 마지막 댓글 밑에 줄이 남지 않도록 자체 밑줄은 없앤다.
-        borderRadius: depth > 0 ? 8 : 0,
-        backgroundColor: depth > 0 ? "#F7F7F8" : undefined,
+        borderRadius: depth > 0 ? 10 : 0,
+        backgroundColor: depth > 0 ? "#F7F7F5" : undefined,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: depth > 0 ? 16 : 27 }}>
+      <View
+        style={{
+          flexDirection: "row",
+          // Figma 작성자 영역: 댓글은 center, 대댓글은 flex-start 정렬.
+          alignItems: depth > 0 ? "flex-start" : "center",
+          justifyContent: "space-between",
+          minHeight: depth > 0 ? 16 : 27,
+        }}
+      >
         <Text style={{ color: "#15171C", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>
           {formatCohortName(comment.author_cohort, comment.author_nickname)}
         </Text>
@@ -99,6 +117,7 @@ export default function CommentItem({
               style={{
                 color: actionState.reportAction === "none" ? "#15803D" : "#A6ACB7",
                 fontSize: 11,
+                lineHeight: 13,
                 fontWeight: "400",
               }}
             >
@@ -125,8 +144,9 @@ export default function CommentItem({
               color: "#15171C",
               fontSize: 13,
               lineHeight: 16,
-              paddingHorizontal: depth > 0 ? 10 : 12,
-              paddingVertical: depth > 0 ? 8 : 10,
+              // Figma 답글수정입력: padding 8/10.
+              paddingHorizontal: 10,
+              paddingVertical: 8,
               textAlignVertical: "top",
             },
             { outlineStyle: "none" } as never,
@@ -151,17 +171,18 @@ export default function CommentItem({
         {formatCommentDate(comment.created_at)}
       </Text>
 
+      {/* Figma 액션행: padding 8/0, gap 16, 라벨 13/16 500 — 댓글과 대댓글이 같은 크기다. */}
       {hasActionRow ? (
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 4, paddingVertical: 8 }}>
           {actionState.showReply && onReply ? (
             <Pressable onPress={() => onReply(comment)}>
-              <Text style={{ color: "#2761FF", fontSize: 11, fontWeight: "500", lineHeight: 13 }}>답글</Text>
+              <Text style={{ color: "#2761FF", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>답글</Text>
             </Pressable>
           ) : null}
 
           {actionState.showSave ? (
             <Pressable disabled={isSaving} onPress={saveEdit}>
-              <Text style={{ color: "#2761FF", fontSize: depth > 0 ? 11 : 12, fontWeight: "500", lineHeight: depth > 0 ? 13 : 15 }}>
+              <Text style={{ color: "#2761FF", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>
                 {isSaving ? "저장 중" : "저장"}
               </Text>
             </Pressable>
@@ -175,7 +196,7 @@ export default function CommentItem({
                 setIsEditing(false);
               }}
             >
-              <Text style={{ color: "#A6ACB7", fontSize: depth > 0 ? 11 : 12, fontWeight: "500", lineHeight: depth > 0 ? 13 : 15 }}>취소</Text>
+              <Text style={{ color: "#A6ACB7", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>취소</Text>
             </Pressable>
           ) : null}
 
@@ -186,24 +207,25 @@ export default function CommentItem({
                 setIsEditing(true);
               }}
             >
-              <Text style={{ color: "#A6ACB7", fontSize: 11, fontWeight: "500", lineHeight: 13 }}>수정</Text>
+              <Text style={{ color: "#A6ACB7", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>수정</Text>
             </Pressable>
           ) : null}
 
           {actionState.showDelete ? (
             <Pressable onPress={() => onDelete?.(comment.id)}>
-              <Text style={{ color: "#D64545", fontSize: 11, fontWeight: "500", lineHeight: 13 }}>삭제</Text>
+              <Text style={{ color: "#D64545", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>삭제</Text>
             </Pressable>
           ) : null}
         </View>
       ) : null}
 
-      {comment.children.map((child) => (
+      {comment.children.map((child, childIndex) => (
         <CommentItem
           key={child.id}
           comment={child}
           currentUserId={currentUserId}
           depth={depth + 1}
+          isFirstReply={childIndex === 0}
           onDelete={onDelete}
           onEdit={onEdit}
           onReply={onReply}

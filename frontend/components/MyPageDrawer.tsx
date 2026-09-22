@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router, usePathname } from "expo-router";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -29,7 +28,8 @@ import {
 } from "../utils/myPageNavigation";
 import { clearStoredPushToken, getStoredPushToken } from "../utils/pushTokenStorage";
 
-import { BackIcon } from "./icons";
+import { BackIcon, ChevronRightIcon } from "./icons";
+import { formatCohortName } from "../utils/userLabel";
 import MyPageDrawerOverlay from "./MyPageDrawerOverlay";
 const COLORS = {
   primary: "#2761FF",
@@ -278,10 +278,10 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
               >
                 <View style={styles.appBar}>
                   <Pressable accessibilityLabel="닫기" onPress={closeDrawer} style={styles.iconButton}>
-                    <BackIcon size={24} color={COLORS.text} />
+                    <BackIcon size={22} color={COLORS.text} />
                   </Pressable>
                   <Text style={styles.appBarTitle}>마이페이지</Text>
-                  <View style={styles.iconButton} />
+                  <View style={styles.appBarSpacer} />
                 </View>
 
                 <ScrollView style={styles.scroller} contentContainerStyle={styles.content}>
@@ -292,19 +292,19 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
                       size={52}
                     />
                     <View style={styles.profileText}>
-                      <Text style={styles.profileName}>{me?.nickname ?? "로그인이 필요합니다"}</Text>
-                      <Text style={styles.profileMeta}>
-                        {[me?.major, me?.cohort ? `${me.cohort}기` : null].filter(Boolean).join(" · ") || me?.email || ""}
-                      </Text>
+                      {/* Figma 마이페이지 프로필: 1줄 "73기 최OO", 2줄 전공. 닉네임의 기수 접두사는 한 번만 표시한다. */}
+                      <Text style={styles.profileName}>{me ? formatCohortName(me.cohort, me.nickname) : "로그인이 필요합니다"}</Text>
+                      <Text style={styles.profileMeta}>{me?.major || me?.email || ""}</Text>
                     </View>
-                    <Ionicons name="chevron-forward" size={15} color={COLORS.subtle} />
+                    <ChevronRightIcon size={15} color={COLORS.subtle} />
                   </Pressable>
+                  <View style={styles.divider} />
 
                   <View style={styles.menuList}>
-                    {MENU_ITEMS.map((item) => (
-                      <Pressable key={item.title} onPress={() => navigateTo(item.href)} style={styles.menuRow}>
+                    {MENU_ITEMS.map((item, index) => (
+                      <Pressable key={item.title} onPress={() => navigateTo(item.href)} style={[styles.menuRow, index === MENU_ITEMS.length - 1 ? styles.menuRowLast : null]}>
                         <Text style={styles.menuText}>{item.title}</Text>
-                        <Ionicons name="chevron-forward" size={15} color={COLORS.subtle} />
+                        <ChevronRightIcon size={15} color={COLORS.subtle} />
                       </Pressable>
                     ))}
                   </View>
@@ -341,25 +341,31 @@ const styles = StyleSheet.create({
     left: 0,
     backgroundColor: COLORS.bg,
   },
+  // Figma TopBar: padding 18/16/14, 높이 54(18+22+14).
   appBar: {
-    minHeight: 62,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: COLORS.bg,
+    paddingTop: 18,
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingBottom: 14,
   },
   iconButton: {
-    width: 42,
-    height: 42,
+    width: 22,
+    height: 22,
     alignItems: "center",
     justifyContent: "center",
+  },
+  appBarSpacer: {
+    width: 20,
+    height: 20,
   },
   appBarTitle: {
     color: COLORS.text,
     fontSize: 18,
     fontWeight: "500",
+    lineHeight: 21, // Figma 18/21
   },
   scroller: {
     flex: 1,
@@ -367,32 +373,40 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 36,
   },
+  // Figma 프로필래퍼: padding 0/16/16, 구분선은 별도 전폭 1px.
   profileRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: COLORS.border,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingBottom: 16,
   },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  // Figma 프로필정보: 고정 폭(flex-grow 0)이라 셰브론이 텍스트 바로 뒤(gap 12)에 붙는다.
   profileText: {
-    flex: 1,
+    flexShrink: 1,
     minWidth: 0,
   },
   profileName: {
     color: COLORS.text,
     fontSize: 16,
     fontWeight: "500",
+    lineHeight: 19, // Figma 16/19
   },
   profileMeta: {
     color: COLORS.muted,
     fontSize: 12,
     fontWeight: "400",
+    lineHeight: 14, // Figma 12/14
     marginTop: 3,
   },
+  // Figma 메뉴목록: padding 8/16/0, 행 43(13+17+13), 마지막 행은 테두리 없음.
   menuList: {
-    marginTop: 8,
+    paddingTop: 8,
+    paddingHorizontal: 16,
   },
   menuRow: {
     flexDirection: "row",
@@ -400,13 +414,16 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.border,
-    paddingHorizontal: 16,
     paddingVertical: 13,
+  },
+  menuRowLast: {
+    borderBottomWidth: 0,
   },
   menuText: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: "400",
+    lineHeight: 17, // Figma 14/17
   },
   logoutRow: {
     justifyContent: "center",
@@ -418,5 +435,6 @@ const styles = StyleSheet.create({
     color: COLORS.danger,
     fontSize: 14,
     fontWeight: "400",
+    lineHeight: 17, // Figma 14/17
   },
 });

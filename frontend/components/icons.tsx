@@ -531,10 +531,11 @@ export function AttachDocIcon({ size = 18, color = "#6B7280" }: IconProps) {
 
 // 공지 첨부링크 체인 아이콘 — 디자인 원본 16x16.
 export function AttachLinkIcon({ size = 16, color = "#6B7280" }: IconProps) {
+  // 디자인 원본 16x16 (stroke 1.3): 상조회 신청 링크입력필드 아이콘.
   return (
     <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
-      <Path d="M8.00006 8.99992H8.97139C10.0921 8.99992 11.0001 8.0067 11.0001 6.70003C11.0001 6.07232 10.7863 5.47032 10.4059 5.02646C10.0254 4.58261 9.50943 4.33325 8.97139 4.33325H5.00004H3.36204C2.24137 4.33325 1.33337 5.32647 1.33337 6.63314C1.33337 7.26085 1.54711 7.86285 1.92756 8.30671C2.30801 8.75056 2.82401 8.99992 3.36204 8.99992" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
-      <Path d="M8.33332 7.00008H7.36198C6.24132 7.00008 5.33332 7.9933 5.33332 9.29997C5.33332 9.92768 5.54705 10.5297 5.9275 10.9735C6.30795 11.4174 6.82395 11.6667 7.36198 11.6667H11.3333H12.9713C14.092 11.6667 15 10.6735 15 9.36686C15 8.73915 14.7863 8.13715 14.4058 7.69329C14.0254 7.24944 13.5094 7.00008 12.9713 7.00008" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M7.99994 9.00016H8.97127C10.0919 9.00016 10.9999 8.00694 10.9999 6.70027C10.9999 6.07257 10.7862 5.47057 10.4058 5.02671C10.0253 4.58285 9.5093 4.3335 8.97127 4.3335H4.99992H3.36192C2.24125 4.3335 1.33325 5.32672 1.33325 6.63338C1.33325 7.26109 1.54699 7.86309 1.92743 8.30695C2.30788 8.75081 2.82388 9.00016 3.36192 9.00016" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d="M8.33332 6.99984H7.36198C6.24132 6.99984 5.33332 7.99306 5.33332 9.29973C5.33332 9.92743 5.54705 10.5294 5.9275 10.9733C6.30795 11.4171 6.82395 11.6665 7.36198 11.6665H11.3333H12.9713C14.092 11.6665 15 10.6733 15 9.36662C15 8.73891 14.7863 8.13691 14.4058 7.69305C14.0254 7.24919 13.5094 6.99984 12.9713 6.99984" stroke={color} strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
@@ -576,6 +577,25 @@ export function NotificationNoticeIcon({ size = 36 }: IconProps) {
       <Rect width={36} height={36} rx={18} fill="#E6F1FB" />
       <Path d="M18 11.5C15.8 11.5 14.3 13.3 14.3 15.5V17.8C14.3 18.8 13.9 19.6 13 20.4H23C22.1 19.6 21.7 18.8 21.7 17.8V15.5C21.7 13.3 20.2 11.5 18 11.5Z" stroke="#0C447C" strokeWidth={1.5} strokeLinejoin="round" />
       <Path d="M16.2 22.2002C16.2 22.6776 16.3896 23.1354 16.7272 23.473C17.0647 23.8106 17.5226 24.0002 18 24.0002C18.4773 24.0002 18.9352 23.8106 19.2727 23.473C19.6103 23.1354 19.8 22.6776 19.8 22.2002" stroke="#0C447C" strokeWidth={1.5} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// 활동 인증 참가자 추가 버튼 — 디자인 원본 28x28 (파란 테두리 원 + 플러스).
+export function ParticipantAddIcon({ size = 28, color = "#2761FF" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 28 28" fill="none">
+      <Rect x={0.65} y={0.65} width={26.7} height={26.7} rx={13.35} stroke={color} strokeWidth={1.3} />
+      <Path d="M14.0002 9.33325V18.6666M9.3335 13.9999H18.6668" stroke={color} strokeWidth={1.9} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// 목록 행 우측 셰브론 — 디자인 원본 15x15 (stroke 1.5, #A6ACB7).
+export function ChevronRightIcon({ size = 15, color = "#A6ACB7" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 15 15" fill="none">
+      <Path d="M5.625 2.8125L10.3125 7.5L5.625 12.1875" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
