@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { Alert, BackHandler, Image, Keyboard, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, View } from "react-native";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Alert, BackHandler, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CommentItem from "../../../../components/CommentItem";
@@ -10,8 +10,9 @@ import ActivityCertificationMediaImage from "../../../../components/ActivityCert
 import LoadingState from "../../../../components/LoadingState";
 import ImageViewerModal from "../../../../components/ImageViewerModal";
 import MediaImage from "../../../../components/MediaImage";
+import PhotoPager from "../../../../components/PhotoPager";
 import NaturalAspectMediaImage from "../../../../components/NaturalAspectMediaImage";
-import { AttachDocIcon, AttachLinkIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../components/icons";
+import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../components/icons";
 import { useBoardsQuery } from "../../../../hooks/useApi";
 import { resolveMediaAccessUrl, useMediaAccessUrl } from "../../../../hooks/useMediaAccessUrl";
 import type { MediaReference } from "../../../../utils/mediaAccess";
@@ -45,7 +46,8 @@ import { isAdminUser } from "../../../../utils/permissions";
 import { formatCohortName } from "../../../../utils/userLabel";
 import { activityCertificationBadgeLabel } from "../../../../utils/activityCertification";
 import { activityCertificationDetailHeading } from "../../../../utils/activityDetailPresentation";
-import { activityImageLayoutFromMetadata } from "../../../../utils/activityImageLayout";
+import { activityImageLayoutFromMetadata, resolveActivityImageRule } from "../../../../utils/activityImageLayout";
+import { createPhotoSwipeConfig } from "../../../../utils/photoCarouselSwipe";
 import { COMMENT_DELETE_COPY } from "../../../../utils/commentPresentation";
 import {
   noticeAttachmentFrameAspectRatio,
@@ -60,6 +62,7 @@ import { shouldShowPostAuthorBlock } from "../../../../utils/postMenu";
 import { REPORT_REASONS, getReportEntryState, getReportSubmission, type ReportReason } from "../../../../utils/reportForm";
 import { createReplyTarget, getReplyComposerState, type ReplyTarget } from "../../../../utils/replyComposer";
 import { resourceCategoryLabel, resourceDetailMeta } from "../../../../utils/resourceBoards";
+import { RESOURCE_SUBJECT_SEPARATOR, resourceSubjectSegments, type ResourceSubjectTone } from "../../../../utils/resourcePostFields";
 
 const COLORS = {
   primary: "#2761FF",
@@ -89,8 +92,6 @@ const ALBUM_FALLBACK_GRADIENTS: readonly (readonly [string, string])[] = [
   ["#B94A2F", "#F39A7D"],
 ];
 
-const NO_COMMENT_RESOURCE_SLUGS = new Set(["lecture-reviews"]);
-
 type ReportTarget = {
   type: "post" | "comment";
   id: number;
@@ -106,7 +107,6 @@ type WebTextInputKeyPressEvent = TextInputKeyPressEvent & {
   };
 };
 
-type IconName = keyof typeof Ionicons.glyphMap;
 
 const SUGGESTION_STATUSES = [
   { value: "received", label: "대기중" },
@@ -153,10 +153,12 @@ function firstUrlFromText(value: string) {
   return value.match(/https?:\/\/[^\s)]+/)?.[0];
 }
 
-function IconButton({ icon, onPress, label, size = 24, color = COLORS.text }: { icon: IconName; onPress: () => void; label: string; size?: number; color?: string }) {
+// 뒤로가기는 Figma TopBar의 22x22 벡터를 그대로 옮긴 BackIcon을 쓴다. Ionicons의
+// chevron-back은 획 두께와 꺾임 위치가 달라 일정 화면과 다르게 보였다.
+function BackButton({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable accessibilityLabel={label} onPress={onPress} style={styles.iconButton}>
-      <Ionicons name={icon} size={size} color={color} />
+    <Pressable accessibilityLabel="뒤로" onPress={onPress} style={styles.iconButton}>
+      <BackIcon size={24} color={COLORS.text} />
     </Pressable>
   );
 }
@@ -252,7 +254,9 @@ export default function PostDetailScreen() {
   const isSuggestionRequest = board?.board_type === "suggestion";
   const isNotice = board?.board_type === "notice" || post?.is_notice === true;
   const isResource = board?.board_type === "resource";
-  const commentsDisabled = isMutualAidRequest || isSuggestionRequest || isNotice || board?.board_type === "activity_certification" || board?.board_type === "activity_history" || Boolean(board?.slug && NO_COMMENT_RESOURCE_SLUGS.has(board.slug));
+  // 강의후기·시험족보의 교수명·난이도·만족도. 값이 없는 예전 글은 빈 배열이라 줄이 빠진다.
+  const subjectSegments = resourceSubjectSegments(board?.slug, post?.metadata);
+  const commentsDisabled = isMutualAidRequest || isSuggestionRequest || isNotice || board?.board_type === "activity_certification" || board?.board_type === "activity_history";
   const { data: commentRes } = usePostComments(postId, Boolean(board) && !commentsDisabled);
   const comments = commentRes?.data ?? [];
 
@@ -280,6 +284,27 @@ export default function PostDetailScreen() {
   const [commentDeleteError, setCommentDeleteError] = useState<string | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+
+  // 사진을 좌우로 쓸어 넘긴다. 제스처를 '움직였을 때만' 가져오므로 그냥 탭하면
+  // 지금처럼 확대 보기가 열리고, 쓸기 시작하면 그 누름이 취소되어 확대 보기가
+  // 열리지 않는다. 갤러리가 아닌 화면(공지·참여활동 안내)에서는 0을 넣어 끈다.
+  // 훅은 아래 early return보다 먼저 있어야 해서, 개수는 ref로 넘긴다.
+  // 활동인증은 사진 방향에 따라 프레임이 240(가로)/400(세로)으로 갈린다. 넘기는
+  // 동안 높이가 출렁이지 않도록 이 글에서 가장 큰 프레임에 맞춘다. 방향은 사진을
+  // 불러와야 알 수 있어, 각 장이 알려준 높이의 최댓값을 쓴다.
+  const [activityFrameHeight, setActivityFrameHeight] = useState<number | null>(null);
+  const reportActivityFrameHeight = useCallback((height: number) => {
+    setActivityFrameHeight((prev) => (prev === null || height > prev ? height : prev));
+  }, []);
+  useEffect(() => {
+    setActivityFrameHeight(null);
+  }, [postId]);
+
+  const gallerySwipeCountRef = useRef(0);
+  const gallerySwipe = useMemo(
+    () => PanResponder.create(createPhotoSwipeConfig(() => gallerySwipeCountRef.current, setGalleryIndex)),
+    []
+  );
 
   const likeMutation = useToggleLike(postId, post?.board_id ?? 0, board);
   const bookmarkMutation = useToggleBookmark(postId);
@@ -358,9 +383,11 @@ export default function PostDetailScreen() {
 
   const navigationHeader = (
     <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
-      <IconButton icon="chevron-back" label="뒤로" onPress={handlePostBack} />
-      <Text numberOfLines={1} style={styles.appBarTitle}>{board?.name ?? "게시글"}</Text>
-      <View style={styles.iconButton} />
+      <View style={styles.appBarRow}>
+        <BackButton onPress={handlePostBack} />
+        <Text numberOfLines={1} style={styles.appBarTitle}>{board?.name ?? "게시글"}</Text>
+        <View style={styles.iconButton} />
+      </View>
     </View>
   );
 
@@ -491,6 +518,15 @@ export default function PostDetailScreen() {
   const galleryTotal = Math.max(imageAttachments.length, 1);
   const isPhotoAlbum = board?.board_type === "album";
   const hasVisualHero = board?.board_type === "album" || isActivityCertification || isCouncilActivityEntry;
+  // 사진첩·활동인증은 PhotoPager가 네이티브 스크롤로 처리하므로 여기서는 끈다.
+  // 원우회 활동만 사진 원래 비율로 보여 주는 디자인이라 아직 PanResponder를 쓴다.
+  const usesPhotoPager = isPhotoAlbum || isActivityCertification;
+  gallerySwipeCountRef.current = hasVisualHero && !usesPhotoPager ? imageAttachments.length : 0;
+  // 페이저는 모든 페이지가 같은 높이여야 한다. 활동인증은 이 글에서 가장 큰
+  // 프레임에 맞추고, 아직 모를 때는 기본 규칙 높이로 시작한다.
+  const activityPagerHeight = activityFrameHeight
+    ?? resolveActivityImageRule(activityImageLayout, "default").height
+    ?? undefined;
   const heroImagePresentation = postDetailImagePresentation({
     placement: "hero",
     boardType: board?.board_type,
@@ -711,11 +747,59 @@ export default function PostDetailScreen() {
       styles.visualHeroBlock,
       isAdminParticipationGuide ? styles.visualHeroBlockInset : null,
     ]}>
-      <View style={[
-        hasNaturalHero ? styles.visualHeroNatural : styles.visualHero,
-        isPhotoAlbum ? styles.visualHeroAlbum : null,
-      ]}>
-        {heroAttachment ? (
+      <View
+        {...gallerySwipe.panHandlers}
+        style={[
+          hasNaturalHero ? styles.visualHeroNatural : styles.visualHero,
+          isPhotoAlbum ? styles.visualHeroAlbum : null,
+          isActivityCertification && imageAttachments.length > 0 && activityPagerHeight !== undefined
+            ? { height: activityPagerHeight }
+            : null,
+        ]}
+      >
+        {isPhotoAlbum && imageAttachments.length > 0 ? (
+          // 사진첩은 높이가 240으로 고정이라 페이지마다 높이가 같다. 그래서 네이티브
+          // 가로 스크롤 페이징을 쓸 수 있고, 손가락을 따라 사진이 밀린다.
+          <PhotoPager
+            index={normalizedGalleryIndex}
+            items={imageAttachments}
+            itemKey={(attachment) => String(attachment.id)}
+            onIndexChange={setGalleryIndex}
+            renderItem={(attachment, itemIndex) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${itemIndex + 1}번째 사진 크게 보기`}
+                onPress={() => setViewerIndex(itemIndex)}
+                style={styles.albumPage}
+              >
+                <MediaImage media={attachment} resizeMode="contain" style={styles.visualHeroImage} />
+              </Pressable>
+            )}
+          />
+        ) : isActivityCertification && imageAttachments.length > 0 ? (
+          // 활동인증도 고정 프레임 안에 사진이 들어가는 디자인이라 사진첩과 같은
+          // 방식으로 넘긴다. 프레임 높이만 이 글 기준으로 맞춰 준다.
+          <PhotoPager
+            index={normalizedGalleryIndex}
+            items={imageAttachments}
+            itemKey={(attachment) => String(attachment.id)}
+            onIndexChange={setGalleryIndex}
+            renderItem={(attachment, itemIndex) => (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${itemIndex + 1}번째 사진 크게 보기`}
+                onPress={() => setViewerIndex(itemIndex)}
+                style={styles.albumPage}
+              >
+                <ActivityCertificationMediaImage
+                  layout={activityImageLayout}
+                  media={attachment}
+                  onFrameHeight={reportActivityFrameHeight}
+                />
+              </Pressable>
+            )}
+          />
+        ) : heroAttachment ? (
           <Pressable disabled={isNotice} accessibilityRole={isNotice ? undefined : "button"}
             accessibilityLabel={isNotice ? undefined : `${normalizedGalleryIndex + 1}번째 사진 크게 보기`}
             onPress={() => setViewerIndex(normalizedGalleryIndex)}
@@ -815,34 +899,34 @@ export default function PostDetailScreen() {
         <ImageViewerModal key={postId} images={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
       ) : null}
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
-        <IconButton
-          icon="chevron-back"
-          label="뒤로"
-          onPress={handlePostBack}
-        />
-        {/* 제목은 아이콘 줄과 같은 높이에 중앙 정렬한다. 상단 safe-area padding 아래에서 시작해야
-            상태바(카메라 컷아웃 포함) 영역에 겹치지 않는다. */}
-        <View pointerEvents="none" style={[styles.appBarTitleWrap, { top: Math.max(insets.top, 10) }]}>
-          <Text numberOfLines={1} style={styles.appBarTitle}>
-            {appBarTitle}
-          </Text>
-        </View>
-        {isPhotoAlbum ? (
-          <View style={styles.iconButton} />
-        ) : (
-          <View style={styles.appBarActions}>
-            {!isAdminParticipationGuide && !isActivityCertification && !isStudyRecruit && !isCouncilActivity && !isMutualAidRequest ? (
-              <Pressable accessibilityLabel="북마크" onPress={handleBookmark} style={[styles.iconButton, styles.appBarActionButton]}>
-                <BookmarkIcon filled={isBookmarked} color={isBookmarked ? COLORS.primary : COLORS.text} size={20} />
-              </Pressable>
-            ) : null}
-            {hasPostMenu && !isCouncilActivity ? (
-              <Pressable accessibilityLabel="더보기" onPress={() => setShowPostMenu(true)} style={[styles.iconButton, styles.appBarActionButton]}>
-                <MoreIcon color={COLORS.text} />
-              </Pressable>
-            ) : null}
+        <View style={styles.appBarRow}>
+          <BackButton onPress={handlePostBack} />
+          {/* 제목은 오른쪽 버튼 수와 무관하게 화면 정중앙에 와야 해서 좌우를 고정한 절대
+              배치를 쓴다. 다만 세로는 계산하지 않고 이 행을 꽉 채워, 뒤로 버튼과 같은
+              중심을 공유하게 한다. safe-area 값을 더해 세로 위치를 잡으면 노치가 있는
+              기기에서만 어긋난다. */}
+          <View pointerEvents="none" style={styles.appBarTitleWrap}>
+            <Text numberOfLines={1} style={styles.appBarTitle}>
+              {appBarTitle}
+            </Text>
           </View>
-        )}
+          {isPhotoAlbum ? (
+            <View style={styles.iconButton} />
+          ) : (
+            <View style={styles.appBarActions}>
+              {!isAdminParticipationGuide && !isActivityCertification && !isStudyRecruit && !isCouncilActivity && !isMutualAidRequest ? (
+                <Pressable accessibilityLabel="북마크" onPress={handleBookmark} style={[styles.iconButton, styles.appBarActionButton]}>
+                  <BookmarkIcon filled={isBookmarked} color={isBookmarked ? COLORS.primary : COLORS.text} size={20} />
+                </Pressable>
+              ) : null}
+              {hasPostMenu && !isCouncilActivity ? (
+                <Pressable accessibilityLabel="더보기" onPress={() => setShowPostMenu(true)} style={[styles.iconButton, styles.appBarActionButton]}>
+                  <MoreIcon color={COLORS.text} />
+                </Pressable>
+              ) : null}
+            </View>
+          )}
+        </View>
       </View>
 
       <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroller} contentContainerStyle={[styles.content, isAdminParticipationGuide || isCouncilActivityEntry || isPhotoAlbum || commentsDisabled ? styles.contentWithoutCommentBar : null]}>
@@ -884,6 +968,17 @@ export default function PostDetailScreen() {
                   : isStudyRecruit
                     ? `${formatCohortName(post.author_cohort, post.author_nickname)} · ${formatBoardDate(post.created_at)}`
                   : `${post.author_nickname} · ${formatBoardDate(post.created_at)}`}
+              </Text>
+            ) : null}
+
+            {subjectSegments.length > 0 ? (
+              <Text style={styles.subjectInfo}>
+                {subjectSegments.map((segment, index) => (
+                  <Text key={segment.tone}>
+                    {index > 0 ? <Text style={styles.subjectSeparator}>{RESOURCE_SUBJECT_SEPARATOR}</Text> : null}
+                    <Text style={SUBJECT_TONE_STYLES[segment.tone]}>{segment.text}</Text>
+                  </Text>
+                ))}
               </Text>
             ) : null}
 
@@ -1491,12 +1586,17 @@ const styles = StyleSheet.create({
   },
   appBar: {
     minHeight: 62,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: COLORS.surface,
     paddingHorizontal: 16,
     paddingBottom: 10,
+  },
+  // 제목의 절대 배치 기준이 되는 행. 여백이 없어야 left/right/top/bottom이
+  // 플랫폼과 무관하게 같은 뜻을 갖는다.
+  appBarRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   iconButton: {
     width: 42,
@@ -1507,9 +1607,10 @@ const styles = StyleSheet.create({
   },
   appBarTitleWrap: {
     position: "absolute",
-    left: 88,
-    right: 88,
-    bottom: 10, // appBar paddingBottom과 동일
+    left: 72, // appBar paddingHorizontal 16을 더해 화면 기준 88
+    right: 72,
+    top: 0,
+    bottom: 0,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -1868,6 +1969,11 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
   },
+  // 사진첩 페이저의 한 장. 페이지 크기를 그대로 채운다.
+  albumPage: {
+    width: "100%",
+    height: "100%",
+  },
   visualHeroNaturalImage: {
     width: "100%",
   },
@@ -1997,6 +2103,27 @@ const styles = StyleSheet.create({
   metaNotice: {
     color: COLORS.muted,
     fontSize: 13,
+  },
+  // Figma 과목정보 래퍼: 14/Medium, 항목마다 색이 다르고 구분점은 연한 회색.
+  // 메타(날짜)와의 간격은 Figma 좌표 기준 16 (메타 텍스트 하단 86 → 과목정보 상단 102).
+  subjectInfo: {
+    color: COLORS.muted,
+    fontSize: 14,
+    fontWeight: "500",
+    lineHeight: 17,
+    marginTop: 16,
+  },
+  subjectSeparator: {
+    color: "#C7CCD4",
+  },
+  subjectProfessor: {
+    color: COLORS.muted,
+  },
+  subjectDifficulty: {
+    color: "#1F4E8C",
+  },
+  subjectSatisfaction: {
+    color: "#3B6D11",
   },
   metaMutualAid: {
     color: "#A6ACB7", // Figma: Regular 12/14
@@ -2561,3 +2688,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
 });
+
+const SUBJECT_TONE_STYLES: Record<ResourceSubjectTone, TextStyle> = {
+  professor: styles.subjectProfessor,
+  difficulty: styles.subjectDifficulty,
+  satisfaction: styles.subjectSatisfaction,
+};

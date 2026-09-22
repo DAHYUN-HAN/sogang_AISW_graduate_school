@@ -2,11 +2,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import MediaImage, { MediaImageBackground } from "../../../components/MediaImage";
-import { EmptyCalendarIcon, LedgerIcon, PersonAvatarIcon, SearchBackIcon, SearchIcon } from "../../../components/icons";
+import { BackIcon, EmptyCalendarIcon, LedgerIcon, PersonAvatarIcon, SearchBackIcon, SearchIcon } from "../../../components/icons";
 import LoadingState from "../../../components/LoadingState";
 import PostCard from "../../../components/PostCard";
 import { useBoardsQuery } from "../../../hooks/useApi";
@@ -34,6 +34,7 @@ import {
 } from "../../../utils/councilIntroductions";
 import { toAbsoluteMediaUrl } from "../../../utils/mediaAccess";
 import { pastCouncilActivitiesFromMetadata } from "../../../utils/pastCouncil";
+import PhotoPager from "../../../components/PhotoPager";
 import {
   boardFeedFooterState,
   boardFeedMode,
@@ -106,7 +107,6 @@ const ALBUM_GRADIENTS: readonly (readonly [string, string])[] = [
   ["#0E7B60", "#55C69A"],
   ["#B94A2F", "#F39A7D"],
 ];
-type IconName = keyof typeof Ionicons.glyphMap;
 type SectionTab = {
   label: string;
   active: boolean;
@@ -227,10 +227,12 @@ function sectionTabs(board: Board | undefined, boards: Board[]): SectionTab[] {
   return [];
 }
 
-function IconButton({ icon, onPress, label }: { icon: IconName; onPress: () => void; label: string }) {
+// 뒤로가기는 Figma TopBar의 22x22 벡터를 그대로 옮긴 BackIcon을 쓴다. Ionicons의
+// chevron-back은 획 두께와 꺾임 위치가 달라 일정 화면과 다르게 보였다.
+function BackButton({ onPress }: { onPress: () => void }) {
   return (
-    <Pressable accessibilityLabel={label} onPress={onPress} style={styles.iconButton}>
-      <Ionicons name={icon} size={24} color={COLORS.text} />
+    <Pressable accessibilityLabel="뒤로" onPress={onPress} style={styles.iconButton}>
+      <BackIcon size={24} color={COLORS.text} />
     </Pressable>
   );
 }
@@ -440,7 +442,7 @@ function CohortLeaderScreen({
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={handleBack} />
+        <BackButton onPress={handleBack} />
         <Text style={styles.appBarTitle}>{headerTitle}</Text>
         <View style={styles.iconButton} />
       </View>
@@ -513,10 +515,19 @@ function pastCouncilsFromMetadata(metadata?: Record<string, unknown> | null): Pa
 function PhotoSlider({ photos }: { photos: string[] }) {
   const [index, setIndex] = useState(0);
   const current = Math.min(index, Math.max(photos.length - 1, 0));
+  // 화살표는 양 끝에서 순환하지만, 쓸어 넘기기는 네이티브 스크롤이라 순환하지 않는다.
+  // 끝에서 더 밀면 제자리로 돌아온다.
+  const step = (delta: number) => setIndex((prev) => (prev + delta + photos.length) % photos.length);
   return (
     <View style={styles.pastPhotoSlider}>
       {photos.length > 0 ? (
-        <MediaImage media={{ url: photos[current] }} resizeMode="contain" style={styles.pastPhoto} />
+        <PhotoPager
+          index={current}
+          items={photos}
+          itemKey={(url, itemIndex) => `${url}:${itemIndex}`}
+          onIndexChange={setIndex}
+          renderItem={(url) => <MediaImage media={{ url }} resizeMode="contain" style={styles.pastPhoto} />}
+        />
       ) : (
         <LinearGradient colors={["#534AB7", "#AFA9EC"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.pastPhoto} />
       )}
@@ -524,14 +535,14 @@ function PhotoSlider({ photos }: { photos: string[] }) {
         <>
           <Pressable
             accessibilityLabel="이전 사진"
-            onPress={() => setIndex((prev) => (prev - 1 + photos.length) % photos.length)}
+            onPress={() => step(-1)}
             style={[styles.pastPhotoNav, { left: 10 }]}
           >
             <Ionicons name="chevron-back" size={16} color="#FFFFFF" />
           </Pressable>
           <Pressable
             accessibilityLabel="다음 사진"
-            onPress={() => setIndex((prev) => (prev + 1) % photos.length)}
+            onPress={() => step(1)}
             style={[styles.pastPhotoNav, { right: 10 }]}
           >
             <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
@@ -604,7 +615,7 @@ function PastCouncilScreen({
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={handleBack} />
+        <BackButton onPress={handleBack} />
         <Text style={styles.appBarTitle}>{selected ? `${selected.cohort} 원우회 임원진` : "역대 원우회"}</Text>
         <View style={styles.iconButton} />
       </View>
@@ -655,7 +666,7 @@ function ExecutiveIntroScreen({ board, topInset, onBack }: { board?: Board | nul
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={onBack} />
+        <BackButton onPress={onBack} />
         <Text style={styles.appBarTitle}>원우회 임원진 소개</Text>
         <View style={styles.iconButton} />
       </View>
@@ -748,7 +759,7 @@ function CouncilActivityHistoryScreen({
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={onBack} />
+        <BackButton onPress={onBack} />
         <Text style={styles.appBarTitle}>원우회 활동내역</Text>
         <View style={styles.iconButton} />
       </View>
@@ -823,7 +834,7 @@ function AccountingExternalScreen({ board, topInset, onBack }: { board?: Board |
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <IconButton icon="chevron-back" label="뒤로" onPress={onBack} />
+        <BackButton onPress={onBack} />
         <Text style={styles.appBarTitle}>회계장부</Text>
         <View style={styles.iconButton} />
       </View>
@@ -1137,7 +1148,17 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
     }
     const category = selectedFilter !== "전체" ? selectedFilter : "";
     closeSearch();
-    router.push(postCreateRouteFromBoardList(boardId, category, isTabRoot, isActivityCards, detailReturnRoute) as never);
+    // 자료공유 `전체`는 여러 게시판을 모아 보여주는 상태다. 마지막으로 들른
+    // 게시판을 임의로 집어넣지 말고, 글쓰기 화면에서 고르게 그룹만 넘긴다.
+    const boardUnresolved = feedMode === "resources";
+    router.push(postCreateRouteFromBoardList(
+      boardUnresolved ? null : boardId,
+      category,
+      isTabRoot,
+      isActivityCards,
+      detailReturnRoute,
+      boardUnresolved ? board?.category : undefined,
+    ) as never);
   };
 
   if (board?.slug === "accounting") {
@@ -1229,7 +1250,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
             {isTabRoot ? (
               <View style={styles.iconButton} />
             ) : (
-              <IconButton icon="chevron-back" label="뒤로" onPress={exitBoardDepth} />
+              <BackButton onPress={exitBoardDepth} />
             )}
             <Text style={styles.appBarTitle}>{display.name}</Text>
             {/* 참여활동은 활동 인증에서만 검색을 제공한다. */}
@@ -1317,6 +1338,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         <LoadingState />
       ) : (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           key={isAlbum ? "album" : isParticipationGuideCards ? "participation-guide" : isActivityCards ? "activity" : "list"}
           numColumns={isAlbum ? 2 : 1}
           data={posts}

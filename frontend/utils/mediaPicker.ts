@@ -4,7 +4,13 @@ import { Platform } from "react-native";
 
 import { mediaApi } from "../services/api";
 import type { MediaAsset } from "../types";
-import { assertAllowedDocumentContentTypes, inferDocumentContentType } from "./documentFiles";
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_CONTENT_TYPES,
+  assertAllowedDocumentContentTypes,
+  assertUploadSize,
+  inferDocumentContentType,
+} from "./documentFiles";
 import { nativeMultiImagePickerOptions, uploadAttachmentBatch } from "./postAttachments";
 import { selectAndUploadProfileImage } from "./profileImagePicker";
 
@@ -28,10 +34,12 @@ function fileNameFromUri(uri: string, fallback: string) {
 }
 
 async function uploadPickedFile(
-  file: File | { uri: string; name: string; type: string },
+  file: File | { uri: string; name: string; type: string; size?: number | null },
   onProgress?: UploadProgress,
   isPrivate = false
 ) {
+  // 사진이든 문서든 여기를 지나가므로 한 곳에서만 본다.
+  assertUploadSize(file);
   const response = await mediaApi.upload(file, onProgress, isPrivate);
   return response.data;
 }
@@ -96,15 +104,21 @@ type DocumentUploadOptions = {
 };
 
 export async function pickAndUploadDocuments(onProgress?: UploadProgress, isPrivate = false, options?: DocumentUploadOptions): Promise<MediaAsset[]> {
+  // 증빙 이미지처럼 더 좁게 받는 자리가 아니면 안내한 4가지만 받는다. 선택
+  // 대화상자에서 한 번 거르고, 고른 뒤에도 실제 형식을 다시 확인한다.
+  const allowedTypes = options?.types ?? ATTACHMENT_CONTENT_TYPES;
+  const accept = options?.accept ?? ATTACHMENT_ACCEPT;
+
   if (Platform.OS === "web") {
-    const files = await pickLocalFiles({ accept: options?.accept, multiple: options?.multiple ?? true });
+    const files = await pickLocalFiles({ accept, multiple: options?.multiple ?? true });
     const normalizedFiles = files.map((file) => {
       const type = inferDocumentContentType(file.name, file.type);
       return file.type === type
         ? file
         : new File([file], file.name, { type, lastModified: file.lastModified });
     });
-    assertAllowedDocumentContentTypes(normalizedFiles, options?.types);
+    assertAllowedDocumentContentTypes(normalizedFiles, allowedTypes);
+    normalizedFiles.forEach(assertUploadSize);
     return Promise.all(
       normalizedFiles.map((file) => uploadPickedFile(file, onProgress, isPrivate))
     );
@@ -113,7 +127,7 @@ export async function pickAndUploadDocuments(onProgress?: UploadProgress, isPriv
   const result = await DocumentPicker.getDocumentAsync({
     copyToCacheDirectory: true,
     multiple: options?.multiple ?? true,
-    type: options?.types ?? "*/*",
+    type: [...allowedTypes],
   });
   if (result.canceled) {
     return [];
@@ -126,8 +140,12 @@ export async function pickAndUploadDocuments(onProgress?: UploadProgress, isPriv
       asset.name || fileNameFromUri(asset.uri, "upload"),
       asset.mimeType,
     ),
+    size: asset.size,
   }));
-  assertAllowedDocumentContentTypes(pickedFiles, options?.types);
+  assertAllowedDocumentContentTypes(pickedFiles, allowedTypes);
+  // 여러 개를 고르면 하나라도 크면 한 개도 올리지 않는다. 앞부분만 올라간 채로
+  // 실패하면 사용자가 무엇이 올라갔는지 알 수 없다.
+  pickedFiles.forEach(assertUploadSize);
 
   const uploaded: MediaAsset[] = [];
   for (const file of pickedFiles) {
@@ -202,6 +220,7 @@ export async function pickAndUploadImages(
         uri: asset.uri,
         name: asset.fileName || fileNameFromUri(asset.uri, "album-image.jpg"),
         type: asset.mimeType || "image/jpeg",
+        size: asset.fileSize,
       },
       onProgress,
     ),
@@ -262,6 +281,7 @@ export async function pickAndUploadBannerImage(onProgress?: UploadProgress): Pro
       uri: asset.uri,
       name: asset.fileName || fileNameFromUri(asset.uri, "banner-image.jpg"),
       type: asset.mimeType || "image/jpeg",
+      size: asset.fileSize,
     },
     onProgress
   );

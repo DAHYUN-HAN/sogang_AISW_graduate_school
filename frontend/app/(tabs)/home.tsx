@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { router, useFocusEffect } from "expo-router";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
+  PanResponder,
   Platform,
   Pressable,
   RefreshControl,
@@ -36,7 +37,7 @@ import { COMMUNITY_TAB_ROUTE, HOME_TAB_ROUTE, NOTICES_TAB_ROUTE, eventDayRoute, 
 import { formatBoardDate, formatHomeScheduleDate } from "../../utils/dateFormat";
 import {
   calendarDateKey,
-  calendarMonthRange,
+  calendarMonthWindowRange,
   currentKoreaMonth,
   eventDaysForMonth,
   eventIsCurrentOrUpcoming,
@@ -80,6 +81,11 @@ const POPULAR_BOARD_SLUGS = [
 ];
 const ALBUM_BOARD_SLUGS = ["activity-history", "event-album", "photo-album", "student-council"];
 const WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 달 넘기기 스와이프. 제스처를 가져오는 기준(8)과 실제로 넘기는 기준(48)을
+// 나눠, 손을 살짝 떨어도 달이 바뀌지 않게 한다.
+const MONTH_SWIPE_CLAIM_DX = 8;
+const MONTH_SWIPE_MIN_DX = 48;
 const MOBILE_WEB_WIDTH = 405;
 const HORIZONTAL_PADDING = 20;
 const ALBUM_CARD_WIDTH = 120;
@@ -446,6 +452,24 @@ function NoticeList({
 }
 
 function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; month: Date; onChangeMonth: (delta: number) => void }) {
+  // 달력을 좌우로 쓸어 달을 넘긴다. 사진첩·캐러셀과 같은 방향으로, 손가락을
+  // 왼쪽으로 밀면 다음 달이 뒤에서 들어온다.
+  const changeMonthRef = useRef(onChangeMonth);
+  changeMonthRef.current = onChangeMonth;
+  const monthSwipe = useMemo(
+    () =>
+      PanResponder.create({
+        // 세로 스크롤을 빼앗지 않도록 가로 이동이 분명할 때만 제스처를 가져온다.
+        // 눌렀다 떼는 동작은 움직임이 없으니 날짜 셀의 탭은 그대로 살아 있다.
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          Math.abs(gesture.dx) > MONTH_SWIPE_CLAIM_DX && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 2,
+        onPanResponderRelease: (_event, gesture) => {
+          if (Math.abs(gesture.dx) < MONTH_SWIPE_MIN_DX) return;
+          changeMonthRef.current(gesture.dx < 0 ? 1 : -1);
+        },
+      }),
+    []
+  );
   const today = koreaCalendarDate();
   const visibleEvents = events;
   const activeDay = today.year === month.getFullYear() && today.month === month.getMonth() + 1 ? today.day : 1;
@@ -466,7 +490,7 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
           <ForwardIcon size={16} color={COLORS.subtle} />
         </Pressable>
       </View>
-      <View style={styles.calendarGrid}>
+      <View {...monthSwipe.panHandlers} style={styles.calendarGrid}>
         {WEEKDAYS.map((day, index) => (
           <Text key={day} style={[styles.weekday, index === 0 ? styles.weekdaySunday : null]}>
             {day}
@@ -625,8 +649,18 @@ export default function HomeScreen() {
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const { openDrawer } = useMyPageDrawer();
   const [month, setMonth] = useState(() => currentKoreaMonth());
+  // 홈 탭은 떠나도 마운트가 유지돼서 보던 달이 그대로 남는다. 돌아올 때마다
+  // 오늘이 있는 달로 되돌린다. 같은 달이면 상태를 건드리지 않아 다시 불러오지 않는다.
+  useFocusEffect(useCallback(() => {
+    setMonth((current) => {
+      const thisMonth = currentKoreaMonth();
+      return current.getTime() === thisMonth.getTime() ? current : thisMonth;
+    });
+  }, []));
   const compact = false;
-  const monthRange = useMemo(() => calendarMonthRange(month), [month]);
+  // 앞뒤 한 달까지 같이 받는다. 옆 달로 넘어가는 순간 들고 있는 응답 안에 그 달이
+  // 이미 있어서 날짜 점이 끊기지 않는다.
+  const monthRange = useMemo(() => calendarMonthWindowRange(month), [month]);
   const {
     data: boardGroups,
     isError: boardsError,
@@ -651,6 +685,10 @@ export default function HomeScreen() {
   const eventsQuery = useQuery({
     queryKey: ["home", "events", monthRange.start, monthRange.end],
     queryFn: () => eventApi.getEvents({ from_date: monthRange.start, to_date: monthRange.end }),
+    // 달을 넘길 때마다 달력이 통째로 "불러오는 중"으로 바뀌지 않게 이전 응답을
+    // 그대로 두고 받아온다. 날짜 점은 보고 있는 달로 걸러지므로 범위 밖 일정이
+    // 잘못 찍히지 않는다.
+    placeholderData: keepPreviousData,
   });
   const albumQuery = useQuery({
     queryKey: ["home", "album", albumBoardId],

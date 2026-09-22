@@ -6,6 +6,7 @@ import {
   canDeleteMutualAidRequest,
   canEditMutualAidRequest,
   isUnchangedMutualAidEventDate,
+  isValidEvidenceLink,
   mutualAidEventTypeLabel,
   mutualAidRelationLabel,
   normalizeMutualAidEventDate,
@@ -53,4 +54,31 @@ test("상조회 링크 입력은 프로젝트 체인 아이콘을 사용한다",
     /<AttachLinkIcon size=\{16\} color=\{COLORS\.muted\} \/>/,
   );
   assert.doesNotMatch(editFormSource, /name="link-2"/);
+});
+
+test("증빙 링크는 도메인을 덜 입력한 주소를 거부한다", () => {
+  // QA: http://www. 로도 상조회 신청이 등록되던 문제
+  assert.equal(isValidEvidenceLink("http://www."), false);
+  assert.equal(isValidEvidenceLink("http://www"), false);
+  assert.equal(isValidEvidenceLink("https://"), false);
+  assert.equal(isValidEvidenceLink("https://example."), false);
+  assert.equal(isValidEvidenceLink("https://.com"), false);
+  assert.equal(isValidEvidenceLink("https://example.c"), false);
+});
+
+test("증빙 링크는 http(s) 정상 주소만 허용한다", () => {
+  assert.equal(isValidEvidenceLink("https://example.com"), true);
+  assert.equal(isValidEvidenceLink("http://www.example.com/invite?id=3"), true);
+  assert.equal(isValidEvidenceLink("  https://example.co.kr/a  "), true);
+  assert.equal(isValidEvidenceLink("ftp://example.com"), false);
+  assert.equal(isValidEvidenceLink("javascript:alert(1)"), false);
+  assert.equal(isValidEvidenceLink("example.com"), false);
+  assert.equal(isValidEvidenceLink(""), false);
+  assert.equal(isValidEvidenceLink(null), false);
+});
+
+test("증빙 링크 길이 제한은 500자다", () => {
+  const base = "https://example.com/";
+  assert.equal(isValidEvidenceLink(base + "a".repeat(500 - base.length)), true);
+  assert.equal(isValidEvidenceLink(base + "a".repeat(501 - base.length)), false);
 });

@@ -1,12 +1,12 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useIsFocused } from "@react-navigation/native";
+import { useIsFocused, useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { isAxiosError } from "axios";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
+import { BackHandler, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -14,11 +14,16 @@ import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmal
 import { useBoardsQuery } from "../../../../hooks/useApi";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/usePosts";
 import CompletionState from "../../../../components/CompletionState";
+import DiscardWriteModal from "../../../../components/DiscardWriteModal";
 import ClubOperationStatusField from "../../../../components/ClubOperationStatusField";
 import { clubOperationStatus } from "../../../../utils/participationGuide";
 import LoadingState from "../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
+import SelectionSheet, { type SelectionOption } from "../../../../components/SelectionSheet";
+import NoticeModal, { type NoticeModalContent } from "../../../../components/NoticeModal";
+import Toast from "../../../../components/Toast";
 import { MediaImageBackground } from "../../../../components/MediaImage";
+import { setWriteLeaveGuard } from "../../../../stores/writeLeaveGuard";
 import { duesPayerApi, postApi } from "../../../../services/api";
 import type { MediaAsset } from "../../../../types";
 import {
@@ -46,15 +51,15 @@ import {
   isActivityCertificationDateAllowed,
   isCalendarDateWithinBounds,
   isCalendarMonthAfterMaximum,
-  isMutualAidEventDateAllowed,
   maximumActivityCertificationDate,
   minimumMutualAidEventDate,
 } from "../../../../utils/dateSelection";
-import { createFormNotice, requiredFieldNotice, type FormNotice } from "../../../../utils/formNotice";
+import { TOAST_MESSAGES, nextToastState, type ToastState } from "../../../../utils/toast";
+import { uploadFailureFeedback } from "../../../../utils/uploadFeedback";
 import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../utils/mediaPicker";
 import {
   canEditMutualAidRequest,
-  isUnchangedMutualAidEventDate,
+  isValidEvidenceLink,
   mutualAidEventTypeLabel,
   mutualAidRelationLabel,
   normalizeMutualAidEventDate,
@@ -66,6 +71,13 @@ import {
   replaceParticipationGuideRepresentative,
   writeAttachmentActions,
 } from "../../../../utils/postAttachments";
+import {
+  RESOURCE_RATING_FIELDS,
+  RESOURCE_RATING_LEVELS,
+  resourcePostFieldValues,
+  resourcePostFields,
+  resourcePostMetadata,
+} from "../../../../utils/resourcePostFields";
 
 const COLORS = {
   primary: "#2761FF",
@@ -92,6 +104,9 @@ const schema = z.object({
   relation: z.string().optional(),
   contact: z.string().optional(),
   applicationUrl: z.string().optional(),
+  professor: z.string().optional(),
+  difficulty: z.string().optional(),
+  satisfaction: z.string().optional(),
   clubOperationStatus: z.enum(["active", "ended"]),
 });
 
@@ -130,10 +145,16 @@ function FormField({ label, required, requiredStar, optional, helper, error, chi
   );
 }
 
-// Figma: 입력 중(포커스) 상태는 1.5px #21262E 테두리
-function FormTextInput({ style, onBlur, onFocus, ...props }: ComponentProps<typeof TextInput>) {
+// Figma: 기본 0.5px #E1E4E9, 입력 중(포커스)과 오류는 1px 테두리
+function FormTextInput({ style, hasError, onBlur, onFocus, ...props }: ComponentProps<typeof TextInput> & { hasError?: boolean }) {
   const [focused, setFocused] = useState(false);
-  const inputStyle: TextStyle = StyleSheet.flatten([style, focused ? styles.inputFocused : null]);
+  // 오류 테두리가 포커스 테두리를 이긴다. 값을 채우기 전까지는 눌러도 빨간색을
+  // 유지해야 인증 화면과 감각이 같다.
+  const inputStyle: TextStyle = StyleSheet.flatten([
+    style,
+    focused ? styles.inputFocused : null,
+    hasError ? styles.inputError : null,
+  ]);
   const scrollableBody = props.multiline && Platform.OS === "android";
   const iosBody = props.multiline && Platform.OS === "ios";
   const maximumBodyHeight = 240;
@@ -192,88 +213,17 @@ function clean(value?: string) {
   return trimmed || undefined;
 }
 
+const BOARD_SELECT_PLACEHOLDER = "게시판을 선택하세요";
+
 const EVIDENCE_MODES = [
   { key: "file" as const, label: "이미지 첨부" },
   { key: "link" as const, label: "링크 첨부" },
 ];
 
-function mutualAidDateGuidance(minimumDate: string) {
-  return `오늘 기준 2일 후인 ${formatBoardDate(minimumDate)}부터 신청할 수 있어요.`;
-}
-
-function isMutualAidDateTooSoonError(error: unknown) {
-  return (
-    isAxiosError<{ code?: string }>(error) &&
-    error.response?.data?.code === "MUTUAL_AID_DATE_TOO_SOON"
-  );
-}
-
 function activitySelectPlaceholder(slug?: string) {
   if (slug?.includes("study")) return "모집글을 선택하세요";
   if (slug?.includes("networking")) return "네트워킹을 선택하세요";
   return "동아리명을 선택하세요";
-}
-
-type SelectionOption = { key: string; label: string };
-
-function SelectionSheet({
-  visible,
-  title,
-  options,
-  emptyText,
-  selectedKey,
-  onClose,
-  onSelect,
-}: {
-  visible: boolean;
-  title: string;
-  options: SelectionOption[];
-  emptyText: string;
-  selectedKey?: string;
-  onClose: () => void;
-  onSelect: (option: SelectionOption) => void;
-}) {
-  return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-      <Pressable onPress={onClose} style={styles.sheetBackdrop}>
-        <Pressable onPress={() => undefined} style={styles.sheetCard}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>{title}</Text>
-          <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-            {options.length === 0 ? <Text style={styles.sheetEmpty}>{emptyText}</Text> : null}
-            {options.map((option) => {
-              const active = option.key === selectedKey;
-              return (
-                <Pressable key={option.key} onPress={() => onSelect(option)} style={styles.sheetOption}>
-                  <Text style={[styles.sheetOptionText, active ? styles.sheetOptionTextActive : null]}>{option.label}</Text>
-                  {active ? <Ionicons name="checkmark" size={16} color={COLORS.primary} /> : null}
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
-function FormNoticeModal({ notice, onClose }: { notice: FormNotice | null; onClose: () => void }) {
-  return (
-    <Modal animationType="fade" transparent visible={Boolean(notice)} onRequestClose={onClose}>
-      <Pressable accessibilityViewIsModal onPress={onClose} style={styles.noticeBackdrop}>
-        <Pressable onPress={() => undefined} style={styles.noticeCard}>
-          <View style={styles.noticeIcon}>
-            <Ionicons name="alert-circle-outline" size={24} color={COLORS.primary} />
-          </View>
-          <Text accessibilityRole="header" style={styles.noticeTitle}>{notice?.title}</Text>
-          <Text style={styles.noticeMessage}>{notice?.message}</Text>
-          <Pressable accessibilityRole="button" onPress={onClose} style={styles.noticeButton}>
-            <Text style={styles.noticeButtonText}>확인</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
 }
 
 const CAL_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -359,6 +309,7 @@ function InlineCalendar({
 
 type PostCreateRouteParams = {
   boardId?: string;
+  boardGroup?: string;
   postId?: string;
   title?: string;
   category?: string;
@@ -398,16 +349,63 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [participantQuery, setParticipantQuery] = useState("");
   const [participantSearchFocused, setParticipantSearchFocused] = useState(false);
   const [evidenceLinkFocused, setEvidenceLinkFocused] = useState(false);
+  const [professorFocused, setProfessorFocused] = useState(false);
   const [selectedParticipants, setSelectedParticipants] = useState<ActivityParticipant[]>([]);
   const [selectionSheet, setSelectionSheet] = useState<"activity" | "mutualType" | "mutualRelation" | "board" | null>(null);
+  const [missingBoard, setMissingBoard] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   // 증빙서류는 파일 업로드와 링크 입력 중 하나만 사용한다.
   const [evidenceMode, setEvidenceMode] = useState<"file" | "link" | null>(null);
   const [evidenceLink, setEvidenceLink] = useState("");
   const [activitySourcePostId, setActivitySourcePostId] = useState<number | null>(null);
   const [createdPostId, setCreatedPostId] = useState<number | null>(null);
-  const [formNotice, setFormNotice] = useState<FormNotice | null>(null);
+  // 등록·저장에 성공해 떠나는 이동은 막으면 안 된다. 완료 화면을 쓰는
+  // 활동인증·상조회·건의만 createdPostId가 채워지므로, 나머지 게시판과 수정
+  // 저장은 이 표시로 usePreventRemove 잠금을 먼저 푼다.
+  const [submitted, setSubmitted] = useState(false);
+  const pendingSubmitNavigation = useRef<(() => void) | null>(null);
+  const [notice, setNotice] = useState<NoticeModalContent | null>(null);
+  // 업로드 실패 원인에 따라 토스트와 모달을 나눠 보여준다.
+  const showUploadFailure = useCallback((error: unknown, imagesOnly = false) => {
+    const feedback = uploadFailureFeedback(error, imagesOnly);
+    if (feedback.kind === "modal") setNotice(feedback.notice);
+    else setToast((current) => nextToastState(current, feedback.message));
+  }, []);
+  const [toast, setToast] = useState<ToastState>(null);
+  // 첨부·증빙은 react-hook-form 밖에 있어서 테두리 표시를 따로 들고 있는다.
+  const [missingRequiredAttachment, setMissingRequiredAttachment] = useState(false);
+  const showToast = useCallback((message: string) => setToast((current) => nextToastState(current, message)), []);
+  const hideToast = useCallback(() => setToast(null), []);
+  const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
+  // 확인창을 띄우는 동안 고른 게시판을 들고 있는다. 확인 전에는 바꾸지 않는다.
+  const [pendingBoardId, setPendingBoardId] = useState<number | null>(null);
+  // 수정 모드는 기존 글 값이 기준선이 된다. 작성 모드는 빈 문자열로 시작한다.
+  const unsavedBaseline = useRef({ attachmentIds: "", participantIds: "", evidenceLink: "" });
   const hydratedPostId = useRef<number | null>(null);
+  // 키보드가 뜨면 입력칸 바로 아래에 붙은 안내문구나 버튼이 가려진다. 드러내야 할
+  // 블록을 기억해 두었다가, 포커스 시점과 키보드 때문에 높이가 줄어드는 시점
+  // (ScrollView onLayout) 양쪽에서 그만큼 스크롤한다.
+  const formScrollRef = useRef<ScrollView>(null);
+  const formScrollHeight = useRef(0);
+  const bankGroupBottom = useRef(0);
+  const attachSectionTop = useRef(0);
+  const attachActionsBottom = useRef(0);
+  const revealTarget = useRef<"end" | "bank" | "attach" | null>(null);
+  const revealFocusedBlock = () => {
+    const target = revealTarget.current;
+    if (!target) return;
+    const bottom = target === "bank"
+      ? bankGroupBottom.current
+      : target === "attach"
+        ? attachSectionTop.current + attachActionsBottom.current
+        : 0;
+    // 드러낼 블록을 모르거나(첨부가 없는 게시판) 아직 재본 적이 없으면 맨 아래까지 내린다.
+    if (bottom <= 0 || formScrollHeight.current <= 0) {
+      formScrollRef.current?.scrollToEnd({ animated: true });
+      return;
+    }
+    formScrollRef.current?.scrollTo({ y: Math.max(0, bottom - formScrollHeight.current + 16), animated: true });
+  };
   const boards = useMemo(() => boardsRes?.data.flatMap((group) => group.boards) ?? [], [boardsRes?.data]);
   const board = useMemo(
     () => boards.find((item) => item.id === boardId),
@@ -432,6 +430,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   // 처음 올릴 때부터 마감 상태인 모집글을 막는다. 마감 전환은 등록 후 수정에서만.
   const canCloseRecruitment = Boolean(postId);
   const isNetworkingProgram = board?.slug === "networking-programs";
+  // 자료공유 게시판별 추가 입력(교수명·난이도·만족도)은 resourcePostFields 표가 정한다.
+  const resourceFields = resourcePostFields(board?.slug);
   const isAdminParticipationPost = board?.slug === "club-promo" || isNetworkingProgram;
   const bankAccountField = activityBankAccountFieldState(postId);
   const compactCreate = !isActivity && !isMutualAid;
@@ -439,9 +439,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const canPickBoard =
     !postId && compactCreate && !isAlbum && !isSuggestion && !isStudyRecruit && !isNetworkingProgram && !isAdminParticipationPost;
   const selectableBoards = useMemo(() => {
-    const group = boardsRes?.data.find((entry) => entry.boards.some((item) => item.id === boardId));
-    return group?.boards ?? [];
-  }, [boardsRes?.data, boardId]);
+    const groups = boardsRes?.data ?? [];
+    const owning = groups.find((entry) => entry.boards.some((item) => item.id === boardId));
+    if (owning) return owning.boards;
+    // 게시판을 아직 안 골랐으면 어느 묶음에서 왔는지로 후보를 좁힌다.
+    return groups.find((entry) => entry.category === params.boardGroup)?.boards ?? [];
+  }, [boardsRes?.data, boardId, params.boardGroup]);
   const trimmedParticipantQuery = participantQuery.trim();
   const participantSearch = useQuery({
     queryKey: ["dues-payer-search", trimmedParticipantQuery],
@@ -468,7 +471,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     retry: false,
   });
 
-  const { clearErrors, control, handleSubmit, reset, setError, setValue } = useForm<FormValues>({
+  const { clearErrors, control, formState, handleSubmit, reset, setError, setValue } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
       title: params.title ?? "",
@@ -481,12 +484,23 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       relation: "",
       contact: "",
       applicationUrl: "",
+      professor: "",
+      difficulty: "",
+      satisfaction: "",
       clubOperationStatus: "active",
     },
   });
 
+  // 인증 화면(register/login)처럼 값을 고치는 즉시 빨간 테두리를 푼다.
+  // 스키마가 모두 optional이라 재검증만으로는 풀리지 않아 직접 지운다.
+  const clearOnChange = (name: keyof FormValues, onChange: (value: string) => void) => (value: string) => {
+    onChange(value);
+    clearErrors(name);
+  };
+
   useEffect(() => {
-    if (!postId || !existingPost || hydratedPostId.current === postId) return;
+    // 게시판이 확정되기 전에 프리필하면 게시판별 추가 입력이 빈 값으로 덮인다.
+    if (!postId || !existingPost || !board || hydratedPostId.current === postId) return;
 
     const metadata = existingPost.metadata ?? {};
     const storedParticipants = activityParticipantsFromMetadata(metadata);
@@ -507,6 +521,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       ),
       contact: typeof metadata.contact === "string" ? metadata.contact : "",
       applicationUrl: typeof metadata.application_url === "string" ? metadata.application_url : "",
+      ...resourcePostFieldValues(resourceFields, metadata),
       clubOperationStatus: clubOperationStatus(metadata),
     });
     setAttachments(existingPost.attachments);
@@ -517,8 +532,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     setSelectedParticipants(storedParticipants);
     setParticipantQuery("");
     setActivitySourcePostId(activitySourcePostIdFromMetadata(metadata));
+    // 불러온 값이 "변경 없음"의 기준이 된다. 이후 이 값과 달라지면 이탈 시 확인창을 띄운다.
+    unsavedBaseline.current = {
+      attachmentIds: existingPost.attachments.map((attachment) => attachment.id).join(","),
+      participantIds: storedParticipants.map((participant) => participant.id).join(","),
+      evidenceLink: storedProofUrl,
+    };
     hydratedPostId.current = postId;
-  }, [existingPost, postId, reset]);
+  }, [board, existingPost, postId, reset, resourceFields]);
 
   useEffect(() => {
     if (isStudyRecruit && (!params.category || params.category === "모집")) {
@@ -548,6 +569,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const syncParticipants = (items: ActivityParticipant[]) => {
     setSelectedParticipants(items);
     setValue("participants", items.map(formatActivityParticipant).join(", "), { shouldValidate: true });
+    clearErrors("participants");
   };
   const addParticipant = (participant: ActivityParticipant) => {
     if (selectedParticipants.some((item) => item.id === participant.id)) {
@@ -573,6 +595,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           ? "제목을 입력하세요"
         : isStudyRecruit
           ? "스터디 제목을 입력하세요"
+        : resourceFields
+          ? resourceFields.titlePlaceholder
           : "제목을 입력하세요",
     category: isMutualAid ? "경조사 종류" : isActivity ? "소속 그룹" : isStudyRecruit ? "모집 상태" : "분류",
     categoryPlaceholder: isMutualAid ? "결혼 / 상(喪) 중 선택" : isActivity ? "활동 대상을 선택하세요" : isStudyRecruit ? "진행중 / 마감" : "선택 입력",
@@ -660,80 +684,83 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       metadata.application_url = clean(values.applicationUrl) as string;
       if (board?.slug === "club-promo") metadata.club_operation_status = values.clubOperationStatus;
     }
+    Object.assign(metadata, resourcePostMetadata(resourceFields, values));
     return Object.keys(metadata).length > 0 ? metadata : undefined;
   };
 
+  // 참여 버튼 링크(관리자 전용)만 쓰는 검사. 토스트 전환 대상이 아니라서
+  // 기존과 같은 확인창 문구를 그대로 유지한다.
   const requireValue = (value: string | undefined, label: string) => {
     if (clean(value)) {
       return false;
     }
-    setFormNotice(requiredFieldNotice(label));
+    setNotice({ title: "필수 항목", body: `${label} 항목을 입력하세요.` });
     return true;
   };
 
-  const handleMutationError = (error: unknown) => {
-    if (isMutualAid && isMutualAidDateTooSoonError(error)) {
-      const message = mutualAidDateGuidance(minimumMutualAidEventDate());
-      setError("eventDate", { message });
-      setFormNotice(createFormNotice("신청 가능한 날짜", message));
-      return;
-    }
-    setFormNotice(createFormNotice(
-      postId ? "수정 실패" : isMutualAid ? "신청 실패" : "등록 실패",
-      "입력 내용과 첨부파일을 확인한 뒤 다시 시도하세요."
-    ));
+  const handleMutationError = () => {
+    showToast(TOAST_MESSAGES.error);
   };
 
   const onSubmit = (values: FormValues) => {
     if (isAlbum && attachmentIds.length > PHOTO_ALBUM_IMAGE_SELECTION_LIMIT) {
-      setFormNotice(createFormNotice("사진 첨부", "사진첩은 게시글당 최대 20장까지 등록할 수 있어요. 사진을 20장 이하로 줄여주세요."));
+      showToast(TOAST_MESSAGES.error);
       return;
     }
-    if (!isActivity && !isMutualAid && requireValue(values.title, labels.title)) {
-      return;
+    // 디자인은 비어 있는 필수 칸을 한 번에 빨갛게 표시한다. 첫 항목에서 멈추지 않고
+    // 전부 모은 뒤 토스트 하나로 알린다. 어느 칸인지는 테두리가 알려주므로
+    // 문구에는 항목명을 넣지 않는다.
+    const missing: (keyof FormValues)[] = [];
+    const requireField = (name: keyof FormValues, value?: string) => {
+      if (!clean(value)) missing.push(name);
+    };
+    if (!isActivity && !isMutualAid) requireField("title", values.title);
+    if (!isMutualAid && !isAlbum) requireField("content", values.content);
+    if (isActivity) {
+      requireField("category", values.category);
+      requireField("activityDate", values.activityDate);
+      requireField("participants", values.participants);
+      if (bankAccountField.required) requireField("bankAccount", values.bankAccount);
     }
-    if (!isMutualAid && !isAlbum && requireValue(values.content, labels.content)) {
+    if (isMutualAid) {
+      requireField("category", values.category);
+      requireField("eventDate", values.eventDate);
+      requireField("relation", values.relation);
+    }
+    if (isStudyRecruit) requireField("contact", values.contact);
+    if (resourceFields?.professor) requireField("professor", values.professor);
+    if (resourceFields?.difficulty) requireField("difficulty", values.difficulty);
+    if (resourceFields?.satisfaction) requireField("satisfaction", values.satisfaction);
+    const missingEvidenceLink = isMutualAid && evidenceMode === "link" && !evidenceLink.trim();
+    const missingAttachment = !missingEvidenceLink
+      && !(isMutualAid && evidenceMode === "link")
+      && requiresAttachment
+      && (isAdminParticipationPost ? !participationRepresentativeImage : attachmentIds.length === 0);
+
+    // 게시판을 고르지 않으면 어디로 보낼지 정해지지 않는다. 다른 필수 칸과
+    // 같은 시점에 같은 방식으로 알린다.
+    const boardUnselected = canPickBoard && !board;
+    clearErrors(missing);
+    setMissingBoard(boardUnselected);
+    setMissingRequiredAttachment(missingAttachment || missingEvidenceLink);
+    if (boardUnselected || missing.length > 0 || missingAttachment || missingEvidenceLink) {
+      // message를 비워 칸 아래 문구 없이 테두리만 빨갛게 만든다.
+      for (const name of missing) setError(name, { message: "" });
+      showToast(TOAST_MESSAGES.requiredFieldError);
       return;
     }
     if (isActivity) {
-      if (
-        requireValue(values.category, "활동 대상") ||
-        requireValue(values.activityDate, "활동일") ||
-        requireValue(values.participants, "참가자") ||
-        (bankAccountField.required && requireValue(values.bankAccount, "입금 계좌"))
-      ) {
-        return;
-      }
       if (!isActivityCertificationDateAllowed(values.activityDate)) {
         const message = "오늘 이후 날짜는 선택할 수 없어요.";
-        setError("activityDate", { message });
-        setFormNotice(createFormNotice("활동일", message));
+        setError("activityDate", { message: "" });
+        showToast(message);
         return;
       }
       const participantError = activityParticipantSelectionError(selectedParticipants, existingPost?.metadata);
       if (participantError) {
-        setFormNotice(createFormNotice("참가자 재선택", participantError));
+        showToast(participantError);
         return;
       }
-    }
-    if (isMutualAid) {
-      if (requireValue(values.category, "경조사 종류") || requireValue(values.eventDate, "경조사 일자") || requireValue(values.relation, "관계")) {
-        return;
-      }
-      const storedEventDate = existingPost?.mutual_aid?.event_date ??
-        (typeof existingPost?.metadata?.event_date === "string" ? existingPost.metadata.event_date : undefined);
-      if (
-        !isUnchangedMutualAidEventDate(values.eventDate, storedEventDate) &&
-        !isMutualAidEventDateAllowed(values.eventDate)
-      ) {
-        const message = mutualAidDateGuidance(minimumMutualAidEventDate());
-        setError("eventDate", { message });
-        setFormNotice(createFormNotice("신청 가능한 날짜", message));
-        return;
-      }
-    }
-    if (isStudyRecruit && requireValue(values.contact, "스터디장 연락수단")) {
-      return;
     }
     if (isAdminParticipationPost) {
       const applicationUrl = clean(values.applicationUrl);
@@ -744,28 +771,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         const parsed = new URL(applicationUrl as string);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("INVALID_PROTOCOL");
       } catch {
-        setFormNotice(createFormNotice("참여 버튼 링크", "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요."));
+        setNotice({
+          title: "참여 버튼 링크",
+          body: "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요.",
+        });
         return;
       }
     }
-    if (isMutualAid && evidenceMode === "link") {
-      const link = evidenceLink.trim();
-      if (!link) {
-        setFormNotice(createFormNotice("증빙서류 첨부", "청첩장·부고장 링크를 입력하세요."));
-        return;
-      }
-      try {
-        const parsed = new URL(link);
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("INVALID_PROTOCOL");
-      } catch {
-        setFormNotice(createFormNotice("증빙서류 첨부", "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요."));
-        return;
-      }
-    } else if (
-      requiresAttachment &&
-      (isAdminParticipationPost ? !participationRepresentativeImage : attachmentIds.length === 0)
-    ) {
-      setFormNotice(createFormNotice(labels.attachment, `${labels.attachmentHelp}을 첨부하세요.`));
+    if (isMutualAid && evidenceMode === "link" && !isValidEvidenceLink(evidenceLink)) {
+      showToast(TOAST_MESSAGES.linkFormatError);
       return;
     }
 
@@ -791,10 +805,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             params.fromBoardId,
             params.returnTo,
           );
-          navigateAfterPostEdit(decision, {
+          pendingSubmitNavigation.current = () => navigateAfterPostEdit(decision, {
             back: () => router.back(),
             replace: (route) => router.replace(route as never),
           });
+          setSubmitted(true);
         },
         onError: handleMutationError,
       });
@@ -807,26 +822,29 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           setCreatedPostId(res.data.id);
           return;
         }
-        router.replace(
-          postCreateCompletionRoute(boardType, res.data.id, boardId, params.returnTo) as never,
-        );
+        const route = postCreateCompletionRoute(boardType, res.data.id, boardId, params.returnTo);
+        pendingSubmitNavigation.current = () => router.replace(route as never);
+        setSubmitted(true);
       },
       onError: handleMutationError,
     });
   };
 
   const uploadAttachments = async (pickAttachments: () => Promise<MediaAsset[]>) => {
+    // 갤러리·파일 선택창이 키보드 위로 뜨면 뒤에 키보드가 남는다. 먼저 내린다.
+    Keyboard.dismiss();
     try {
       setIsUploading(true);
       const uploaded = await pickAttachments();
       if (uploaded.length > 0) {
+        setMissingRequiredAttachment(false);
         setAttachments((current) => {
           const next = [...current, ...uploaded];
           return isAlbum ? next.slice(0, PHOTO_ALBUM_IMAGE_SELECTION_LIMIT) : next;
         });
       }
-    } catch {
-      setFormNotice(createFormNotice("업로드 실패", "파일 업로드를 다시 시도하세요."));
+    } catch (error) {
+      showUploadFailure(error, isAlbum || isActivity || isAdminParticipationPost);
     } finally {
       setIsUploading(false);
     }
@@ -834,7 +852,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
   const pickPostImages = () => {
     if (isAlbumImageLimitReached) {
-      setFormNotice(createFormNotice("사진 첨부", "사진첩은 게시글당 최대 20장까지 등록할 수 있어요."));
+      showToast("게시글당 최대 20장까지 등록할 수 있어요");
       return Promise.resolve([]);
     }
     return pickAndUploadImages(
@@ -848,7 +866,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 skippedCount > 0 ? `게시글당 최대 20장까지 등록할 수 있어 ${skippedCount}장은 제외했어요.` : null,
                 failedCount > 0 ? `${uploadedCount}장은 추가했고 ${failedCount}장은 업로드하지 못했어요.` : null,
               ].filter((message): message is string => Boolean(message));
-              setFormNotice(createFormNotice("사진 업로드 안내", messages.join(" ")));
+              setNotice({ title: "사진 업로드 안내", body: messages.join("\n") });
             },
           }
         : undefined,
@@ -856,6 +874,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   };
 
   const selectParticipationRepresentativeImage = async () => {
+    Keyboard.dismiss();
     try {
       setIsUploading(true);
       const uploaded = await pickAndUploadImages(undefined, {
@@ -867,7 +886,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             failedCount > 0 ? "대표 이미지를 업로드하지 못했어요." : null,
           ].filter((message): message is string => Boolean(message));
           if (messages.length > 0) {
-            setFormNotice(createFormNotice("대표 이미지", messages.join(" ")));
+            setNotice({ title: "대표 이미지", body: messages.join("\n") });
           }
         },
       });
@@ -876,8 +895,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           replaceParticipationGuideRepresentative(current, uploaded[0]),
         );
       }
-    } catch {
-      setFormNotice(createFormNotice("업로드 실패", "대표 이미지 업로드를 다시 시도하세요."));
+    } catch (error) {
+      showUploadFailure(error, true);
     } finally {
       setIsUploading(false);
     }
@@ -888,10 +907,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       retainSuccessfulUploads: true,
       onBatchIssue: ({ uploadedCount, failedCount }) => {
         if (failedCount > 0) {
-          setFormNotice(createFormNotice(
-            "상세 글 이미지",
-            `${uploadedCount}장은 추가했고 ${failedCount}장은 업로드하지 못했어요.`,
-          ));
+          setNotice({
+            title: "상세 글 이미지",
+            body: `${uploadedCount}장은 추가했고 ${failedCount}장은 업로드하지 못했어요.`,
+          });
         }
       },
     }),
@@ -927,7 +946,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   });
 
   const participantResults = participantSearch.data?.data ?? [];
-  const activitySourcePosts = activitySourceQuery.data ?? [];
+  // 동아리 활동인증은 운영 중인 동아리만 고를 수 있다. 운영이 끝난 동아리의
+  // 안내 글은 지우지 않고 남겨둔다 — 과거 활동인증이 그 글을 참조해 배지에
+  // 마지막 공식명을 띄우기 때문이다.
+  const activitySourcePosts = useMemo(() => {
+    const posts = activitySourceQuery.data ?? [];
+    if (activitySourceBoard?.slug !== "club-promo") return posts;
+    return posts.filter((post) => clubOperationStatus(post.metadata) === "active");
+  }, [activitySourceBoard?.slug, activitySourceQuery.data]);
   const activityOptions: SelectionOption[] = activitySourcePosts.map((post) => ({ key: String(post.id), label: post.title }));
   const mutualAidTypeOptions: SelectionOption[] = [
     { key: "marriage", label: "결혼" },
@@ -936,6 +962,56 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const mutualAidRelationOptions: SelectionOption[] = ["본인", "배우자", "부모", "자녀", "형제/자매"].map((label) => ({ key: label, label }));
   const imageAttachments = attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
   const nonImageAttachments = attachments.filter((attachment) => !attachment.content_type.startsWith("image/"));
+
+  // 제목·본문 등 폼 필드의 변경은 react-hook-form이 기준선 대비로 이미 추적한다.
+  // 첨부·참가자·증빙 링크는 폼 밖 상태라 기준선과 직접 비교한다.
+  const hasUnsavedChanges =
+    formState.isDirty ||
+    attachments.map((attachment) => attachment.id).join(",") !== unsavedBaseline.current.attachmentIds ||
+    selectedParticipants.map((participant) => participant.id).join(",") !== unsavedBaseline.current.participantIds ||
+    evidenceLink !== unsavedBaseline.current.evidenceLink;
+
+  // 게시판마다 받는 항목이 달라서 쓰던 값을 그대로 옮기면 엉뚱한 칸에 남는다.
+  // 디자인(BoardChangeConfirmModal)대로 확인을 받은 뒤 처음 상태로 되돌린다.
+  const applyBoardChange = useCallback((nextBoardId: number) => {
+    setBoardId(nextBoardId);
+    reset();
+    setAttachments([]);
+    setSelectedParticipants([]);
+    setParticipantQuery("");
+    setActivitySourcePostId(null);
+    setEvidenceLink("");
+    setEvidenceMode(null);
+    setMissingRequiredAttachment(false);
+    setMissingBoard(false);
+    unsavedBaseline.current = { attachmentIds: "", participantIds: "", evidenceLink: "" };
+  }, [reset]);
+
+  const selectBoard = useCallback((nextBoardId: number) => {
+    setSelectionSheet(null);
+    if (nextBoardId === boardId) return;
+    // 아직 아무것도 안 썼으면 물어볼 것이 없다.
+    if (!hasUnsavedChanges) {
+      applyBoardChange(nextBoardId);
+      return;
+    }
+    setPendingBoardId(nextBoardId);
+  }, [applyBoardChange, boardId, hasUnsavedChanges]);
+
+  const leaveCreateScreen = useCallback(() => {
+    const decision = postCreateFormBackDecision({
+      boardType,
+      editOrigin: params.editOrigin,
+      postId: params.postId,
+      returnTo: params.returnTo,
+      canGoBack: router.canGoBack(),
+      boardId,
+      fromBoardId: params.fromBoardId,
+    });
+    if (decision.action === "back") router.back();
+    else if (decision.action === "navigate") router.navigate(decision.route as never);
+    else router.replace(decision.route as never);
+  }, [boardId, boardType, params.editOrigin, params.fromBoardId, params.postId, params.returnTo]);
 
   const handleCreateBack = useCallback(() => {
     if (createdPostId) {
@@ -950,19 +1026,78 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       setDatePickerOpen(false);
       return;
     }
-    const decision = postCreateFormBackDecision({
-      boardType,
-      editOrigin: params.editOrigin,
-      postId: params.postId,
-      returnTo: params.returnTo,
-      canGoBack: router.canGoBack(),
-      boardId,
-      fromBoardId: params.fromBoardId,
+    // 작성·수정 중인 내용이 있으면 바로 나가지 않고 확인부터 받는다.
+    if (hasUnsavedChanges) {
+      setDiscardPromptOpen(true);
+      return;
+    }
+    leaveCreateScreen();
+  }, [boardId, boardType, createdPostId, datePickerOpen, hasUnsavedChanges, leaveCreateScreen, params.returnTo, selectionSheet]);
+
+  // iOS 가장자리 스와이프는 UIKit이 직접 pop 해서 위 핸들러들을 타지 않는다.
+  // usePreventRemove가 native-stack의 preventNativeDismiss를 켜 그 제스처까지
+  // 막아주므로, 확인창을 헤더·안드로이드 뒤로가기와 같은 지점으로 모은다.
+  const navigation = useNavigation();
+  const [removeConfirmed, setRemoveConfirmed] = useState(false);
+  const pendingRemoveAction = useRef<NavigationAction | null>(null);
+  // 하단 탭을 눌러 떠나려는 경우. 확인 후에 이 함수를 불러 그 탭으로 옮긴다.
+  const pendingTabLeave = useRef<(() => void) | null>(null);
+
+  usePreventRemove(hasUnsavedChanges && !createdPostId && !submitted && !removeConfirmed, ({ data }) => {
+    pendingRemoveAction.current = data.action;
+    setDiscardPromptOpen(true);
+  });
+
+  useEffect(() => {
+    if (!submitted) return;
+    // 잠금이 풀린 렌더 뒤에 옮긴다. 같은 틱에 옮기면 usePreventRemove가 아직
+    // 이전 값을 들고 있어 등록에도 작성 취소 확인창이 뜬다.
+    const go = pendingSubmitNavigation.current;
+    pendingSubmitNavigation.current = null;
+    go?.();
+  }, [submitted]);
+
+  // 탭바는 이 화면의 부모라 handleCreateBack을 타지 않는다. 가로채기를 걸어
+  // 헤더·안드로이드 뒤로가기와 같은 확인창을 거치게 한다.
+  const blocksLeaving = hasUnsavedChanges && !createdPostId && !removeConfirmed;
+  useEffect(() => {
+    if (!blocksLeaving) return undefined;
+    setWriteLeaveGuard((proceed) => {
+      pendingTabLeave.current = proceed;
+      setDiscardPromptOpen(true);
     });
-    if (decision.action === "back") router.back();
-    else if (decision.action === "navigate") router.navigate(decision.route as never);
-    else router.replace(decision.route as never);
-  }, [boardId, boardType, createdPostId, datePickerOpen, params.editOrigin, params.fromBoardId, params.postId, params.returnTo, selectionSheet]);
+    return () => setWriteLeaveGuard(null);
+  }, [blocksLeaving]);
+
+  useEffect(() => {
+    if (!removeConfirmed) return;
+    // 잠금이 풀린 뒤에 원래 하려던 이동을 그대로 진행한다. 제스처가 아니라
+    // 헤더·안드로이드에서 왔으면 남겨둔 동작이 없어 기존 경로를 탄다.
+    const tabLeave = pendingTabLeave.current;
+    pendingTabLeave.current = null;
+    const action = pendingRemoveAction.current;
+    pendingRemoveAction.current = null;
+    if (tabLeave) tabLeave();
+    else if (action) navigation.dispatch(action);
+    else leaveCreateScreen();
+  }, [leaveCreateScreen, navigation, removeConfirmed]);
+
+  const handleDiscardConfirm = useCallback(() => {
+    setDiscardPromptOpen(false);
+    // 작성 모드는 returnTo 경로에서 화면이 스택에 남을 수 있어 직접 비운다.
+    // 수정 모드는 뒤로가기가 스택을 pop 하므로 언마운트되며 사라진다.
+    if (!postId) {
+      reset();
+      setAttachments([]);
+      setSelectedParticipants([]);
+      setParticipantQuery("");
+      setEvidenceLink("");
+      setEvidenceMode("file");
+      setActivitySourcePostId(null);
+    }
+    // 잠금을 먼저 풀어야 이동이 다시 막히지 않는다. 실제 이동은 위 effect가 한다.
+    setRemoveConfirmed(true);
+  }, [postId, reset]);
 
   useFocusEffect(
     useCallback(() => {
@@ -1034,8 +1169,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         >
           {isMutualAid ? (
             <CloseIcon size={20} color={COLORS.text} />
+          ) : isActivity ? (
+            <BackIcon size={24} color={COLORS.text} />
           ) : (
-            <Ionicons name={isActivity ? "chevron-back" : "close"} size={24} color={COLORS.text} />
+            <Ionicons name="close" size={24} color={COLORS.text} />
           )}
         </Pressable>
         <Text style={[styles.appBarTitle, isMutualAid ? styles.appBarTitleMutualAid : null]}>{labels.screenTitle}</Text>
@@ -1043,18 +1180,23 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       </View>
 
       <ScrollView
+        ref={formScrollRef}
         style={styles.formScroller}
         contentContainerStyle={[styles.content, isActivity ? styles.activityContent : null, isMutualAid ? styles.contentMutualAid : null]}
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
+        onLayout={(event) => {
+          formScrollHeight.current = event.nativeEvent.layout.height;
+          revealFocusedBlock();
+        }}
       >
         {isActivity ? (
           <>
             <Controller
               control={control}
               name="category"
-              render={({ field }) => (
-                <Pressable onPress={() => setSelectionSheet("activity")} style={styles.activitySelect}>
+              render={({ field, fieldState }) => (
+                <Pressable onPress={() => { Keyboard.dismiss(); setSelectionSheet("activity"); }} style={[styles.activitySelect, fieldState.error ? styles.inputError : null]}>
                   <Text style={[styles.activitySelectValue, !field.value ? styles.activitySelectPlaceholder : null]}>
                     {field.value || activitySelectPlaceholder(board?.slug)}
                   </Text>
@@ -1064,7 +1206,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             />
 
             <View style={styles.activityFieldGroup}>
-              <Pressable disabled={isUploading} onPress={selectFile} style={[styles.activityPhotoBox, isUploading ? styles.attachButtonDisabled : null]}>
+              <Pressable disabled={isUploading} onPress={selectFile} style={[styles.activityPhotoBox, isUploading ? styles.attachButtonDisabled : null, missingRequiredAttachment ? styles.borderOnlyError : null]}>
                 {imageAttachments.length > 0 ? (
                   <View style={styles.activityPhotoGrid}>
                     {imageAttachments.map((attachment) => {
@@ -1103,10 +1245,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 render={({ field, fieldState }) => (
                   <FormTextInput
                     multiline
-                    onChangeText={field.onChange}
+                    onChangeText={clearOnChange("content", field.onChange)}
                     placeholder="활동에 대한 소감을 남겨주세요"
                     placeholderTextColor="#A6ACB7"
-                    style={[styles.input, styles.activityFeedbackInput, fieldState.error ? styles.inputError : null]}
+                    hasError={Boolean(fieldState.error)}
+                    style={[styles.input, styles.activityFeedbackInput]}
                     textAlignVertical="top"
                     value={field.value}
                   />
@@ -1124,8 +1267,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                     accessibilityHint="달력에서 실제 활동 날짜를 선택합니다"
                     accessibilityLabel="활동일 선택"
                     accessibilityRole="button"
-                    onPress={() => setDatePickerOpen((open) => !open)}
-                    style={styles.activityInputWithIcon}
+                    onPress={() => { Keyboard.dismiss(); setDatePickerOpen((open) => !open); }}
+                    style={[styles.activityInputWithIcon, fieldState.error ? styles.inputError : null]}
                   >
                     <Text style={styles.activityDateValue}>{field.value ? formatBoardDate(field.value) : "활동일을 선택하세요"}</Text>
                     <CalendarSmallIcon size={15} color="#A6ACB7" />
@@ -1146,16 +1289,22 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               )}
             />
 
-            <View style={styles.activityFieldGroup}>
+            <View
+              style={styles.activityFieldGroup}
+              onLayout={(event) => { bankGroupBottom.current = event.nativeEvent.layout.y + event.nativeEvent.layout.height; }}
+            >
               <Text style={styles.activityFieldTitle}>활동비 받을 계좌번호</Text>
               <Controller
                 control={control}
                 name="bankAccount"
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <FormTextInput
-                    onChangeText={field.onChange}
+                    onBlur={() => { revealTarget.current = null; }}
+                    onFocus={() => { revealTarget.current = "bank"; revealFocusedBlock(); }}
+                    onChangeText={clearOnChange("bankAccount", field.onChange)}
                     placeholder={bankAccountField.placeholder}
                     placeholderTextColor="#A6ACB7"
+                    hasError={Boolean(fieldState.error)}
                     style={styles.input}
                     value={field.value ?? ""}
                   />
@@ -1176,15 +1325,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               <Controller
                 control={control}
                 name="participants"
-                render={() => {
+                render={({ fieldState }) => {
                   return (
                     <>
-                      <View style={[styles.activityInputWithIcon, participantSearchFocused ? styles.activityInputWithIconFocused : null]}>
+                      <View style={[styles.activityInputWithIcon, participantSearchFocused ? styles.activityInputWithIconFocused : null, fieldState.error ? styles.inputError : null]}>
                         <Ionicons name="search-outline" size={16} color="#A6ACB7" />
                         <TextInput
-                          onBlur={() => setParticipantSearchFocused(false)}
+                          onBlur={() => { setParticipantSearchFocused(false); revealTarget.current = null; }}
                           onChangeText={setParticipantQuery}
-                          onFocus={() => setParticipantSearchFocused(true)}
+                          onFocus={() => { setParticipantSearchFocused(true); revealTarget.current = "end"; revealFocusedBlock(); }}
                           placeholder="이름으로 검색"
                           placeholderTextColor="#A6ACB7"
                           style={[styles.activityInlineInput, { outlineStyle: "none" } as never]}
@@ -1251,39 +1400,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         {canPickBoard ? (
           <View style={styles.boardSelectWrap}>
             <Pressable
-              onPress={() => setSelectionSheet(selectionSheet === "board" ? null : "board")}
-              style={styles.selectLike}
+              onPress={() => { Keyboard.dismiss(); setSelectionSheet("board"); }}
+              style={[styles.selectLike, missingBoard ? styles.inputError : null]}
             >
               <Text style={[styles.selectText, !board ? styles.selectPlaceholder : null]} numberOfLines={1}>
-                {board?.name ?? "게시판을 선택하세요"}
+                {board?.name ?? BOARD_SELECT_PLACEHOLDER}
               </Text>
-              <Ionicons name={selectionSheet === "board" ? "chevron-up" : "chevron-down"} size={16} color="#A6ACB7" />
+              <Ionicons name="chevron-down" size={16} color="#A6ACB7" />
             </Pressable>
-            {selectionSheet === "board" ? (
-              <View style={styles.boardDropdown}>
-                <Text style={styles.boardDropdownTitle}>게시판을 선택하세요</Text>
-                {selectableBoards.length === 0 ? (
-                  <Text style={styles.boardDropdownEmpty}>선택할 수 있는 게시판이 없습니다.</Text>
-                ) : (
-                  selectableBoards.map((item, index) => {
-                    const active = item.id === boardId;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        onPress={() => {
-                          setBoardId(item.id);
-                          setSelectionSheet(null);
-                        }}
-                        style={[styles.boardDropdownItem, index > 0 ? styles.boardDropdownDivider : null]}
-                      >
-                        <Text style={[styles.boardDropdownText, active ? styles.boardDropdownTextActive : null]}>{item.name}</Text>
-                        {active ? <Ionicons name="checkmark" size={16} color={COLORS.primary} /> : null}
-                      </Pressable>
-                    );
-                  })
-                )}
-              </View>
-            ) : null}
           </View>
         ) : null}
 
@@ -1340,10 +1464,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           render={({ field, fieldState }) => (
             <FormField label={compactCreate || isStudyRecruit ? "" : labels.title} required error={fieldState.error?.message}>
               <FormTextInput
-                onChangeText={field.onChange}
+                onChangeText={clearOnChange("title", field.onChange)}
                 placeholder={labels.titlePlaceholder}
                 placeholderTextColor="#A6ACB7"
-                style={[styles.input, fieldState.error ? styles.inputError : null]}
+                hasError={Boolean(fieldState.error)}
+                style={styles.input}
                 value={field.value}
               />
             </FormField>
@@ -1351,14 +1476,80 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         />
       ) : null}
 
+      {resourceFields?.professor ? (
+        <Controller
+          control={control}
+          name="professor"
+          render={({ field, fieldState }) => (
+            <FormField label={compactCreate ? "" : "교수명"}>
+              {/* 포커스 테두리는 바깥 래퍼가 갖는다. 안쪽 입력에 붙이면 둥근 모서리를
+                  따르지 않고 각진 사각형으로 그려지고, 글자 시작 위치도 밀린다. */}
+              <View
+                style={[
+                  styles.suffixInputRow,
+                  professorFocused ? styles.suffixInputRowFocused : null,
+                  fieldState.error ? styles.inputError : null,
+                ]}
+              >
+                <TextInput
+                  onBlur={() => setProfessorFocused(false)}
+                  onChangeText={clearOnChange("professor", field.onChange)}
+                  onFocus={() => setProfessorFocused(true)}
+                  placeholder="교수명을 입력하세요"
+                  placeholderTextColor="#A6ACB7"
+                  style={[styles.suffixInput, { outlineStyle: "none" } as never]}
+                  value={field.value}
+                />
+                <Text style={styles.suffixInputLabel}>교수</Text>
+              </View>
+            </FormField>
+          )}
+        />
+      ) : null}
+
+      {RESOURCE_RATING_FIELDS.filter((rating) => resourceFields?.[rating.name]).map((rating) => (
+        <Controller
+          control={control}
+          key={rating.name}
+          name={rating.name}
+          render={({ field, fieldState }) => (
+            <FormField label={rating.label}>
+              <View style={styles.ratingRow}>
+                {RESOURCE_RATING_LEVELS.map((level) => {
+                  const selected = field.value === level;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      key={level}
+                      // 필수 입력이라 해제는 없다. 다른 등급을 눌러 바꾼다.
+                      // 위 입력칸에 포커스가 남아 있으면 검은 테두리와 키보드가 그대로라
+                      // 등급을 고르는 순간 포커스를 놓아준다.
+                      onPress={() => { Keyboard.dismiss(); field.onChange(level); clearErrors(rating.name); }}
+                      style={[
+                        styles.ratingButton,
+                        selected ? styles.ratingButtonActive : null,
+                        fieldState.error ? styles.borderOnlyError : null,
+                      ]}
+                    >
+                      <Text style={[styles.ratingText, selected ? styles.ratingTextActive : null]}>{level}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </FormField>
+          )}
+        />
+      ))}
+
       {!isAlbum && (isMutualAid || board?.slug === "club-promo") ? (
         <Controller
           control={control}
           name="category"
-          render={({ field }) => (
+          render={({ field, fieldState }) => (
             <FormField label={compactCreate ? "" : labels.category} requiredStar={isMutualAid} helper={isSuggestion ? "운영, 행사, 시설 등 필요한 경우만 입력하세요." : undefined}>
               {isMutualAid ? (
-                <Pressable onPress={() => setSelectionSheet("mutualType")} style={styles.selectionField}>
+                <Pressable onPress={() => { Keyboard.dismiss(); setSelectionSheet("mutualType"); }} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>{field.value || labels.categoryPlaceholder}</Text>
                   <Ionicons name="chevron-down" size={16} color={COLORS.subtle} />
                 </Pressable>
@@ -1404,7 +1595,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 </View>
               ) : (
                 <FormTextInput
-                  onChangeText={field.onChange}
+                  onChangeText={clearOnChange("category", field.onChange)}
                   placeholder={labels.categoryPlaceholder}
                   placeholderTextColor="#A6ACB7"
                   style={styles.input}
@@ -1481,7 +1672,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             name="eventDate"
             render={({ field, fieldState }) => (
               <FormField error={fieldState.error?.message} label="날짜" requiredStar>
-                <Pressable onPress={() => setDatePickerOpen((open) => !open)} style={styles.selectionField}>
+                <Pressable onPress={() => { Keyboard.dismiss(); setDatePickerOpen((open) => !open); }} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>
                     {field.value ? formatBoardDate(field.value) : "경조사 날짜를 선택하세요"}
                   </Text>
@@ -1504,9 +1695,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           <Controller
             control={control}
             name="relation"
-            render={({ field }) => (
+            render={({ field, fieldState }) => (
               <FormField label="관계" requiredStar>
-                <Pressable onPress={() => setSelectionSheet("mutualRelation")} style={styles.selectionField}>
+                <Pressable onPress={() => { Keyboard.dismiss(); setSelectionSheet("mutualRelation"); }} style={[styles.selectionField, fieldState.error ? styles.inputError : null]}>
                   <Text style={[styles.selectionValue, !field.value ? styles.selectionPlaceholder : null]}>
                     {field.value || "본인 / 배우자 / 부모 등 선택"}
                   </Text>
@@ -1523,6 +1714,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             <View style={styles.evidenceModeRow}>
               {EVIDENCE_MODES.map((mode) => {
                 const active = evidenceMode === mode.key;
+                // 증빙이 비었다는 표시는 고른 쪽 탭에 띄운다. 아직 아무 쪽도
+                // 고르지 않았으면 어디를 채워야 하는지 알 수 없으므로 양쪽에 띄운다.
+                const showsError = missingRequiredAttachment && (active || evidenceMode === null);
                 return (
                   <Pressable
                     key={mode.key}
@@ -1533,8 +1727,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                     onPress={() => handleEvidenceModeSelect(mode.key)}
                     style={styles.evidenceModeTab}
                   >
-                    <View style={[styles.evidenceModeTabVisual, active ? styles.evidenceModeTabActive : null]}>
-                      <Text style={[styles.evidenceModeText, active ? styles.evidenceModeTextActive : null]}>{mode.label}</Text>
+                    <View style={[styles.evidenceModeTabVisual, active ? styles.evidenceModeTabActive : null, showsError ? styles.evidenceModeTabError : null]}>
+                      <Text style={[styles.evidenceModeText, active && !showsError ? styles.evidenceModeTextActive : null]}>{mode.label}</Text>
                     </View>
                   </Pressable>
                 );
@@ -1594,7 +1788,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   autoCapitalize="none"
                   keyboardType="url"
                   onBlur={() => setEvidenceLinkFocused(false)}
-                  onChangeText={setEvidenceLink}
+                  onChangeText={(value) => {
+                    setEvidenceLink(value);
+                    setMissingRequiredAttachment(false);
+                  }}
                   onFocus={() => setEvidenceLinkFocused(true)}
                   placeholder="청첩장, 부고장 링크(URL)를 입력해주세요"
                   placeholderTextColor={COLORS.muted}
@@ -1611,6 +1808,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               <FormField label="비고" optional>
                 <FormTextInput
                   multiline
+                  onBlur={() => { revealTarget.current = null; }}
+                  onFocus={() => { revealTarget.current = "end"; revealFocusedBlock(); }}
                   onChangeText={field.onChange}
                   placeholder="전달하고 싶은 내용이 있다면 적어주세요"
                   placeholderTextColor="#A6ACB7"
@@ -1632,10 +1831,13 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             <FormField label={compactCreate || isStudyRecruit ? "" : labels.content} required={!isMutualAid} error={fieldState.error?.message}>
               <FormTextInput
                 multiline
-                onChangeText={field.onChange}
+                onBlur={() => { revealTarget.current = null; }}
+                onFocus={() => { revealTarget.current = "attach"; revealFocusedBlock(); }}
+                onChangeText={clearOnChange("content", field.onChange)}
                 placeholder={labels.contentPlaceholder}
                 placeholderTextColor="#A6ACB7"
-                style={[styles.input, styles.textArea, isSuggestion ? styles.suggestionContentInput : isStudyRecruit ? styles.studyContentInput : styles.generalContentInput, fieldState.error ? styles.inputError : null]}
+                hasError={Boolean(fieldState.error)}
+                style={[styles.input, styles.textArea, isSuggestion ? styles.suggestionContentInput : isStudyRecruit ? styles.studyContentInput : styles.generalContentInput]}
                 textAlignVertical="top"
                 value={field.value ?? ""}
               />
@@ -1652,7 +1854,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             <FormField label="스터디장 연락수단">
               <FormTextInput
                 multiline
-                onChangeText={field.onChange}
+                onChangeText={clearOnChange("contact", field.onChange)}
                 placeholder={"스터디원들과 연락할 수단을 입력해주세요.\n(이메일, 카카오톡 ID, 휴대폰번호 등)"}
                 placeholderTextColor="#A6ACB7"
                 style={[styles.input, styles.contactInput]}
@@ -1686,7 +1888,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       ) : null}
 
       {isStudyRecruit || isSuggestion || isMutualAid ? null : compactCreate && !isAlbum && !isAdminParticipationPost ? (
-        <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} disabled={createMutation.isPending || updateMutation.isPending} />
+        <PostAttachmentEditor
+          attachments={attachments}
+          onChange={setAttachments}
+          onUploadingChange={setIsUploading}
+          onError={showUploadFailure}
+          disabled={createMutation.isPending || updateMutation.isPending}
+          onLayout={(event) => { attachSectionTop.current = event.nativeEvent.layout.y; }}
+          onActionsLayout={(event) => { attachActionsBottom.current = event.nativeEvent.layout.y + event.nativeEvent.layout.height; }}
+        />
       ) : compactCreate ? (
         <View style={styles.compactAttachWrap}>
           {!isAdminParticipationPost ? (
@@ -1870,6 +2080,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
       <Pressable
         disabled={isSubmitting}
+        // 제출할 때도 포커스를 놓아 검은 테두리와 키보드를 함께 걷는다.
+        onPress={() => { Keyboard.dismiss(); handleSubmit(onSubmit)(); }}
+        style={[styles.submitButton, isActivity ? styles.activitySubmitButton : null, isSubmitting ? styles.submitButtonDisabled : null]}
         onPress={handleSubmit(onSubmit)}
         style={[styles.submitButton, isActivity ? styles.activitySubmitButton : null, isMutualAid ? styles.submitButtonMutualAid : null, isSubmitting ? styles.submitButtonDisabled : null]}
       >
@@ -1877,6 +2090,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       </Pressable>
       </ScrollView>
 
+      <SelectionSheet
+        visible={selectionSheet === "board"}
+        title={BOARD_SELECT_PLACEHOLDER}
+        options={selectableBoards.map((item) => ({ key: String(item.id), label: item.name }))}
+        emptyText={isBoardsLoading ? "게시판을 불러오는 중입니다." : "선택할 수 있는 게시판이 없습니다."}
+        selectedKey={board ? String(board.id) : undefined}
+        onClose={() => setSelectionSheet(null)}
+        onSelect={(option) => selectBoard(Number(option.key))}
+      />
       <SelectionSheet
         visible={selectionSheet === "activity"}
         title={activitySelectPlaceholder(board?.slug)}
@@ -1886,6 +2108,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => {
           setValue("category", option.label, { shouldValidate: true });
+          clearErrors("category");
           setActivitySourcePostId(Number(option.key));
           setSelectionSheet(null);
         }}
@@ -1898,6 +2121,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => {
           setValue("category", option.label, { shouldValidate: true });
+          clearErrors("category");
           setSelectionSheet(null);
         }}
       />
@@ -1909,10 +2133,27 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => {
           setValue("relation", option.label, { shouldValidate: true });
+          clearErrors("relation");
           setSelectionSheet(null);
         }}
       />
-      <FormNoticeModal notice={formNotice} onClose={() => setFormNotice(null)} />
+      <DiscardWriteModal
+        visible={discardPromptOpen}
+        mode={postId ? "edit" : "create"}
+        onKeep={() => setDiscardPromptOpen(false)}
+        onDiscard={handleDiscardConfirm}
+      />
+      <DiscardWriteModal
+        visible={pendingBoardId !== null}
+        mode="boardChange"
+        onKeep={() => setPendingBoardId(null)}
+        onDiscard={() => {
+          if (pendingBoardId !== null) applyBoardChange(pendingBoardId);
+          setPendingBoardId(null);
+        }}
+      />
+      <NoticeModal notice={notice} onClose={() => setNotice(null)} />
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }
@@ -2137,63 +2378,6 @@ const styles = StyleSheet.create({
   recruitmentStatusTextDisabled: {
     color: COLORS.subtle,
   },
-  sheetBackdrop: {
-    flex: 1,
-    justifyContent: "flex-end",
-    alignItems: "center",
-    backgroundColor: "rgba(17, 24, 39, 0.42)",
-  },
-  sheetCard: {
-    width: "100%",
-    maxWidth: 405,
-    maxHeight: "70%",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    backgroundColor: COLORS.bg,
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 28,
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    alignSelf: "center",
-    borderRadius: 2,
-    backgroundColor: "#C7CCD4",
-    marginBottom: 16,
-  },
-  sheetTitle: {
-    color: COLORS.text,
-    fontSize: 17,
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  sheetEmpty: {
-    color: COLORS.muted,
-    fontSize: 14,
-    fontWeight: "700",
-    paddingVertical: 24,
-  },
-  sheetOption: {
-    minHeight: 50,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#EAECEF",
-  },
-  sheetOptionText: {
-    flex: 1,
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "400",
-  },
-  sheetOptionTextActive: {
-    color: COLORS.primary,
-    fontWeight: "500",
-  },
   activityPhotoBox: {
     height: 200,
     alignItems: "center",
@@ -2332,9 +2516,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   activityInputWithIconFocused: {
-    borderWidth: 1.5, // Figma 참가자검색 focus: 1.5px #21262E
+    borderWidth: 1, // Figma 참가자검색 focus: 1px #21262E
     borderColor: "#21262E",
-    paddingHorizontal: 13, // 굵어진 테두리만큼 보정해 내용 흔들림 방지
   },
   activityInlineInput: {
     flex: 1,
@@ -2343,59 +2526,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "400",
     paddingVertical: 0,
-  },
-  noticeBackdrop: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(17, 24, 39, 0.42)",
-    paddingHorizontal: 24,
-  },
-  noticeCard: {
-    width: "100%",
-    maxWidth: 360,
-    alignItems: "center",
-    borderRadius: 16,
-    backgroundColor: COLORS.bg,
-    paddingHorizontal: 22,
-    paddingTop: 24,
-    paddingBottom: 20,
-  },
-  noticeIcon: {
-    width: 46,
-    height: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 23,
-    backgroundColor: COLORS.primary50,
-  },
-  noticeTitle: {
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "700",
-    marginTop: 14,
-    textAlign: "center",
-  },
-  noticeMessage: {
-    color: COLORS.muted,
-    fontSize: 14,
-    lineHeight: 21,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  noticeButton: {
-    width: "100%",
-    minHeight: 46,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    marginTop: 20,
-  },
-  noticeButtonText: {
-    color: "#FFFFFF",
-    fontSize: 15,
-    fontWeight: "400",
   },
   activityDateValue: {
     flex: 1,
@@ -2489,6 +2619,9 @@ const styles = StyleSheet.create({
     paddingRight: 20,
   },
   activityWarningText: {
+    // 가로 flex 안의 Text는 RN 기본 flexShrink가 0이라 남은 폭에 맞지 않고
+    // 줄 끝 글자가 배경 밖으로 밀려난다. 다른 안내 박스와 같게 맞춘다.
+    flex: 1,
     color: "#854F0B",
     fontSize: 12,
     fontWeight: "400",
@@ -2543,49 +2676,6 @@ const styles = StyleSheet.create({
     width: "100%",
     position: "relative",
     zIndex: 10,
-  },
-  boardDropdown: {
-    marginTop: 6,
-    borderWidth: 0.5,
-    borderColor: "#E1E4E9",
-    borderRadius: 8,
-    backgroundColor: "#FFFFFF",
-    overflow: "hidden",
-  },
-  boardDropdownTitle: {
-    color: COLORS.text,
-    fontSize: 17,
-    fontWeight: "500",
-    paddingHorizontal: 14,
-    paddingTop: 14,
-    paddingBottom: 8,
-  },
-  boardDropdownItem: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  boardDropdownDivider: {
-    borderTopWidth: 1,
-    borderTopColor: "#EAECEF",
-  },
-  boardDropdownText: {
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: "400",
-  },
-  boardDropdownTextActive: {
-    color: COLORS.primary,
-    fontWeight: "500",
-  },
-  boardDropdownEmpty: {
-    color: COLORS.subtle,
-    fontSize: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 16,
   },
   guideBox: {
     flexDirection: "row",
@@ -2669,6 +2759,15 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
     backgroundColor: "#E8EEFF", // Figma: 선택 탭 배경
   },
+  // Figma MutualAidApply-ImageMode-Error / LinkMode-Error: 고른 탭이 파란 채움과
+  // 파란 글자를 잃고 빨간 테두리만 남는다. 링크 입력칸은 빨개지지 않는다.
+  // 두께는 선택 탭의 파란 테두리와 같은 1px이라야 오류가 켜질 때 탭 크기가
+  // 흔들리지 않는다.
+  evidenceModeTabError: {
+    borderWidth: 1,
+    borderColor: "#D64545",
+    backgroundColor: COLORS.bg,
+  },
   evidenceModeText: {
     color: COLORS.muted, // Figma: #6B7280 Medium 13/16
     fontSize: 13,
@@ -2682,10 +2781,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   evidenceImageHint: {
-    color: COLORS.muted,
-    fontSize: 12,
+    // Figma MutualAidApply-ImageMode-Error: Regular 13/16 #999EA8
+    color: "#999EA8",
+    fontSize: 13,
     fontWeight: "400",
-    lineHeight: 15,
+    lineHeight: 16,
   },
   evidenceImageGrid: {
     flexDirection: "row",
@@ -2827,7 +2927,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   evidenceLinkFieldFocused: {
-    borderWidth: 1.5, // Figma focus: 1.5px #21262E
+    borderWidth: 1, // Figma focus: 1px #21262E
     borderColor: "#21262E",
   },
   calCard: {
@@ -2865,6 +2965,67 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 14, // Figma (선택) 12/14, 라벨과 간격은 labelRow gap 7
   },
+  // Figma: 교수명 입력 — 우측에 "교수" 접미 라벨이 붙은 단일 입력 박스
+  suffixInputRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    backgroundColor: COLORS.bg,
+    paddingHorizontal: 14,
+  },
+  // 제목 칸(input)과 글자 시작 위치를 맞추려면 굵어진 테두리만큼 패딩을 줄인다.
+  suffixInputRowFocused: {
+    borderWidth: 1, // Figma focus: 1px #21262E
+    borderColor: "#21262E",
+  },
+  suffixInput: {
+    flex: 1,
+    minHeight: 41,
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "400",
+    lineHeight: 17,
+    paddingVertical: 12,
+    // Android TextInput의 기본 가로 패딩을 없앤다. 두면 바깥 래퍼의 14에 더해져
+    // 제목·내용 칸보다 글자가 안쪽에서 시작한다.
+    paddingHorizontal: 0,
+  },
+  suffixInputLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.muted,
+  },
+  // Figma: 난이도/만족도 — 테두리 버튼 3개, 선택 시 primary 테두리 + 연한 배경
+  ratingRow: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 8,
+  },
+  ratingButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+  },
+  ratingButtonActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: "#E8EEFF",
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.muted,
+  },
+  ratingTextActive: {
+    color: COLORS.primary,
+  },
   input: {
     width: "100%",
     minHeight: 41, // Figma: 41h (textArea가 덮어씀)
@@ -2880,13 +3041,20 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   inputFocused: {
-    borderWidth: 1.5, // Figma 참가자검색 focus와 동일: 1.5px #21262E
+    borderWidth: 1, // Figma 참가자검색 focus와 동일: 1px #21262E
     borderColor: "#21262E",
-    paddingHorizontal: 13, // 굵어진 테두리만큼 보정
-    paddingVertical: 11,
   },
+  // Figma 오류 상태: 1px #D64545. 입력칸·등급 버튼 모두 같은 굵기다.
+  // 기본 0.5 -> 1로 0.5px만 굵어져 여백 보정 없이도 글자가 밀리지 않는다.
+  // 기본 테두리(0.5)보다 굵어지는 만큼 좌우 패딩을 줄여 글자 위치를 유지한다.
   inputError: {
-    borderColor: COLORS.danger,
+    borderWidth: 1,
+    borderColor: "#D64545",
+  },
+  // 등급 버튼은 좌우 패딩이 없어 두께만 바꾼다.
+  borderOnlyError: {
+    borderWidth: 1,
+    borderColor: "#D64545",
   },
   textArea: {
     minHeight: 70, // Figma: 비고필드 70h

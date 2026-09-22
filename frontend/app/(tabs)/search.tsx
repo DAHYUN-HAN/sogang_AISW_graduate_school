@@ -217,6 +217,7 @@ export default function SearchScreen() {
       ) : null}
       {!isLoading && hasSearched ? (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           data={results}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={[styles.listContent, isNoticeSearch ? styles.noticeListContent : null, results.length === 0 ? styles.emptyContent : null]}

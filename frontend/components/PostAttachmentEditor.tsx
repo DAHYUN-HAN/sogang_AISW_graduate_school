@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Keyboard, Linking, Platform, Pressable, StyleSheet, Text, View, type ViewProps } from "react-native";
 
 import { resolveMediaAccessUrl } from "../hooks/useMediaAccessUrl";
 import type { MediaAsset } from "../types";
@@ -17,11 +17,19 @@ type Props = {
   isPrivate?: boolean;
   disabled?: boolean;
   title?: string;
+  /**
+   * 업로드·열기 실패를 그대로 넘긴다. 토스트와 모달은 화면 전체를 기준으로
+   * 떠야 해서 스크롤 안에 있는 이 컴포넌트가 직접 띄울 수 없다. 원인별 표시는
+   * uploadFailureFeedback을 쓰는 화면이 정한다.
+   */
+  onError?: (error: unknown) => void;
+  /** 첨부 영역과 첨부 버튼 행의 위치. 키보드 위로 버튼을 드러내려는 화면이 쓴다. */
+  onLayout?: ViewProps["onLayout"];
+  onActionsLayout?: ViewProps["onLayout"];
 };
 
-export default function PostAttachmentEditor({ attachments, onChange, onUploadingChange, isPrivate = false, disabled = false, title = "첨부파일" }: Props) {
+export default function PostAttachmentEditor({ attachments, onChange, onUploadingChange, isPrivate = false, disabled = false, title = "첨부파일", onError, onLayout, onActionsLayout }: Props) {
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState("");
   const [preview, setPreview] = useState<MediaAsset | null>(null);
   const busy = useRef(false);
   const unavailable = disabled || uploading;
@@ -30,10 +38,10 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
 
   const upload = async (previous?: MediaAsset) => {
     if (disabled || busy.current) return;
+    Keyboard.dismiss();
     busy.current = true;
     setUploading(true);
     onUploadingChange(true);
-    setError("");
     try {
       const selected = await pickAndUploadDocuments(undefined, isPrivate, { multiple: !previous });
       if (selected.length) {
@@ -41,8 +49,8 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
           ? current.map((item) => item.id === previous.id ? selected[0] : item)
           : [...current, ...selected]);
       }
-    } catch {
-      setError("파일을 업로드하지 못했어요. 다시 시도해주세요.");
+    } catch (uploadError) {
+      onError?.(uploadError);
     } finally {
       busy.current = false;
       setUploading(false);
@@ -65,8 +73,9 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
         assignWebLocation: (uri) => window.location.assign(uri),
         openExternalUrl: (uri) => Linking.openURL(uri),
       });
-    } catch {
-      setError("파일을 열지 못했어요. 다시 시도해주세요.");
+    } catch (openError) {
+      // 원인을 특정할 수 없어 업로드 실패와 같은 Screen/Common/UploadFailModal로 알린다.
+      onError?.(openError);
     }
   };
 
@@ -105,15 +114,14 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
           </Pressable>
         </View>
         {uploading ? <Text accessibilityLiveRegion="polite" style={styles.status}>파일을 업로드하고 있어요.</Text> : null}
-        {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
         {preview ? <ImageViewerModal images={[preview]} initialIndex={0} onClose={() => setPreview(null)} /> : null}
       </View>
     );
   }
 
   return (
-    <View style={styles.section}>
-      <View style={styles.addActions}>
+    <View style={styles.section} onLayout={onLayout}>
+      <View style={styles.addActions} onLayout={onActionsLayout}>
         <Pressable accessibilityRole="button" accessibilityLabel="파일 첨부" disabled={unavailable} onPress={() => upload()} style={[styles.add, unavailable && styles.disabled]}>
           <View style={styles.addVisual}>
             <AttachFileIcon size={16} color="#6B7280" />
@@ -160,7 +168,6 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
       ) : null}
 
       {uploading ? <Text accessibilityLiveRegion="polite" style={styles.status}>파일을 업로드하고 있어요.</Text> : null}
-      {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       {preview ? <ImageViewerModal images={[preview]} initialIndex={0} onClose={() => setPreview(null)} /> : null}
     </View>
   );
@@ -200,6 +207,5 @@ const styles = StyleSheet.create({
   fileRemove: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   change: { color: "#6B7280", fontSize: 12, fontWeight: "600" },
   status: { color: "#667085", fontSize: 12 },
-  error: { fontSize: 12, lineHeight: 18, color: "#B42318" },
   disabled: { opacity: 0.45 },
 });

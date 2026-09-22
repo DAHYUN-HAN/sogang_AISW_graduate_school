@@ -14,7 +14,7 @@ from app import migrate
 from app.config import settings
 from app.errors import AppException
 from app.main import app
-from app.media_service import media_file_signature
+from app.media_service import media_file_signature, normalize_original_filename
 from app.models.banner import Banner
 from app.models.board import Board
 from app.models.media import MediaAsset, PostAttachment
@@ -1138,3 +1138,21 @@ def test_migration_detection_refuses_structural_mismatch_before_upgrade(
         migrate.run_migrations(inspector=FakeInspector(ambiguous), config=object())
     assert upgrade_called is False
     assert stamp_called is False
+
+
+@pytest.mark.parametrize(
+    ("sent", "expected"),
+    [
+        # RN FormData 가 encodeURIComponent 로 감싼 한글 파일명
+        ("%EB%B3%B4%EA%B3%A0%EC%84%9C.pdf", "보고서.pdf"),
+        ("%ED%95%A0%EC%9D%B8%2050%25.pdf", "할인 50%.pdf"),
+        # 브라우저가 보내는 날것의 한글은 그대로 둔다.
+        ("보고서.pdf", "보고서.pdf"),
+        # ASCII 범위 이스케이프만 있으면 진짜 파일명으로 보고 건드리지 않는다.
+        ("50%20off.pdf", "50%20off.pdf"),
+        # UTF-8 로 풀리지 않으면 되돌리지 않는다.
+        ("%C0%80.pdf", "%C0%80.pdf"),
+    ],
+)
+def test_normalize_original_filename_restores_react_native_percent_encoding(sent, expected):
+    assert normalize_original_filename(sent) == expected

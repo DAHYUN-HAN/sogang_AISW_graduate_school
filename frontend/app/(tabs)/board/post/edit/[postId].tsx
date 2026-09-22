@@ -1,18 +1,33 @@
+import { useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
-import { Alert, BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
+import { setWriteLeaveGuard } from "../../../../../stores/writeLeaveGuard";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import LoadingState from "../../../../../components/LoadingState";
 import ClubOperationStatusField from "../../../../../components/ClubOperationStatusField";
 import { clubOperationStatus } from "../../../../../utils/participationGuide";
+import DiscardWriteModal from "../../../../../components/DiscardWriteModal";
+import NoticeModal, { type NoticeModalContent } from "../../../../../components/NoticeModal";
+import SelectionSheet from "../../../../../components/SelectionSheet";
 import PostAttachmentEditor from "../../../../../components/PostAttachmentEditor";
+import Toast from "../../../../../components/Toast";
+import {
+  RESOURCE_RATING_FIELDS,
+  RESOURCE_RATING_LEVELS,
+  resourcePostFieldValues,
+  resourcePostFields,
+  withResourcePostMetadata,
+} from "../../../../../utils/resourcePostFields";
+import { TOAST_MESSAGES, nextToastState, type ToastState } from "../../../../../utils/toast";
+import { uploadFailureFeedback } from "../../../../../utils/uploadFeedback";
 import type { MediaAsset } from "../../../../../types";
 import { pickAndUploadImages } from "../../../../../utils/mediaPicker";
 import {
@@ -41,16 +56,36 @@ const COLORS = {
   danger50: "#FFF5F5",
 };
 
+// 작성 화면과 같은 방식이다. 필수 검사는 제출할 때 한 번에 모아서 하고,
+// 문구 없이 테두리만 빨갛게 한 뒤 토스트로 알린다.
 const schema = z.object({
-  title: z.string().trim().min(1, "제목을 입력해주세요"),
+  title: z.string().optional(),
   category: z.string().optional(),
   content: z.string().optional(),
   contact: z.string().optional(),
   applicationUrl: z.string().optional(),
+  professor: z.string().optional(),
+  difficulty: z.string().optional(),
+  satisfaction: z.string().optional(),
   clubOperationStatus: z.enum(["active", "ended"]),
 });
 
 type FormValues = z.infer<typeof schema>;
+
+// reset()에 값을 넘기면 그 값이 새 기본값이 된다. 저장된 글을 채운 뒤에는
+// 인자 없는 reset()이 빈 폼이 아니라 그 글로 되돌아가므로, 비울 때는 이
+// 값을 직접 넘긴다.
+const EMPTY_FORM: FormValues = {
+  title: "",
+  category: "",
+  content: "",
+  contact: "",
+  applicationUrl: "",
+  professor: "",
+  difficulty: "",
+  satisfaction: "",
+  clubOperationStatus: "active",
+};
 
 export default function PostEditScreen() {
   const insets = useSafeAreaInsets();
@@ -71,6 +106,8 @@ export default function PostEditScreen() {
   const [isBoardMenuOpen, setIsBoardMenuOpen] = useState(false);
   const selectedBoard = resourceBoardOptions.find((item) => item.id === selectedBoardId) ?? board;
   const isResourceEdit = resourceBoardOptions.length > 0;
+  // 게시판을 옮기면 받을 과목정보도 바뀐다. 원래 게시판이 아니라 고른 게시판을 본다.
+  const resourceFields = resourcePostFields(selectedBoard?.slug);
   const isStudyRecruit = board?.slug === "study-recruit";
   const isAdminParticipationPost = board?.slug === "club-promo" || board?.slug === "networking-programs";
   const isAlbum = board?.board_type === "album";
@@ -78,6 +115,11 @@ export default function PostEditScreen() {
   const isActivityCertification = board?.board_type === "activity_certification";
   const updateMutation = useUpdatePost(postId, post?.board_id ?? 0, board);
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
+  const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
+  // 확인창을 띄우는 동안 고른 게시판을 들고 있는다. 확인 전에는 옮기지 않는다.
+  const [pendingBoardId, setPendingBoardId] = useState<number | null>(null);
+  // 첨부와 게시판 이동은 react-hook-form 밖이라 기준선을 따로 들고 있는다.
+  const unsavedBaseline = useRef({ attachmentIds: "", boardId: 0 });
   const hydratedPostId = useRef<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
@@ -88,36 +130,61 @@ export default function PostEditScreen() {
   const albumImageSelectionLimit = postImageSelectionLimit(board?.board_type, attachments.length);
   const isAlbumImageLimitReached = isAlbum && albumImageSelectionLimit === 0;
 
-  const { control, handleSubmit, reset, setError } = useForm<FormValues>({
+  const [toast, setToast] = useState<ToastState>(null);
+  const [notice, setNotice] = useState<NoticeModalContent | null>(null);
+  // 작성 화면과 같은 규칙으로 업로드 실패를 나눠 보여준다.
+  const showUploadFailure = useCallback((error: unknown) => {
+    const feedback = uploadFailureFeedback(error);
+    if (feedback.kind === "modal") setNotice(feedback.notice);
+    else setToast((current) => nextToastState(current, feedback.message));
+  }, []);
+  const hideToast = useCallback(() => setToast(null), []);
+
+  const { control, clearErrors, formState, handleSubmit, reset, setError } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { title: "", category: "", content: "", contact: "", applicationUrl: "", clubOperationStatus: "active" },
+    defaultValues: EMPTY_FORM,
   });
 
-  useEffect(() => {
-    if (!post || hydratedPostId.current === post.id) return;
-    setSelectedBoardId((current) => current || post.board_id);
+  // 인증 화면처럼 값을 고치는 즉시 빨간 테두리를 푼다. 스키마가 모두 optional이라
+  // 재검증만으로는 풀리지 않아 직접 지운다.
+  const clearOnChange = (name: keyof FormValues, onChange: (value: string) => void) => (value: string) => {
+    onChange(value);
+    clearErrors(name);
+  };
+
+  // 저장된 글로 폼을 되돌린다. 첫 진입과 게시판 변경 후 초기화가 같은 값을 쓴다.
+  const hydrateFromPost = useCallback(() => {
+    if (!post) return;
     reset({
       title: post.title,
       category: post.category ?? "",
       content: post.content,
       contact: typeof post.metadata?.contact === "string" ? post.metadata.contact : "",
       applicationUrl: typeof post.metadata?.application_url === "string" ? post.metadata.application_url : "",
+      ...resourcePostFieldValues(resourcePostFields(board?.slug), post.metadata),
       clubOperationStatus: clubOperationStatus(post.metadata),
     });
     setAttachments(post.attachments);
+    unsavedBaseline.current = {
+      attachmentIds: post.attachments.map((attachment) => attachment.id).join(","),
+      boardId: post.board_id,
+    };
+  }, [board?.slug, post, reset]);
+
+  useEffect(() => {
+    if (!post || hydratedPostId.current === post.id) return;
+    setSelectedBoardId((current) => current || post.board_id);
+    hydrateFromPost();
     hydratedPostId.current = post.id;
-  }, [post, reset]);
+  }, [hydrateFromPost, post]);
 
   useEffect(() => {
     if (!post || !isActivityCertification) return;
     router.replace(`/board/post/create?boardId=${post.board_id}&postId=${post.id}` as never);
   }, [isActivityCertification, post]);
 
-  const goBack = useCallback(() => {
-    if (isBoardMenuOpen) {
-      setIsBoardMenuOpen(false);
-      return;
-    }
+  // 저장 후처럼 물어보지 않고 바로 나가는 경로. 사용자가 닫을 때는 requestClose를 쓴다.
+  const leaveScreen = useCallback(() => {
     if (params.editOrigin) {
       const decision = postCreateFormBackDecision({
         boardType: board?.board_type,
@@ -135,20 +202,95 @@ export default function PostEditScreen() {
     }
     if (router.canGoBack()) router.back();
     else router.replace(postDetailRoute(postId));
-  }, [board?.board_type, isBoardMenuOpen, params.editOrigin, params.fromBoardId, params.returnTo, post?.board_id, postId]);
+  }, [board?.board_type, params.editOrigin, params.fromBoardId, params.returnTo, post?.board_id, postId]);
+
+  // 나갈 때 확인창을 띄울지. 내용·첨부뿐 아니라 게시판을 옮긴 것도 변경으로 센다.
+  const hasUnsavedChanges =
+    formState.isDirty
+    || attachments.map((attachment) => attachment.id).join(",") !== unsavedBaseline.current.attachmentIds
+    || (selectedBoardId !== 0 && selectedBoardId !== unsavedBaseline.current.boardId);
+
+  // 게시판마다 받는 항목이 달라서 고치던 값을 그대로 옮기면 엉뚱한 칸에 남는다.
+  // 작성 화면과 달리 빈 폼이 아니라 저장된 글로 되돌린다. 비우면 그대로 저장할 때
+  // 글 내용이 사라진다.
+  // 게시판을 바꾸면 쓰던 내용을 비운다. 작성 화면과 같은 규칙이다.
+  const clearForBoardChange = useCallback((nextBoardId: number) => {
+    setSelectedBoardId(nextBoardId);
+    reset(EMPTY_FORM);
+    setAttachments([]);
+    clearErrors();
+  }, [clearErrors, reset]);
+
+  const selectBoard = useCallback((nextBoardId: number) => {
+    setIsBoardMenuOpen(false);
+    if (nextBoardId === selectedBoardId) return;
+    // 작성 화면과 달리 늘 물어본다. 수정 화면은 저장된 글이 이미 채워져 있어
+    // 비울 내용이 없는 경우가 없다.
+    setPendingBoardId(nextBoardId);
+  }, [selectedBoardId]);
+
+  const requestClose = useCallback(() => {
+    if (isBoardMenuOpen) {
+      setIsBoardMenuOpen(false);
+      return;
+    }
+    if (hasUnsavedChanges) {
+      setDiscardPromptOpen(true);
+      return;
+    }
+    leaveScreen();
+  }, [hasUnsavedChanges, isBoardMenuOpen, leaveScreen]);
 
   useFocusEffect(useCallback(() => {
     if (Platform.OS !== "android") return undefined;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      goBack();
+      requestClose();
       return true;
     });
     return () => subscription.remove();
-  }, [goBack]));
+  }, [requestClose]));
+
+  // iOS 가장자리 스와이프는 UIKit이 직접 pop 해서 위 핸들러를 타지 않는다.
+  // usePreventRemove가 native-stack의 preventNativeDismiss를 켜 그것까지 막는다.
+  const navigation = useNavigation();
+  const [removeConfirmed, setRemoveConfirmed] = useState(false);
+  const pendingRemoveAction = useRef<NavigationAction | null>(null);
+  // 하단 탭을 눌러 떠나려는 경우. 확인 후에 이 함수를 불러 그 탭으로 옮긴다.
+  const pendingTabLeave = useRef<(() => void) | null>(null);
+
+  usePreventRemove(hasUnsavedChanges && !removeConfirmed, ({ data }) => {
+    pendingRemoveAction.current = data.action;
+    setDiscardPromptOpen(true);
+  });
+
+  // 탭바는 이 화면의 부모라 requestClose를 타지 않는다. 가로채기를 걸어
+  // 헤더·안드로이드 뒤로가기와 같은 확인창을 거치게 한다.
+  const blocksLeaving = hasUnsavedChanges && !removeConfirmed;
+  useEffect(() => {
+    if (!blocksLeaving) return undefined;
+    setWriteLeaveGuard((proceed) => {
+      pendingTabLeave.current = proceed;
+      setDiscardPromptOpen(true);
+    });
+    return () => setWriteLeaveGuard(null);
+  }, [blocksLeaving]);
+
+  useEffect(() => {
+    if (!removeConfirmed) return;
+    // 잠금이 풀린 뒤에 원래 하려던 이동을 진행한다. 헤더·안드로이드에서 왔으면
+    // 남겨둔 동작이 없어 기존 경로를 탄다.
+    const tabLeave = pendingTabLeave.current;
+    pendingTabLeave.current = null;
+    const action = pendingRemoveAction.current;
+    pendingRemoveAction.current = null;
+    if (tabLeave) tabLeave();
+    else if (action) navigation.dispatch(action);
+    else leaveScreen();
+  }, [leaveScreen, navigation, removeConfirmed]);
 
   const navigationHeader = (
     <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 18) }]}>
-      <Pressable accessibilityLabel="닫기" onPress={goBack} style={styles.iconButton}>
+      <Pressable accessibilityLabel="닫기" onPress={requestClose} style={styles.iconButton}>
         <CloseIcon size={20} color={COLORS.text} />
       </Pressable>
       <Text style={styles.appBarTitle}>{isStudyRecruit ? "스터디 모집" : "글 수정"}</Text>
@@ -179,30 +321,46 @@ export default function PostEditScreen() {
   }
 
   const onSubmit = (values: FormValues) => {
+    // 필수 검사를 통과한 뒤에는 비어 있지 않다.
+    const title = values.title?.trim() ?? "";
     const content = values.content?.trim() ?? "";
     if (isAlbum && attachments.length > PHOTO_ALBUM_IMAGE_SELECTION_LIMIT) {
       setUploadNotice("사진첩은 게시글당 최대 20장까지 등록할 수 있어요. 사진을 20장 이하로 줄여주세요.");
       return;
     }
-    if (!isAlbum && !isMutualAid && !content) {
-      setError("content", { message: "내용을 입력해주세요" });
+
+    // 작성 화면과 같다. 첫 항목에서 멈추지 않고 비어 있는 칸을 모두 모아
+    // 한 번에 빨갛게 칠하고, 문구에는 항목명을 넣지 않는다.
+    const missing: (keyof FormValues)[] = [];
+    const requireField = (name: keyof FormValues, value?: string) => {
+      if (!value?.trim()) missing.push(name);
+    };
+    requireField("title", values.title);
+    if (!isAlbum && !isMutualAid) requireField("content", values.content);
+    if (isStudyRecruit) requireField("contact", values.contact);
+    if (isAdminParticipationPost) requireField("applicationUrl", values.applicationUrl);
+    if (resourceFields?.professor) requireField("professor", values.professor);
+    if (resourceFields?.difficulty) requireField("difficulty", values.difficulty);
+    if (resourceFields?.satisfaction) requireField("satisfaction", values.satisfaction);
+
+    clearErrors(missing);
+    if (missing.length > 0) {
+      // message를 비워 칸 아래 문구 없이 테두리만 빨갛게 만든다.
+      for (const name of missing) setError(name, { message: "" });
+      setToast((current) => nextToastState(current, TOAST_MESSAGES.requiredFieldError));
       return;
     }
-    if (isStudyRecruit && !values.contact?.trim()) {
-      setError("contact", { message: "연락 수단을 입력해주세요" });
-      return;
-    }
+
     if (isAdminParticipationPost) {
       const applicationUrl = values.applicationUrl?.trim() ?? "";
-      if (!applicationUrl) {
-        setError("applicationUrl", { message: "참여 버튼 링크를 입력해주세요" });
-        return;
-      }
       try {
         const parsed = new URL(applicationUrl);
         if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("INVALID_PROTOCOL");
       } catch {
-        setError("applicationUrl", { message: "http:// 또는 https://로 시작하는 올바른 주소를 입력해주세요" });
+        setNotice({
+          title: "참여 버튼 링크",
+          body: "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요.",
+        });
         return;
       }
       if (!participationRepresentativeImage) {
@@ -214,8 +372,8 @@ export default function PostEditScreen() {
     updateMutation.mutate(
       {
         board_id: isResourceEdit ? selectedBoardId || post.board_id : undefined,
-        title: values.title.trim(),
-        content: isAlbum ? values.title.trim() : content,
+        title,
+        content: isAlbum ? title : content,
         category: isResourceEdit
           ? resourceCategoryLabel(selectedBoard) ?? undefined
           : values.category?.trim() || undefined,
@@ -231,7 +389,9 @@ export default function PostEditScreen() {
                 application_url: values.applicationUrl?.trim() ?? "",
                 ...(board?.slug === "club-promo" ? { club_operation_status: values.clubOperationStatus } : {}),
               }
-          : post.metadata,
+            : isResourceEdit
+              ? withResourcePostMetadata(post.metadata, resourceFields, values)
+              : post.metadata,
         attachment_ids: attachments.map((attachment) => attachment.id),
         is_anonymous: post.is_anonymous,
       },
@@ -255,7 +415,7 @@ export default function PostEditScreen() {
             });
             return;
           }
-          goBack();
+          leaveScreen();
         },
         onError: () => Alert.alert("저장 실패", "작성자 또는 관리자만 이 게시글을 수정할 수 있습니다."),
       }
@@ -263,6 +423,7 @@ export default function PostEditScreen() {
   };
 
   const selectImages = async () => {
+    Keyboard.dismiss();
     if (isAlbumImageLimitReached) {
       setUploadNotice("사진첩은 게시글당 최대 20장까지 등록할 수 있어요.");
       return;
@@ -300,6 +461,7 @@ export default function PostEditScreen() {
   };
 
   const selectParticipationImages = async (kind: "representative" | "detail") => {
+    Keyboard.dismiss();
     if (kind === "detail" && !participationRepresentativeImage) {
       setUploadNotice("대표 이미지를 먼저 등록해주세요.");
       return;
@@ -349,34 +511,12 @@ export default function PostEditScreen() {
               accessibilityLabel="게시판 선택"
               accessibilityRole="button"
               accessibilityState={{ expanded: isBoardMenuOpen }}
-              onPress={() => setIsBoardMenuOpen((current) => !current)}
+              onPress={() => { Keyboard.dismiss(); setIsBoardMenuOpen(true); }}
               style={styles.boardSelect}
             >
               <Text numberOfLines={1} style={styles.readOnlyText}>{selectedBoard?.name ?? "게시판 선택"}</Text>
-              <Ionicons name={isBoardMenuOpen ? "chevron-up" : "chevron-down"} size={18} color={COLORS.muted} />
+              <Ionicons name="chevron-down" size={18} color={COLORS.muted} />
             </Pressable>
-            {isBoardMenuOpen ? (
-              <View style={styles.boardMenu}>
-                {resourceBoardOptions.map((option) => {
-                  const selected = option.id === selectedBoardId;
-                  return (
-                    <Pressable
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: selected }}
-                      key={option.id}
-                      onPress={() => {
-                        setSelectedBoardId(option.id);
-                        setIsBoardMenuOpen(false);
-                      }}
-                      style={[styles.boardOption, selected ? styles.boardOptionSelected : null]}
-                    >
-                      <Text style={[styles.boardOptionText, selected ? styles.boardOptionTextSelected : null]}>{option.name}</Text>
-                      {selected ? <Ionicons name="checkmark" size={18} color={COLORS.primary} /> : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            ) : null}
           </View>
         ) : isStudyRecruit ? null : (
           <View style={styles.readOnlyField}>
@@ -415,17 +555,72 @@ export default function PostEditScreen() {
                 accessibilityLabel="제목"
                 multiline={!isStudyRecruit}
                 onBlur={field.onBlur}
-                onChangeText={field.onChange}
-                placeholder="제목을 입력하세요"
+                onChangeText={clearOnChange("title", field.onChange)}
+                placeholder={resourceFields?.titlePlaceholder ?? "제목을 입력하세요"}
                 placeholderTextColor={COLORS.subtle}
                 style={[styles.input, isStudyRecruit ? null : styles.titleInput, fieldState.error ? styles.inputError : null]}
                 textAlignVertical="top"
                 value={field.value}
               />
-              {fieldState.error ? <Text style={styles.errorText}>{fieldState.error.message}</Text> : null}
             </View>
           )}
         />
+
+        {resourceFields?.professor ? (
+          <Controller
+            control={control}
+            name="professor"
+            render={({ field, fieldState }) => (
+              <View style={styles.labeledField}>
+                <Text style={styles.fieldLabel}>교수명</Text>
+                <View style={[styles.suffixInputRow, fieldState.error ? styles.inputError : null]}>
+                  <TextInput
+                    onChangeText={clearOnChange("professor", field.onChange)}
+                    placeholder="교수명을 입력하세요"
+                    placeholderTextColor={COLORS.subtle}
+                    style={[styles.suffixInput, { outlineStyle: "none" } as never]}
+                    value={field.value ?? ""}
+                  />
+                  <Text style={styles.suffixInputLabel}>교수</Text>
+                </View>
+              </View>
+            )}
+          />
+        ) : null}
+
+        {RESOURCE_RATING_FIELDS.filter((rating) => resourceFields?.[rating.name]).map((rating) => (
+          <Controller
+            control={control}
+            key={rating.name}
+            name={rating.name}
+            render={({ field, fieldState }) => (
+              <View style={styles.labeledField}>
+                <Text style={styles.fieldLabel}>{rating.label}</Text>
+                <View style={styles.ratingRow}>
+                  {RESOURCE_RATING_LEVELS.map((level) => {
+                    const selected = field.value === level;
+                    return (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityState={{ selected }}
+                        key={level}
+                        // 필수 입력이라 해제는 없다. 다른 등급을 눌러 바꾼다.
+                        onPress={() => { Keyboard.dismiss(); field.onChange(level); clearErrors(rating.name); }}
+                        style={[
+                          styles.ratingButton,
+                          selected ? styles.ratingButtonActive : null,
+                          fieldState.error ? styles.borderOnlyError : null,
+                        ]}
+                      >
+                        <Text style={[styles.ratingText, selected ? styles.ratingTextActive : null]}>{level}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          />
+        ))}
 
         {board?.slug === "club-promo" ? (
           <Controller
@@ -445,14 +640,13 @@ export default function PostEditScreen() {
                   accessibilityLabel="내용"
                   multiline
                   onBlur={field.onBlur}
-                  onChangeText={field.onChange}
+                  onChangeText={clearOnChange("content", field.onChange)}
                   placeholder="내용을 입력하세요"
                   placeholderTextColor={COLORS.subtle}
                   style={[styles.input, isStudyRecruit ? styles.studyContentInput : styles.contentInput, fieldState.error ? styles.inputError : null]}
                   textAlignVertical="top"
                   value={field.value}
                 />
-                {fieldState.error ? <Text style={styles.errorText}>{fieldState.error.message}</Text> : null}
               </View>
             )}
           />
@@ -468,13 +662,12 @@ export default function PostEditScreen() {
                 <TextInput
                   accessibilityLabel="연락 수단"
                   onBlur={field.onBlur}
-                  onChangeText={field.onChange}
+                  onChangeText={clearOnChange("contact", field.onChange)}
                   placeholder="스터디장 연락 수단"
                   placeholderTextColor={COLORS.subtle}
                   style={[styles.input, fieldState.error ? styles.inputError : null]}
                   value={field.value}
                 />
-                {fieldState.error ? <Text style={styles.errorText}>{fieldState.error.message}</Text> : null}
               </View>
             )}
           />
@@ -495,13 +688,12 @@ export default function PostEditScreen() {
                       autoCorrect={false}
                       keyboardType="url"
                       onBlur={field.onBlur}
-                      onChangeText={field.onChange}
+                      onChangeText={clearOnChange("applicationUrl", field.onChange)}
                       placeholder="https://forms.gle/..."
                       placeholderTextColor={COLORS.subtle}
                       style={[styles.input, fieldState.error ? styles.inputError : null]}
                       value={field.value}
                     />
-                    {fieldState.error ? <Text style={styles.errorText}>{fieldState.error.message}</Text> : null}
                   </View>
                 )}
               />
@@ -589,17 +781,44 @@ export default function PostEditScreen() {
             {uploadNotice ? <Text style={styles.errorText}>{uploadNotice}</Text> : null}
           </>
         ) : isResourceEdit || board?.category === "community" ? (
-          <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} disabled={updateMutation.isPending} />
+          <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} onError={showUploadFailure} disabled={updateMutation.isPending} />
         ) : null}
 
         <Pressable
           disabled={updateMutation.isPending || isUploading}
-          onPress={handleSubmit(onSubmit)}
+          // 제출할 때도 포커스를 놓아 검은 테두리와 키보드를 함께 걷는다.
+          onPress={() => { Keyboard.dismiss(); handleSubmit(onSubmit)(); }}
           style={[styles.submitButton, updateMutation.isPending || isUploading ? styles.submitButtonDisabled : null]}
         >
           <Text style={styles.submitText}>{updateMutation.isPending || isUploading ? "저장 중" : "완료"}</Text>
         </Pressable>
       </ScrollView>
+      <SelectionSheet
+        visible={isBoardMenuOpen}
+        title="게시판을 선택하세요"
+        options={resourceBoardOptions.map((option) => ({ key: String(option.id), label: option.name }))}
+        emptyText="옮길 수 있는 게시판이 없습니다."
+        selectedKey={String(selectedBoardId)}
+        onClose={() => setIsBoardMenuOpen(false)}
+        onSelect={(option) => selectBoard(Number(option.key))}
+      />
+      <DiscardWriteModal
+        visible={discardPromptOpen}
+        mode="edit"
+        onKeep={() => setDiscardPromptOpen(false)}
+        onDiscard={() => { setDiscardPromptOpen(false); setRemoveConfirmed(true); }}
+      />
+      <DiscardWriteModal
+        visible={pendingBoardId !== null}
+        mode="boardChange"
+        onKeep={() => setPendingBoardId(null)}
+        onDiscard={() => {
+          if (pendingBoardId !== null) clearForBoardChange(pendingBoardId);
+          setPendingBoardId(null);
+        }}
+      />
+      <NoticeModal notice={notice} onClose={() => setNotice(null)} />
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }
@@ -687,32 +906,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  boardMenu: {
-    marginTop: 6,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    backgroundColor: COLORS.surface,
-  },
-  boardOption: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 14,
-  },
-  boardOptionSelected: {
-    backgroundColor: "#EDF2FE",
-  },
-  boardOptionText: {
-    color: COLORS.text,
-    fontSize: 14,
-  },
-  boardOptionTextSelected: {
-    color: COLORS.primary,
-    fontWeight: "700",
-  },
   // Figma: 작성 화면과 동일한 세그먼트 컨트롤 (46h 트랙 + 38h 옵션)
   statusRow: {
     flexDirection: "row",
@@ -771,9 +964,68 @@ const styles = StyleSheet.create({
   studyContentInput: {
     height: 111, // Figma: 스터디 내용입력 111h
   },
+  // 작성 화면과 같은 규칙. Figma 오류 상태는 1px이고 여백은 기본과 같다.
   inputError: {
-    borderColor: COLORS.danger,
-    backgroundColor: COLORS.danger50,
+    borderWidth: 1,
+    borderColor: "#D64545",
+  },
+  // 등급 버튼은 좌우 여백이 없어 두께만 바꾼다.
+  borderOnlyError: {
+    borderWidth: 1,
+    borderColor: "#D64545",
+  },
+  suffixInputRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    backgroundColor: COLORS.surface,
+    paddingHorizontal: 14,
+  },
+  suffixInput: {
+    flex: 1,
+    minHeight: 41,
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: "400",
+    lineHeight: 17,
+    paddingVertical: 12,
+    // Android TextInput의 기본 가로 여백을 없앤다. 두면 바깥 래퍼의 14에 더해진다.
+    paddingHorizontal: 0,
+  },
+  suffixInputLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.muted,
+  },
+  ratingRow: {
+    width: "100%",
+    flexDirection: "row",
+    gap: 8,
+  },
+  ratingButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 11,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+  },
+  ratingButtonActive: {
+    borderColor: COLORS.primary,
+    backgroundColor: "#E8EEFF",
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: COLORS.muted,
+  },
+  ratingTextActive: {
+    color: COLORS.primary,
   },
   errorText: {
     color: COLORS.danger,

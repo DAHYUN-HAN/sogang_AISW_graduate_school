@@ -23,7 +23,10 @@ test("auth headers retain the Figma 360px geometry", () => {
     const appBarTitle = styleBlock(source, "appBarTitle");
 
     assert.match(source, /paddingTop: Math\.max\(insets\.top, 18\)/, screen);
-    assert.match(source, /<BackIcon size=\{22\}/, screen);
+    // 로그인은 게스트가 처음 닿는 화면이라 돌아갈 곳이 없다. Figma TopBar(194:22)도
+    // 아이콘 없는 22x22 자리다. 나머지 두 화면은 로그인에서 밀려 들어오므로 뒤로가 있다.
+    if (screen === "app/auth/login.tsx") assert.doesNotMatch(source, /<BackIcon/, screen);
+    else assert.match(source, /<BackIcon size=\{22\}/, screen);
     assert.match(appBar, /minHeight: 56/);
     assert.match(appBar, /paddingHorizontal: 16/);
     assert.match(appBar, /paddingBottom: 12/);

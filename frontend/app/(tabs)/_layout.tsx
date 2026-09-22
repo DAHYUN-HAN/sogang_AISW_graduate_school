@@ -1,6 +1,7 @@
 import { BottomTabBar, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { router, Tabs, usePathname } from "expo-router";
 import { useRef } from "react";
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CommunityTabIcon, CouncilTabIcon, HomeTabIcon, NoticeTabIcon, ParticipationTabIcon } from "../../components/icons";
@@ -11,13 +12,22 @@ import {
   tabRootPressAction,
   type VisibleTabRootName,
 } from "../../stores/tabRootResetStore";
+import { requestWriteLeave } from "../../stores/writeLeaveGuard";
 import { shouldHideTabBar } from "../../utils/tabBarVisibility";
 
+// 탭 한 칸의 내용물은 아이콘 22 + 간격 3 + 라벨 13 = 38pt다. 아래 높이에서
+// 위아래 여백을 뺀 값이 이보다 작으면 라벨이 잘린다.
+//
+// iOS 표준 탭바는 49pt라 74를 쓰면 다른 앱보다 25pt 두꺼워 보인다. 49에 맞추려면
+// 여백을 8에서 줄여야 38이 들어간다(49 - 5 - 6 = 38).
+// 안드로이드 74는 Material 하단 네비 범위(56~80) 안이라 그대로 둔다.
+const TAB_BAR_METRICS = Platform.OS === "ios"
+  ? { height: 49, paddingTop: 5, paddingBottom: 6 }
+  : { height: 74, paddingTop: 8, paddingBottom: 8 };
+
 const TAB_BAR_STYLE = {
-  height: 74,
+  ...TAB_BAR_METRICS,
   borderTopColor: "#E1E4E9",
-  paddingTop: 8,
-  paddingBottom: 8,
   backgroundColor: "#FFFFFF",
 };
 
@@ -29,10 +39,16 @@ function handleTabRootPress(
 ) {
   const action = tabRootPressAction(tabName);
   event.preventDefault();
-  if (action.resetTab) {
-    requestTabRootReset(action.resetTab);
-  }
-  router.navigate(action.route as never);
+  const go = () => {
+    if (action.resetTab) {
+      requestTabRootReset(action.resetTab);
+    }
+    router.navigate(action.route as never);
+  };
+  // 글쓰기·수정 중이면 폼 화면이 확인창을 띄우고, 사용자가 취소를 고른 뒤에
+  // 누른 탭으로 옮긴다.
+  if (requestWriteLeave(go)) return;
+  go();
 }
 
 // 숨김 탭(board/events 등)이 포커스되면 기본 탭바는 아무 탭도 하이라이트하지 않는다.

@@ -12,6 +12,7 @@ from app.models.post import Post
 
 
 CURRENT_CLUB_NAMES = (
+    "파인튜닝",
     "SG_LLM",
     "알바트로스냅",
     "서강의 봄",

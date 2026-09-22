@@ -5,7 +5,6 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.author_snapshots import resolve_author_display
-from app.board_policies import comments_are_disabled
 from app.deps import get_current_user, get_db
 from app.errors import AppException
 from app.models.comment import Comment
@@ -44,9 +43,7 @@ def get_comments(
     post = db.get(Post, post_id)
     if post is None or post.deleted_at is not None:
         raise AppException(status_code=404, message="Post not found.", code="NOT_FOUND")
-    board = require_post_read(db, post, current_user)
-    if comments_are_disabled(board) and current_user.role != "admin":
-        return success_response([])
+    require_post_read(db, post, current_user)
 
     filters = [Comment.post_id == post_id]
     blocked_author_ids = db.scalars(
@@ -119,13 +116,7 @@ def create_comment(
     post = db.get(Post, post_id)
     if post is None or post.deleted_at is not None:
         raise AppException(status_code=404, message="Post not found.", code="NOT_FOUND")
-    board = require_post_read(db, post, current_user)
-    if comments_are_disabled(board):
-        raise AppException(
-            status_code=403,
-            message="Comments are disabled for this board.",
-            code="COMMENTS_DISABLED",
-        )
+    require_post_read(db, post, current_user)
 
     if payload.parent_id is not None:
         parent_comment = db.get(Comment, payload.parent_id)

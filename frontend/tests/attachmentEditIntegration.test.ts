@@ -7,6 +7,8 @@ import { activityParticipantsFromMetadata, activitySourcePostIdFromMetadata } fr
 import { clubOperationStatus } from "../utils/participationGuide";
 import { mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate } from "../utils/mutualAid";
 
+import { resourcePostMetadata } from "../utils/resourcePostFields";
+
 const edit = ts.createSourceFile("edit.tsx", readFileSync("app/(tabs)/board/post/edit/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const create = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const mediaPickerSource = readFileSync("utils/mediaPicker.ts", "utf8");
@@ -53,9 +55,11 @@ test("resource edit exposes existing mixed attachments and writes the user's rem
     board: { board_type: "resource", category: "resources", write_permission: "user" },
     attachments, PostAttachmentEditor: "AttachmentEditor", updateMutation: { isPending: false },
     setAttachments: (next: typeof attachments) => { attachments = next; }, setIsUploading: () => {},
+    showUploadFailure: () => {},
     element: (type: string, props: Record<string, unknown>) => ({ type, props }),
   });
   assert.ok(rendered, "Resource edits must render an attachment editor");
+  assert.equal(typeof rendered.props.onError, "function", "Upload and open failures reach the screen's toast/modal");
   assert.equal(rendered.type, "AttachmentEditor");
   assert.deepEqual(rendered.props.attachments.map((item: { id: number }) => item.id), [12, 34]);
   rendered.props.onChange([attachments[1]]);
@@ -164,6 +168,8 @@ test("mutual-aid saves explicit replacement with remaining file IDs and clears a
     isActivity: false, isMutualAid: true, isStudyRecruit: false, isAdminParticipationPost: false,
     isAlbum: false, isSuggestion: false, evidenceMode: "file", evidenceLink: "https://example.com/old-proof",
     clean: (value?: string) => value?.trim() || undefined,
+    // 상조회는 자료공유 추가 입력이 없는 게시판이라 resourceFields가 null이다.
+    resourceFields: null, resourcePostMetadata,
   };
   const buildMetadata = runInNewContext(metadataCode, context);
   const payload = runInNewContext(payloadCode, {

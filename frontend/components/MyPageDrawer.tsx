@@ -2,7 +2,6 @@ import { router, usePathname } from "expo-router";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -84,7 +83,6 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
   const pendingSettingsRef = useRef<MyPageDrawerSettingsRoute | null>(null);
   const lastMountedOriginRef = useRef<MyPageOriginRoute | null>(null);
   const drawerOriginRef = useRef<MyPageOriginRoute | null>(null);
-  const edgeTouchStartXRef = useRef<number | null>(null);
   const me = data?.data;
 
   useEffect(() => {
@@ -200,46 +198,6 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
     setTimeout(() => router.replace("/auth/login" as never), 170);
   };
 
-  const edgePanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        // Observe edge drags from the parent without placing a touch surface over children.
-        onStartShouldSetPanResponder: () => false,
-        onStartShouldSetPanResponderCapture: (event) => {
-          // gesture.x0 is not populated until grant, after the move-capture decision.
-          edgeTouchStartXRef.current = event.nativeEvent.pageX;
-          return false;
-        },
-        onMoveShouldSetPanResponderCapture: (_, gesture) =>
-          !isVisible
-          && gesture.numberActiveTouches === 1
-          && edgeTouchStartXRef.current !== null
-          && edgeTouchStartXRef.current >= 0 && edgeTouchStartXRef.current < 24
-          && gesture.dx > 14 && gesture.dx > Math.abs(gesture.dy) * 1.4,
-        onPanResponderTerminationRequest: () => false,
-        onPanResponderRelease: (event) => {
-          if (edgeTouchStartXRef.current !== null && event.nativeEvent.pageX - edgeTouchStartXRef.current > 36) {
-            openDrawer();
-          }
-        },
-      }),
-    [isVisible, openDrawer]
-  );
-
-  const drawerPanResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          isVisible && gesture.dx < -12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.25,
-        onPanResponderRelease: (_, gesture) => {
-          if (gesture.dx < -48) {
-            closeDrawer();
-          }
-        },
-      }),
-    [closeDrawer, isVisible]
-  );
-
   const backdropOpacity = translateX.interpolate({
     inputRange: [-drawerWidth, 0],
     outputRange: [0, 1],
@@ -253,7 +211,14 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
 
   return (
     <MyPageDrawerContext.Provider value={contextValue}>
-      <View style={styles.host} {...edgePanResponder.panHandlers}>
+      {/* 서랍에는 스와이프 제스처를 두지 않는다. 여는 쪽(왼쪽 가장자리 드래그)은
+          iOS의 기본 스와이프 뒤로가기와 같은 구역(왼쪽 약 25pt)을 놓고 다퉜고,
+          네이티브 제스처 인식기는 JS 반응자가 막을 수 없어 뒤로가기와 서랍이
+          번갈아 걸렸다. 지금은 서랍뿐 아니라 스택도 스와이프를 쓰지 않는다.
+          여는 것은 헤더의 마이페이지 버튼, 닫는 것은 서랍의 닫기 버튼(과
+          안드로이드 시스템 뒤로가기)뿐이다. 서랍이 화면을 꽉 채워서 뒤 배경은
+          눌리지 않는다. */}
+      <View style={styles.host}>
         {children}
         {isVisible ? (
           <MyPageDrawerOverlay onClose={closeDrawer} onShow={drawerDidShow}>
@@ -274,7 +239,6 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
                     transform: [{ translateX }],
                   },
                 ]}
-                {...drawerPanResponder.panHandlers}
               >
                 <View style={styles.appBar}>
                   <Pressable accessibilityLabel="닫기" onPress={closeDrawer} style={styles.iconButton}>

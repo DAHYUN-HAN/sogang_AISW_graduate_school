@@ -166,8 +166,19 @@ export function postDetailRoute(postId: number, fromBoardId?: number, returnTo?:
   return params.length > 0 ? `${path}?${params.join("&")}` : path;
 }
 
-export function postCreateRoute(boardId: number, category = "", returnTo?: unknown) {
-  const params = [`boardId=${boardId}`, `category=${encodeURIComponent(category)}`];
+// boardId가 없는 글쓰기도 있다. 자료공유 `전체`처럼 여러 게시판을 모아 보는
+// 목록에서는 고를 게시판이 정해지지 않아서, 대신 boardGroup으로 어느 묶음에서
+// 왔는지만 넘기고 글쓰기 화면이 직접 고르게 한다.
+export function postCreateRoute(
+  boardId: number | null,
+  category = "",
+  returnTo?: unknown,
+  boardGroup?: string,
+) {
+  const params: string[] = [];
+  if (boardId !== null && boardId > 0) params.push(`boardId=${boardId}`);
+  params.push(`category=${encodeURIComponent(category)}`);
+  if (boardGroup) params.push(`boardGroup=${encodeURIComponent(boardGroup)}`);
   const safeReturnTo = postDetailReturnRoute(returnTo);
   if (safeReturnTo) params.push(`returnTo=${encodeURIComponent(safeReturnTo)}`);
   return `/board/post/create?${params.join("&")}` as const;
@@ -271,13 +282,14 @@ export function postEditCompletionDecision(
 }
 
 export function postCreateRouteFromBoardList(
-  boardId: number,
+  boardId: number | null,
   category: string,
   isTabRoot: boolean,
   _isActivityCertification: boolean,
   returnTo: unknown,
+  boardGroup?: string,
 ) {
-  return postCreateRoute(boardId, category, isTabRoot ? returnTo : undefined);
+  return postCreateRoute(boardId, category, isTabRoot ? returnTo : undefined, boardGroup);
 }
 
 export function postCreateBackDecision(

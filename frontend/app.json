@@ -21,7 +21,7 @@
           "image": "./assets/splash-logo.png",
           "backgroundColor": "#EEF2FE",
           "resizeMode": "contain",
-          "imageWidth": 360,
+          "imageWidth": 600,
           "android": {
             "imageWidth": 600
           }

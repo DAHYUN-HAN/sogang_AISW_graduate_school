@@ -86,7 +86,8 @@ test("focus and editing preserve controlled input props without remounting", () 
   assert.equal(h.render().type, "ScrollView");
   h.render().children[0].props.onFocus({});
   let viewport = h.render();
-  assert.equal(flatten(viewport.props.style).borderWidth, 1.5);
+  // 포커스 테두리 1px. 기본 0.5px에서 0.5만 굵어진다.
+  assert.equal(flatten(viewport.props.style).borderWidth, 1);
   const input = viewport.children[0];
   assert.equal(input.props.onChangeText, h.props.onChangeText);
   assert.equal(input.props.value, h.props.value);

@@ -148,3 +148,43 @@ def test_mutual_aid_accepts_evidence_link_instead_of_file(api, monkeypatch: pyte
         post = db.get(Post, with_link.json()["data"]["id"])
         assert post.metadata_json["proof_url"] == "https://example.com/invite"
         assert db.query(PostMutualAid).filter(PostMutualAid.post_id == post.id).one().event_type == "wedding"
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        "http://www.",
+        "http://www",
+        "https://example.",
+        "https://.com",
+        "https://example.c",
+        "ftp://example.com",
+        "example.com",
+        "https://example.com/" + "a" * 500,
+    ],
+)
+def test_evidence_link_rejects_incomplete_addresses(link: str) -> None:
+    """QA: http://www. 처럼 도메인을 덜 입력해도 신청이 등록되던 문제."""
+
+    with pytest.raises(Exception) as excinfo:
+        posts_router._validate_evidence_link({"proof_url": link})
+    assert getattr(excinfo.value, "code", None) == "VALIDATION_ERROR"
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        "https://example.com",
+        "http://www.example.com/invite?id=3",
+        "  https://example.co.kr/a  ",
+        "https://xn--hu5bp7l.xn--3e0b707e",
+    ],
+)
+def test_evidence_link_accepts_normal_addresses(link: str) -> None:
+    posts_router._validate_evidence_link({"proof_url": link})
+
+
+def test_evidence_link_is_optional() -> None:
+    posts_router._validate_evidence_link(None)
+    posts_router._validate_evidence_link({})
+    posts_router._validate_evidence_link({"proof_url": "   "})

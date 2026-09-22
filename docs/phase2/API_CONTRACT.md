@@ -1145,7 +1145,7 @@ Rules:
 
 - When authenticated, comments written by blocked authors are excluded from the response tree.
 - A deleted or otherwise hidden comment author returns `author_cohort: null`.
-- `lecture-reviews` is a forced-anonymous, no-comment board. Non-admin users receive an empty comment list and user-facing post responses mask the author as `Anonymous`.
+- `lecture-reviews` is a forced-anonymous board that supports comments. User-facing post responses mask the post author as `Anonymous`, while comment authors follow the normal comment-author rules.
 - `exam-archive` exposes the post author under the normal post-author rules and supports comments.
 
 ### POST `/posts/{post_id}/comments`
@@ -1166,7 +1166,6 @@ Rules:
 - Maximum depth is 2.
 - `content` is trimmed, required, and limited to 500 characters.
 - If `parent_id` points to a reply, return `BAD_REQUEST`.
-- Creating a comment on `lecture-reviews` returns `403 COMMENTS_DISABLED`.
 - The shared post-read policy is evaluated before all comment reads and mutations. Another member's mutual-aid comment tree is hidden with `404 NOT_FOUND`.
 
 ### PUT `/comments/{comment_id}`

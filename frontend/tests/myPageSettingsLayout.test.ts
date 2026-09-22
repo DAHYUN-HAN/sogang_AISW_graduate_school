@@ -20,6 +20,10 @@ function harness() {
       useNavigation: () => ({ isFocused: () => focused }),
       useFocusEffect: (fn: typeof effect) => { effect = fn; },
     },
+    // iOS 가장자리 스와이프로 들어오는 제거를 막고 같은 복귀를 태운다.
+    "@react-navigation/native": {
+      usePreventRemove: (prevent: boolean, callback: () => void) => { preventRemove = { prevent, callback }; },
+    },
     "react-native": { Platform: { OS: "android" }, BackHandler: {
       addEventListener: (_event: string, fn: () => boolean) => {
         back = fn;
@@ -31,6 +35,7 @@ function harness() {
     }) },
     "../utils/myPageNavigation": myPageNavigation,
   };
+  let preventRemove: { prevent: boolean; callback: () => void } | undefined;
   const exports = {} as { useReturnToMyPageDrawer: (route: string) => { onLayout: () => void; returnToMyPageDrawer: () => void } };
   const code = ts.transpileModule(readFileSync("hooks/useReturnToMyPageDrawer.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS },
@@ -41,6 +46,7 @@ function harness() {
   });
   const hook = exports.useReturnToMyPageDrawer("/settings/profile");
   return { hook, ready, frames, back: () => back?.(), returns: () => returns,
+    preventRemove: () => preventRemove,
     frame: () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach((callback) => callback()); },
     focus: () => { focused = true; return effect(); }, blur: () => { focused = false; } };
 }
@@ -88,4 +94,16 @@ test("화면을 떠나면 표시 대기를 취소하여 다른 설정의 패널�
   h.frame();
   assert.equal(h.frames.size, 0);
   assert.deepEqual(h.ready, []);
+});
+
+test("설정 하위에서 스와이프로 빠져나가는 것도 막고 마이페이지로 복귀한다", () => {
+  // 이 화면들의 뒤로가기는 pop이 아니라 서랍으로 덮은 뒤 원래 탭으로 가는
+  // 전환이다. iOS 제스처가 그냥 pop 하면 설정 목록으로 떨어진다.
+  const h = harness();
+  const prevented = h.preventRemove();
+  assert.ok(prevented, "usePreventRemove를 걸어야 한다");
+  assert.equal(prevented.prevent, true);
+  assert.equal(h.returns(), 0);
+  prevented.callback();
+  assert.equal(h.returns(), 1, "헤더·안드로이드와 같은 복귀를 타야 한다");
 });

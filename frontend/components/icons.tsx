@@ -454,6 +454,18 @@ export function NoticeAlertIcon({ size = 14, color = "#854F0B" }: IconProps) {
   );
 }
 
+// 토스트용 경고 아이콘 — 디자인 원본 18x18. 채워진 원 위에 흰 느낌표라
+// NoticeAlertIcon(테두리만 있는 원)과 다르다. color는 원의 채움색이다.
+export function ToastAlertIcon({ size = 18, color = "#D64545" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <Path d="M9 18C13.9706 18 18 13.9706 18 9C18 4.02944 13.9706 0 9 0C4.02944 0 0 4.02944 0 9C0 13.9706 4.02944 18 9 18Z" fill={color} />
+      <Path d="M9 5V9.8" stroke="#FFFFFF" strokeWidth={1.6} strokeLinecap="round" />
+      <Path d="M9 13.6C9.55228 13.6 10 13.1523 10 12.6C10 12.0477 9.55228 11.6 9 11.6C8.44772 11.6 8 12.0477 8 12.6C8 13.1523 8.44772 13.6 9 13.6Z" fill="#FFFFFF" />
+    </Svg>
+  );
+}
+
 // 기본 프로필 아바타 — 디자인 원본 80x80 (파란 배경 원 + 흰 실루엣, 카메라 배지는 별도 오버레이).
 export function DefaultAvatarIcon({ size = 80 }: IconProps) {
   return (

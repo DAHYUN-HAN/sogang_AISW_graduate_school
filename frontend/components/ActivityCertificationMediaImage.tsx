@@ -15,11 +15,13 @@ import MediaImage from "./MediaImage";
 type Props = {
   layout: ActivityImageLayout;
   media: MediaReference;
+  // 여러 장을 한 프레임에서 넘길 때, 바깥에서 프레임 높이를 맞추는 데 쓴다.
+  onFrameHeight?: (height: number) => void;
 };
 
 const FALLBACK_ASPECT_RATIO = 16 / 9;
 
-export default function ActivityCertificationMediaImage({ layout, media }: Props) {
+export default function ActivityCertificationMediaImage({ layout, media, onFrameHeight }: Props) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [dimensions, setDimensions] = useState<ImageDimensions>();
   const { uri } = useMediaAccessUrl(media);
@@ -56,6 +58,11 @@ export default function ActivityCertificationMediaImage({ layout, media }: Props
     ? Math.min(containerWidth, rule.max_width ?? containerWidth)
     : undefined;
   const fallbackHeight = rule.height;
+  const resolvedHeight = frame?.height ?? rule.height ?? undefined;
+
+  useEffect(() => {
+    if (resolvedHeight !== undefined) onFrameHeight?.(resolvedHeight);
+  }, [onFrameHeight, resolvedHeight]);
 
   return (
     <View

@@ -2,7 +2,6 @@ from app.models.board import Board
 
 
 ANONYMOUS_BOARD_SLUGS = frozenset({"lecture-reviews"})
-NO_COMMENT_BOARD_SLUGS = frozenset({"lecture-reviews"})
 RESOURCE_CATEGORY_LABELS = {
     "lecture-reviews": "강의후기",
     "exam-archive": "시험족보",
@@ -21,7 +20,3 @@ def canonical_post_category(board: Board, submitted_category: str | None) -> str
 
 def hides_author_identity(board: Board) -> bool:
     return board.slug in ANONYMOUS_BOARD_SLUGS
-
-
-def comments_are_disabled(board: Board) -> bool:
-    return board.slug in NO_COMMENT_BOARD_SLUGS

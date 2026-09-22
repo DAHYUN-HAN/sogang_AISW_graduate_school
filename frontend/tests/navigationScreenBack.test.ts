@@ -39,6 +39,10 @@ function harness(path: string, options: Record<string, unknown> = {}) {
     deleteCommentMutation: { isPending: false },
     deletePostMutation: { isPending: false },
     nestedBackHandlerRef: { current: null },
+    // 수정 화면은 저장하지 않은 변경이 있을 때만 확인창을 띄운다. 여기서는
+    // 확인창을 거치지 않는 경로(변경 없음)를 검사한다.
+    hasUnsavedChanges: false,
+    setDiscardPromptOpen: () => {},
     useCallback: (fn: unknown) => fn,
     useFocusEffect: (fn: typeof effects[number]) => effects.push(fn),
     Platform: { OS: "android" },
@@ -67,7 +71,7 @@ function harness(path: string, options: Record<string, unknown> = {}) {
     ts.forEachChild(node, visit);
   }
   visit(source);
-  const code = declarations(source, ["closeSearch", "exitBoardDepth", "goBack", "handleBack", "handlePostBack"]) + "\n" + focusStatements.join("\n") + '\nheader = typeof handleBack !== "undefined" ? handleBack : typeof goBack !== "undefined" ? goBack : typeof handlePostBack !== "undefined" ? handlePostBack : undefined;';
+  const code = declarations(source, ["closeSearch", "exitBoardDepth", "goBack", "leaveScreen", "requestClose", "handleBack", "handlePostBack"]) + "\n" + focusStatements.join("\n") + '\nheader = typeof handleBack !== "undefined" ? handleBack : typeof requestClose !== "undefined" ? requestClose : typeof goBack !== "undefined" ? goBack : typeof handlePostBack !== "undefined" ? handlePostBack : undefined;';
   const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   let context: typeof bindings & { header?: () => void };
   function render() {
@@ -171,15 +175,16 @@ for (const path of ["board/post/[postId]", "board/post/edit/[postId]", "events/[
       let backs = 0;
       const result = runInNewContext(jsx, {
         React: { createElement: (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props, children }) },
-        View: "View", Text: "Text", Pressable: "Pressable", IconButton: "IconButton", LoadingState: "LoadingState", BackIcon: "BackIcon", CloseIcon: "CloseIcon",
+        View: "View", Text: "Text", Pressable: "Pressable", BackButton: "BackButton", LoadingState: "LoadingState", BackIcon: "BackIcon", CloseIcon: "CloseIcon",
         styles: {}, COLORS: {}, insets: { top: 0 }, board: undefined, isStudyRecruit: false,
         isLoading, isError: true, post: undefined, event: undefined,
-        handleBack: () => backs++, handlePostBack: () => backs++, goBack: () => backs++,
+        handleBack: () => backs++, handlePostBack: () => backs++, goBack: () => backs++, requestClose: () => backs++,
       });
       const controls: { onPress?: () => void }[] = [];
       function visit(node: any) {
         if (!node || typeof node !== "object") return;
-        if (["뒤로", "닫기"].includes(node.props?.accessibilityLabel ?? node.props?.label)) controls.push(node.props);
+        // BackButton은 라벨을 안쪽 Pressable에 들고 있어 겉에서는 보이지 않는다.
+        if (node.type === "BackButton" || ["뒤로", "닫기"].includes(node.props?.accessibilityLabel ?? node.props?.label)) controls.push(node.props);
         node.children?.flat(Infinity).forEach(visit);
       }
       visit(result);

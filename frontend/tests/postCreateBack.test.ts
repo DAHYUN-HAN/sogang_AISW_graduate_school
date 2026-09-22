@@ -23,19 +23,36 @@ function findHeader(node: ts.Node) {
 }
 findHeader(form);
 assert.ok(headerBack);
-const backStatements = form.body!.statements.filter((node) =>
-  (ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => declaration.name.getText(source) === "handleCreateBack")) ||
-  (ts.isExpressionStatement(node) && ts.isCallExpression(node.expression) && node.expression.expression.getText(source) === "useFocusEffect"),
-);
-const code = ts.transpileModule(`${backStatements.map((node) => node.getText(source)).join("\n")}\nheaderCallback = ${headerBack.getText(source)};`, {
+// removeConfirmed/pendingRemoveAction은 구조 분해라 이름이 정확히 일치하지 않는다.
+const BACK_CALLBACKS = ["leaveCreateScreen", "handleCreateBack", "handleDiscardConfirm", "removeConfirmed", "pendingRemoveAction", "pendingTabLeave"];
+const backStatements = form.body!.statements.filter((node) => {
+  if (ts.isVariableStatement(node)) {
+    return node.declarationList.declarations.some((declaration) =>
+      BACK_CALLBACKS.some((name) => declaration.name.getText(source).includes(name)));
+  }
+  if (ts.isExpressionStatement(node) && ts.isCallExpression(node.expression)) {
+    const callee = node.expression.expression.getText(source);
+    if (callee === "useFocusEffect" || callee === "usePreventRemove") return true;
+    // 확인 후 실제 이동을 진행하는 effect만 가져온다.
+    return callee === "useEffect" && node.getText(source).includes("removeConfirmed");
+  }
+  return false;
+});
+const code = ts.transpileModule(`${backStatements.map((node) => node.getText(source)).join("\n")}\nheaderCallback = ${headerBack.getText(source)};\ndiscardCallback = handleDiscardConfirm;`, {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
 
-function harness(options: { platform?: string; returnTo?: string; canGoBack?: boolean; postId?: string; editOrigin?: string; createdPostId?: number; boardType?: string; selectionSheet?: string; datePickerOpen?: boolean } = {}) {
-  const navigation: string[] = [];
-  const state = { selectionSheet: options.selectionSheet ?? null, datePickerOpen: options.datePickerOpen ?? false };
+function harness(options: { platform?: string; returnTo?: string; canGoBack?: boolean; postId?: string; editOrigin?: string; createdPostId?: number; boardType?: string; selectionSheet?: string; datePickerOpen?: boolean; hasUnsavedChanges?: boolean; submitted?: boolean } = {}) {
+  const routes: string[] = [];
+  const cleared: string[] = [];
+  const state = { selectionSheet: options.selectionSheet ?? null, datePickerOpen: options.datePickerOpen ?? false, discardPromptOpen: false, removeConfirmed: false };
   let listener: (() => boolean) | undefined;
   let focusEffect: (() => (() => void) | undefined) | undefined;
+  let preventRemove: { prevent: boolean; callback: (event: { data: { action: unknown } }) => void } | undefined;
+  const effects: (() => void)[] = [];
+  // useRef는 호출 순서대로 각기 다른 상자를 돌려주고, 다시 그려도 같은 상자를 유지한다.
+  const refs: { current: unknown }[] = [];
+  let refCursor = 0;
   const context = {
     boardId: 7,
     boardType: options.boardType ?? "resource",
@@ -43,14 +60,40 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
     params: { returnTo: options.returnTo, postId: options.postId, editOrigin: options.editOrigin, fromBoardId: "7" },
     router: {
       canGoBack: () => options.canGoBack ?? true,
-      back: () => navigation.push("back"),
-      navigate: (route: string) => navigation.push(`navigate:${route}`),
-      replace: (route: string) => navigation.push(`replace:${route}`),
+      back: () => routes.push("back"),
+      navigate: (route: string) => routes.push(`navigate:${route}`),
+      replace: (route: string) => routes.push(`replace:${route}`),
     },
     postCreateFormBackDecision,
     postCreateCompletionRoute,
+    postId: options.postId ? Number(options.postId) : null,
+    hasUnsavedChanges: options.hasUnsavedChanges ?? false,
+    // 등록·저장에 성공하면 화면이 이 표시로 잠금을 먼저 푼다.
+    submitted: options.submitted ?? false,
     setSelectionSheet: (value: string | null) => { state.selectionSheet = value; },
     setDatePickerOpen: (value: boolean) => { state.datePickerOpen = value; },
+    setDiscardPromptOpen: (value: boolean) => { state.discardPromptOpen = value; },
+    // 확인창에서 나가기를 고르면 잠금을 풀고, 풀린 뒤 effect가 이동을 진행한다.
+    setRemoveConfirmed: (value: boolean) => {
+      state.removeConfirmed = value;
+      if (!value) return;
+      render();
+      effects.splice(0).forEach((effect) => effect());
+    },
+    useState: (initial: unknown) => [state.removeConfirmed || initial, rendered.setRemoveConfirmed],
+    useRef: () => (refs[refCursor] ??= { current: null }, refs[refCursor++]),
+    useEffect: (effect: () => void) => { effects.push(effect); },
+    usePreventRemove: (prevent: boolean, callback: (event: { data: { action: unknown } }) => void) => {
+      preventRemove = { prevent, callback };
+    },
+    navigation: { dispatch: (action: { type?: string }) => routes.push(`dispatch:${action?.type ?? "action"}`) },
+    reset: () => { cleared.push("form"); },
+    setAttachments: () => { cleared.push("attachments"); },
+    setSelectedParticipants: () => { cleared.push("participants"); },
+    setParticipantQuery: () => { cleared.push("participantQuery"); },
+    setEvidenceLink: () => { cleared.push("evidenceLink"); },
+    setEvidenceMode: () => { cleared.push("evidenceMode"); },
+    setActivitySourcePostId: () => { cleared.push("activitySource"); },
     useCallback: (callback: unknown) => callback,
     useFocusEffect: (effect: typeof focusEffect) => { focusEffect = effect; },
     Platform: { OS: options.platform ?? "android" },
@@ -62,14 +105,26 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
       },
     },
     headerCallback: undefined as (() => void) | undefined,
+    discardCallback: undefined as (() => void) | undefined,
   };
   let rendered = { ...context, ...state };
   function render() {
+    effects.length = 0;
+    refCursor = 0;
     rendered = { ...context, ...state };
     runInNewContext(code, rendered);
   }
   render();
-  return { navigation, state, header: () => rendered.headerCallback!(), focus: () => { render(); return focusEffect?.(); }, hardware: () => listener?.() };
+  return {
+    navigation: routes,
+    cleared,
+    state,
+    preventRemove: () => preventRemove,
+    header: () => rendered.headerCallback!(),
+    discard: () => rendered.discardCallback!(),
+    focus: () => { render(); return focusEffect?.(); },
+    hardware: () => listener?.(),
+  };
 }
 
 for (const returnTo of [COMMUNITY_TAB_ROUTE, PARTICIPATION_TAB_ROUTE]) {
@@ -159,4 +214,87 @@ test("작성 중 펼친 날짜 선택기도 Back에서 먼저 닫는다", () => 
   h.focus();
   h.hardware();
   assert.deepEqual(h.navigation, [`navigate:${PARTICIPATION_TAB_ROUTE}`]);
+});
+
+test("작성 중인 내용이 있으면 헤더와 Android Back이 곧바로 나가지 않고 확인창을 연다", () => {
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true });
+  h.focus();
+  assert.equal(h.hardware(), true, "확인창을 열 때도 Android Back을 소비해야 한다");
+  h.header();
+  assert.deepEqual(h.navigation, [], "확인 전에는 이동하지 않는다");
+  assert.equal(h.state.discardPromptOpen, true);
+});
+
+test("작성 취소를 확인하면 폼을 비우고 원래 탭으로 복귀한다", () => {
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true });
+  h.header();
+  assert.equal(h.state.discardPromptOpen, true);
+  h.discard();
+  assert.equal(h.state.discardPromptOpen, false);
+  assert.deepEqual(h.cleared, ["form", "attachments", "participants", "participantQuery", "evidenceLink", "evidenceMode", "activitySource"]);
+  assert.deepEqual(h.navigation, [`navigate:${COMMUNITY_TAB_ROUTE}`]);
+});
+
+test("수정 취소를 확인하면 폼을 비우지 않고 수정 전 게시글 상세로 돌아간다", () => {
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, postId: "42", editOrigin: "post-detail", hasUnsavedChanges: true });
+  h.header();
+  assert.equal(h.state.discardPromptOpen, true);
+  h.discard();
+  assert.deepEqual(h.cleared, [], "수정 화면은 pop되어 언마운트되므로 비우지 않는다");
+  assert.deepEqual(h.navigation, ["back"]);
+});
+
+test("변경사항이 있어도 선택창과 날짜 선택기를 확인창보다 먼저 닫는다", () => {
+  for (const options of [{ selectionSheet: "board" }, { datePickerOpen: true }]) {
+    const h = harness({ returnTo: PARTICIPATION_TAB_ROUTE, hasUnsavedChanges: true, ...options });
+    h.header();
+    assert.deepEqual(h.navigation, []);
+    assert.equal(h.state.discardPromptOpen, false, "선택기를 닫는 단계에서는 확인창을 열지 않는다");
+    h.focus();
+    h.header();
+    assert.deepEqual(h.navigation, [], "확인창이 열린 동안에도 이동하지 않는다");
+    assert.equal(h.state.discardPromptOpen, true);
+  }
+});
+
+test("등록 완료 후에는 변경사항이 남아 있어도 확인창 없이 완료 경로로 간다", () => {
+  const h = harness({ boardType: "suggestion", createdPostId: 42, hasUnsavedChanges: true });
+  h.focus();
+  assert.equal(h.hardware(), true);
+  assert.equal(h.state.discardPromptOpen, false);
+  assert.deepEqual(h.navigation, [`replace:${postCreateCompletionRoute("suggestion", 42, 7)}`]);
+});
+
+test("iOS 스와이프로 나가려 해도 확인창을 먼저 띄운다", () => {
+  // UIKit이 직접 pop 해서 헤더·Android 핸들러를 타지 않는다. usePreventRemove가
+  // native-stack의 preventNativeDismiss를 켜 그 제스처까지 막는다.
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true });
+  const prevented = h.preventRemove();
+  assert.ok(prevented, "usePreventRemove를 걸어야 한다");
+  assert.equal(prevented.prevent, true);
+
+  prevented.callback({ data: { action: { type: "POP" } } });
+  assert.equal(h.state.discardPromptOpen, true);
+  assert.deepEqual(h.navigation, [], "확인 전에는 나가지 않는다");
+
+  h.discard();
+  // 제스처로 들어왔으면 원래 하려던 이동을 그대로 진행한다.
+  assert.deepEqual(h.navigation, ["dispatch:POP"]);
+});
+
+test("작성 중인 내용이 없으면 스와이프를 막지 않는다", () => {
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE });
+  assert.equal(h.preventRemove()?.prevent, false);
+});
+
+test("등록에 성공하면 잠금이 풀려 확인창 없이 이동한다", () => {
+  // 완료 화면을 쓰지 않는 게시판은 createdPostId가 비어 있어, 이 표시가 없으면
+  // 등록 직후의 router.replace까지 붙잡혀 작성 취소 확인창이 떴다.
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true, submitted: true });
+  assert.equal(h.preventRemove()?.prevent, false);
+});
+
+test("등록을 마친 뒤에는 스와이프를 막지 않는다", () => {
+  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true, createdPostId: 11 });
+  assert.equal(h.preventRemove()?.prevent, false);
 });

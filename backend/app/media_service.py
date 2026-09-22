@@ -10,7 +10,7 @@ import zipfile
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import unquote, urlencode, urlsplit
 
 from fastapi import UploadFile
 from sqlalchemy import select
@@ -189,8 +189,34 @@ def resolve_media_download(media: MediaAsset, path: Path) -> MediaDownload:
     return MediaDownload(filename=filename, content_type=content_type)
 
 
+# 비ASCII 바이트를 담은 퍼센트 이스케이프. %20 같은 ASCII 범위는 걸리지 않는다.
+_PERCENT_ENCODED_NON_ASCII = re.compile(r"%[89A-Fa-f][0-9A-Fa-f]")
+
+
+def _decode_percent_encoded_filename(filename: str) -> str:
+    """React Native FormData가 감싸 보낸 파일명을 되돌린다.
+
+    RN 0.77+ 의 Libraries/Network/FormData.js 는 filename 을 encodeURIComponent 로
+    감싼다. RFC 5987 의 filename* 가 아니라 평범한 filename= 값이라, 서버는
+    "%EB%B3%B4%EA%B3%A0%EC%84%9C.pdf" 를 글자 그대로 읽는다. 브라우저 FormData 는
+    이렇게 하지 않아 앱에서만 깨져 보인다.
+
+    파일명에 들어 있는 진짜 '%' 를 건드리지 않도록, 비ASCII 바이트가 있고 전체가
+    UTF-8 로 풀릴 때만 되돌린다.
+    """
+
+    if not _PERCENT_ENCODED_NON_ASCII.search(filename):
+        return filename
+    try:
+        return unquote(filename, errors="strict") or filename
+    except UnicodeDecodeError:
+        return filename
+
+
 def normalize_original_filename(filename: str | None) -> str:
-    basename = (filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+    # 경로 분리와 길이 검사는 되돌린 뒤의 실제 이름을 기준으로 한다.
+    decoded = _decode_percent_encoded_filename(filename or "")
+    basename = decoded.replace("\\", "/").rsplit("/", 1)[-1].strip()
     if (
         not basename
         or basename in {".", ".."}

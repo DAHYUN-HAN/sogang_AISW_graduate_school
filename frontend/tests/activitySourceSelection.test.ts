@@ -6,6 +6,7 @@ import ts from "typescript";
 import { QueryClient } from "@tanstack/react-query";
 
 import * as activityCertification from "../utils/activityCertification";
+import * as participationGuide from "../utils/participationGuide";
 
 const source = ts.createSourceFile(
   "create.tsx",
@@ -75,6 +76,7 @@ test("활동인증 작성·수정 선택창은 새 동아리와 이름이 바뀐
   ).outputText;
   const options = runInNewContext(code, {
     ...activityCertification,
+    ...participationGuide,
     useMemo: (build: () => unknown) => build(),
     activitySourceQuery: { data: posts },
     activitySourceBoard: { id: 9, slug: "club-promo" },

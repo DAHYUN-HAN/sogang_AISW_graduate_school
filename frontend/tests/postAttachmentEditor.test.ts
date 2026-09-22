@@ -36,7 +36,7 @@ function editorHarness(isPrivate = false) {
         useState: (initial: unknown) => { const i = cursor++; if (!(i in state)) state[i] = initial; return [state[i], (value: unknown) => { state[i] = value; }]; },
         useRef: (initial: unknown) => { const i = cursor++; if (!(i in state)) state[i] = { current: initial }; return state[i]; },
       };
-      if (id === "react-native") return { View: "View", Text: "Text", Pressable: "Pressable", Platform: { OS: "web" }, StyleSheet: { create: (x: unknown) => x } };
+      if (id === "react-native") return { View: "View", Text: "Text", Pressable: "Pressable", Platform: { OS: "web" }, Keyboard: { dismiss: () => {} }, StyleSheet: { create: (x: unknown) => x } };
       if (id === "@expo/vector-icons") return { Ionicons: "Icon" };
       if (id === "./icons") return { AttachFileIcon: "AttachFileIcon", CloseIcon: "CloseIcon" };
       if (id.includes("mediaPicker")) return { pickAndUploadImages: picker, pickAndUploadDocuments: picker };
