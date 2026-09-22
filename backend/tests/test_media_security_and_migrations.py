@@ -19,6 +19,7 @@ from app.models.banner import Banner
 from app.models.board import Board
 from app.models.media import MediaAsset, PostAttachment
 from app.models.post import Post
+from app.models.post_extension import PostMutualAid
 from app.models.user import User
 from app.routers import media as media_router
 
@@ -549,7 +550,7 @@ def test_post_media_reuses_post_read_policy_and_any_readable_link_allows(api, me
     with api.session() as db:
         db.add_all(
             [
-                PostAttachment(post_id=1, media_id=media_id, sort_order=0),
+                PostAttachment(post_id=4, media_id=media_id, sort_order=0),
                 PostAttachment(post_id=3, media_id=media_id, sort_order=0),
             ]
         )
@@ -560,7 +561,7 @@ def test_post_media_reuses_post_read_policy_and_any_readable_link_allows(api, me
     assert _signed_file_response(api, access).status_code == 200
 
 
-def test_private_mutual_aid_media_is_readable_by_members_after_attachment(api, media_storage) -> None:
+def test_private_mutual_aid_media_allows_only_processing_owner_and_admin(api, media_storage) -> None:
     _, private_directory = media_storage
     uploaded = _upload(api, filename="evidence.pdf", body=PDF_BYTES, content_type="application/pdf", private=True)
     assert uploaded.status_code == 200
@@ -635,6 +636,186 @@ def test_mutual_aid_evidence_is_visible_to_everyone_and_editable_by_the_owner(ap
         assert [attachment.media_id for attachment in attachments] == [media_id]
         # 파일 증빙으로 저장하면 기존 링크 증빙은 대체된다(증빙은 파일 또는 링크 중 하나).
         assert "proof_url" not in post.metadata_json
+
+
+def _attach_evidence(api, *, actor="owner", private=True, filename="evidence.pdf"):
+    uploaded = _upload(api, actor=actor, filename=filename, body=PDF_BYTES, content_type="application/pdf", private=private)
+    assert uploaded.status_code == 200
+    media_id = uploaded.json()["data"]["id"]
+    with api.session() as db:
+        post = db.get(Post, 1)
+        post.category = "wedding"
+        post.metadata_json = {
+            "event_date": "2026-08-01",
+            "relation": "self",
+            "proof_url": "https://example.com/private-proof",
+        }
+        db.add(PostAttachment(post_id=1, media_id=media_id, sort_order=media_id))
+        db.commit()
+    return media_id
+
+
+def _evidence_edit_payload(attachment_ids, proof_url=""):
+    return {
+        "title": "Updated request",
+        "content": "Updated remarks",
+        "category": "wedding",
+        "metadata": {"event_date": "2026-08-01", "relation": "self", "proof_url": proof_url},
+        "attachment_ids": attachment_ids,
+        "replace_evidence": True,
+    }
+
+
+def test_evidence_is_visible_only_in_authorized_edit_detail(api, media_storage) -> None:
+    media_id = _attach_evidence(api, actor="admin")
+    for actor in ("owner", "other"):
+        detail = api.client.get("/api/posts/1", headers=api.headers[actor]).json()["data"]
+        assert detail["attachments"] == []
+        assert "proof_url" not in detail["metadata"]
+        listed = api.client.get("/api/boards/1/posts", headers=api.headers[actor]).json()["data"]
+        listed_post = next(post for post in listed if post["id"] == 1)
+        assert "proof_url" not in listed_post["metadata"]
+        assert listed_post["attachment_count"] == 0
+    for actor in ("owner", "admin"):
+        response = api.client.get("/api/posts/1?for_edit=true", headers=api.headers[actor])
+        assert response.status_code == 200
+        detail = response.json()["data"]
+        assert [item["id"] for item in detail["attachments"]] == [media_id]
+        assert detail["metadata"]["proof_url"] == "https://example.com/private-proof"
+    peer = api.client.get("/api/posts/1?for_edit=true", headers=api.headers["other"])
+    assert peer.status_code == 403
+    assert api.client.get("/api/posts/1?for_edit=true").status_code == 401
+
+
+def test_regular_post_edit_detail_requires_owner_or_admin(api) -> None:
+    for actor in ("owner", "admin"):
+        assert api.client.get("/api/posts/3?for_edit=true", headers=api.headers[actor]).status_code == 200
+    assert api.client.get("/api/posts/3?for_edit=true", headers=api.headers["other"]).status_code == 403
+
+
+@pytest.mark.parametrize("state", ["completed", "rejected", "deleted", "inactive_board", "restricted_board", "missing_extension"])
+@pytest.mark.parametrize("private", [True, False])
+def test_evidence_access_fails_closed_after_request_becomes_uneditable(api, media_storage, state, private) -> None:
+    media_id = _attach_evidence(api, private=private)
+    initial = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"])
+    assert initial.status_code == 200
+    with api.session() as db:
+        mutual_aid = db.scalar(select(PostMutualAid).where(PostMutualAid.post_id == 1))
+        post = db.get(Post, 1)
+        board = db.get(Board, 1)
+        if state in {"completed", "rejected"}:
+            mutual_aid.status = state
+        elif state == "deleted":
+            from app.security import utc_now
+            post.deleted_at = utc_now()
+        elif state == "inactive_board":
+            board.is_active = False
+        elif state == "restricted_board":
+            board.read_permission = "admin"
+        else:
+            db.delete(mutual_aid)
+        media = db.get(MediaAsset, media_id)
+        legacy_path = f"/uploads/{media.stored_filename}"
+        db.commit()
+    for actor in ("owner", "other"):
+        assert api.client.get(f"/api/media/{media_id}", headers=api.headers[actor]).status_code == 404
+        assert api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers[actor]).status_code == 404
+        assert api.client.get("/api/media/access-url", params={"path": legacy_path}, headers=api.headers[actor]).status_code == 404
+    edit = api.client.get("/api/posts/1?for_edit=true", headers=api.headers["owner"])
+    assert edit.status_code in {400, 404}
+    update = api.client.put("/api/posts/1", headers=api.headers["owner"], json=_evidence_edit_payload([media_id]))
+    assert update.status_code in {400, 404}
+    admin = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["admin"])
+    assert admin.status_code == 200
+    assert _signed_file_response(api, admin).content == PDF_BYTES
+
+
+def test_legacy_public_evidence_cannot_escape_policy_through_regular_post_or_profile(api, media_storage) -> None:
+    media_id = _attach_evidence(api, private=False)
+    with api.session() as db:
+        media = db.get(MediaAsset, media_id)
+        db.add(PostAttachment(post_id=3, media_id=media_id, sort_order=1))
+        db.get(User, 1).profile_image_url = media.url
+        legacy_path = f"/uploads/{media.stored_filename}"
+        db.commit()
+    for path in (f"/api/media/{media_id}", f"/api/media/{media_id}/access-url", f"/api/media/{media_id}/download-link"):
+        assert api.client.get(path, headers=api.headers["other"]).status_code == 404
+    assert api.client.get("/api/media/access-url", params={"path": legacy_path}, headers=api.headers["other"]).status_code == 404
+    access = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"])
+    assert access.status_code == 200
+    assert _signed_file_response(api, access).content == PDF_BYTES
+
+
+@pytest.mark.parametrize("existing_actor,private", [("owner", True), ("admin", True), ("admin", False)])
+def test_explicit_evidence_edit_retains_order_and_detaches_removed_files(api, media_storage, existing_actor, private) -> None:
+    first = _attach_evidence(api, actor=existing_actor, private=private, filename="first.pdf")
+    removed = _attach_evidence(api, filename="removed.pdf")
+    last = _attach_evidence(api, filename="last.pdf")
+    replacement = _upload(api, filename="replacement.pdf", body=PDF_BYTES, content_type="application/pdf", private=True).json()["data"]["id"]
+    response = api.client.put("/api/posts/1", headers=api.headers["owner"], json=_evidence_edit_payload([last, first, replacement]))
+    assert response.status_code == 200
+    with api.session() as db:
+        links = db.scalars(select(PostAttachment).where(PostAttachment.post_id == 1).order_by(PostAttachment.sort_order)).all()
+        assert [link.media_id for link in links] == [last, first, replacement]
+        assert db.get(Post, 1).metadata_json["proof_url"] == ""
+        removed_media = db.get(MediaAsset, removed)
+        assert removed_media is not None
+        assert (media_storage[1] / removed_media.stored_filename).read_bytes() == PDF_BYTES
+
+
+def test_explicit_evidence_edit_switches_files_and_link(api, media_storage) -> None:
+    media_id = _attach_evidence(api)
+    linked = api.client.put("/api/posts/1", headers=api.headers["owner"], json=_evidence_edit_payload([], "https://example.com/new-proof"))
+    assert linked.status_code == 200
+    detail = api.client.get("/api/posts/1?for_edit=true", headers=api.headers["owner"]).json()["data"]
+    assert detail["attachments"] == []
+    assert detail["metadata"]["proof_url"] == "https://example.com/new-proof"
+    filed = api.client.put("/api/posts/1", headers=api.headers["owner"], json=_evidence_edit_payload([media_id]))
+    assert filed.status_code == 200
+    detail = api.client.get("/api/posts/1?for_edit=true", headers=api.headers["owner"]).json()["data"]
+    assert [item["id"] for item in detail["attachments"]] == [media_id]
+    assert detail["metadata"]["proof_url"] == ""
+
+
+@pytest.mark.parametrize("invalid", ["empty", "invalid_link", "missing_ids", "missing_proof_url", "invalid_id", "foreign_id", "public_id"])
+def test_invalid_explicit_evidence_edit_preserves_existing_request(api, media_storage, invalid) -> None:
+    media_id = _attach_evidence(api)
+    payload = _evidence_edit_payload([])
+    if invalid == "invalid_link":
+        payload["metadata"]["proof_url"] = "javascript:alert(1)"
+    elif invalid == "missing_ids":
+        del payload["attachment_ids"]
+    elif invalid == "missing_proof_url":
+        payload["attachment_ids"] = [media_id]
+        del payload["metadata"]["proof_url"]
+    elif invalid == "invalid_id":
+        payload["attachment_ids"] = [999999]
+    elif invalid in {"foreign_id", "public_id"}:
+        uploaded = _upload(api, actor="other" if invalid == "foreign_id" else "owner", private=invalid != "public_id")
+        payload["attachment_ids"] = [uploaded.json()["data"]["id"]]
+    response = api.client.put("/api/posts/1", headers=api.headers["owner"], json=payload)
+    assert response.status_code in {400, 422}
+    with api.session() as db:
+        post = db.get(Post, 1)
+        assert post.title == "Private Need Alpha"
+        assert post.metadata_json["proof_url"] == "https://example.com/private-proof"
+        assert list(db.scalars(select(PostAttachment.media_id).where(PostAttachment.post_id == 1))) == [media_id]
+
+
+@pytest.mark.parametrize("replace_evidence", [None, False])
+def test_legacy_hidden_evidence_edit_still_preserves_existing_files(api, media_storage, replace_evidence) -> None:
+    media_id = _attach_evidence(api)
+    payload = _evidence_edit_payload([])
+    del payload["metadata"]["proof_url"]
+    if replace_evidence is None:
+        del payload["replace_evidence"]
+    else:
+        payload["replace_evidence"] = replace_evidence
+    response = api.client.put("/api/posts/1", headers=api.headers["owner"], json=payload)
+    assert response.status_code == 200
+    with api.session() as db:
+        assert list(db.scalars(select(PostAttachment.media_id).where(PostAttachment.post_id == 1))) == [media_id]
+        assert db.get(Post, 1).metadata_json["proof_url"] == "https://example.com/private-proof"
 
 
 def test_profile_and_banner_references_are_member_readable_via_stable_and_legacy_paths(api, media_storage) -> None:

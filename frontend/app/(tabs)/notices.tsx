@@ -12,6 +12,7 @@ import { useAggregatePosts } from "../../hooks/usePosts";
 import { useTabRootResetStore } from "../../stores/tabRootResetStore";
 import type { Board } from "../../types";
 import { formatBoardDate } from "../../utils/dateFormat";
+import { noticeDeadlineLabel } from "../../utils/homeNoticeDeadline";
 import { NOTICES_TAB_ROUTE } from "../../utils/appRoutes";
 import {
   noticeRefreshControlRefreshing,
@@ -53,19 +54,6 @@ type IconName = keyof typeof Ionicons.glyphMap;
 
 function flattenBoards(groups?: { boards: Board[] }[]) {
   return groups?.flatMap((group) => group.boards) ?? [];
-}
-
-function deadlineLabel(value?: string | null) {
-  if (!value) return "";
-  const target = new Date(value);
-  if (Number.isNaN(target.getTime())) return "";
-  const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate());
-  const days = Math.round((targetDay.getTime() - today.getTime()) / 86_400_000);
-  if (days < 0) return "마감";
-  if (days === 0) return "마감 D-day";
-  return `마감 D-${days}`;
 }
 
 function IconButton({ icon, onPress, label }: { icon: IconName; onPress: () => void; label: string }) {
@@ -129,7 +117,7 @@ function NoticesContent() {
       postId: post.id,
       title: post.title,
       category: categoryFromNoticePost(post, boardById.get(post.board_id)),
-      date: [formatBoardDate(post.created_at), deadlineLabel(post.deadline_at)].filter(Boolean).join(" · "),
+      date: [formatBoardDate(post.created_at), noticeDeadlineLabel(post.deadline_at)].filter(Boolean).join(" · "),
       isPinned: post.is_pinned,
     }));
   }, [boardById, postsQuery.items]);

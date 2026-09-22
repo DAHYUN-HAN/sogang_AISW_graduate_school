@@ -402,12 +402,22 @@ export function useMultiBoardPosts(
   });
 }
 
-export function usePostDetail(postId: number, enabled = true) {
-  return useQuery({
-    queryKey: ["post", postId],
-    queryFn: () => postApi.getPostDetail(postId),
-    enabled: enabled && Number.isFinite(postId) && postId > 0,
+export function usePostDetail(postId: number, enabled = true, forEdit = false) {
+  const canFetch = enabled && Number.isFinite(postId) && postId > 0;
+  const query = useQuery({
+    queryKey: forEdit ? ["post", postId, "edit"] : ["post", postId],
+    queryFn: () => postApi.getPostDetail(postId, forEdit),
+    enabled: canFetch,
+    refetchOnMount: forEdit ? "always" : true,
   });
+  // Hydrate edit forms from the current server state once, then preserve drafts
+  // across later focus refetches. Cached attachments may have changed elsewhere.
+  const awaitingEditFetch = forEdit && canFetch && !query.isFetchedAfterMount;
+  return {
+    ...query,
+    data: forEdit && (awaitingEditFetch || query.isError) ? undefined : query.data,
+    isLoading: query.isLoading || awaitingEditFetch,
+  };
 }
 
 export function usePostComments(postId: number, enabled = true) {
@@ -419,6 +429,7 @@ export function usePostComments(postId: number, enabled = true) {
 }
 
 type PostMutationPayload = {
+  replace_evidence?: boolean;
   board_id?: number;
   title: string;
   content: string;

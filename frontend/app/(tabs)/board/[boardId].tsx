@@ -1136,6 +1136,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
       return;
     }
     const category = selectedFilter !== "전체" ? selectedFilter : "";
+    closeSearch();
     router.push(postCreateRouteFromBoardList(boardId, category, isTabRoot, isActivityCards, detailReturnRoute) as never);
   };
 

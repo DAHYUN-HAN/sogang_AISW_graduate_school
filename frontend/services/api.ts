@@ -381,8 +381,8 @@ export const postApi = {
     const response = await api.get<ApiSuccess<PostListItem[]>>("/posts/feed", { params });
     return response.data;
   },
-  getPostDetail: async (postId: number) => {
-    const response = await api.get<ApiSuccess<PostDetail>>(`/posts/${postId}`);
+  getPostDetail: async (postId: number, forEdit = false) => {
+    const response = await api.get<ApiSuccess<PostDetail>>(`/posts/${postId}`, { params: forEdit ? { for_edit: true } : undefined });
     return response.data;
   },
   createPost: async (
@@ -403,6 +403,7 @@ export const postApi = {
   updatePost: async (
     postId: number,
     payload: {
+      replace_evidence?: boolean;
       board_id?: number;
       title: string;
       content: string;

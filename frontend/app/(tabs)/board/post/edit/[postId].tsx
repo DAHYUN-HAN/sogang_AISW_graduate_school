@@ -3,13 +3,16 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
 import { Alert, BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import LoadingState from "../../../../../components/LoadingState";
+import ClubOperationStatusField from "../../../../../components/ClubOperationStatusField";
+import { clubOperationStatus } from "../../../../../utils/participationGuide";
+import PostAttachmentEditor from "../../../../../components/PostAttachmentEditor";
 import type { MediaAsset } from "../../../../../types";
 import { pickAndUploadImages } from "../../../../../utils/mediaPicker";
 import {
@@ -44,6 +47,7 @@ const schema = z.object({
   content: z.string().optional(),
   contact: z.string().optional(),
   applicationUrl: z.string().optional(),
+  clubOperationStatus: z.enum(["active", "ended"]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -57,7 +61,7 @@ export default function PostEditScreen() {
     returnTo?: string;
   }>();
   const postId = Number(params.postId);
-  const { data, isError, isLoading, refetch } = usePostDetail(postId);
+  const { data, isError, isLoading, refetch } = usePostDetail(postId, true, true);
   const post = data?.data;
   const { data: boardsRes } = useBoardsQuery();
   const boards = boardsRes?.data.flatMap((group) => group.boards) ?? [];
@@ -74,6 +78,7 @@ export default function PostEditScreen() {
   const isActivityCertification = board?.board_type === "activity_certification";
   const updateMutation = useUpdatePost(postId, post?.board_id ?? 0, board);
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
+  const hydratedPostId = useRef<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadNotice, setUploadNotice] = useState<string | null>(null);
   const {
@@ -85,11 +90,11 @@ export default function PostEditScreen() {
 
   const { control, handleSubmit, reset, setError } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { title: "", category: "", content: "", contact: "", applicationUrl: "" },
+    defaultValues: { title: "", category: "", content: "", contact: "", applicationUrl: "", clubOperationStatus: "active" },
   });
 
   useEffect(() => {
-    if (!post) return;
+    if (!post || hydratedPostId.current === post.id) return;
     setSelectedBoardId((current) => current || post.board_id);
     reset({
       title: post.title,
@@ -97,8 +102,10 @@ export default function PostEditScreen() {
       content: post.content,
       contact: typeof post.metadata?.contact === "string" ? post.metadata.contact : "",
       applicationUrl: typeof post.metadata?.application_url === "string" ? post.metadata.application_url : "",
+      clubOperationStatus: clubOperationStatus(post.metadata),
     });
     setAttachments(post.attachments);
+    hydratedPostId.current = post.id;
   }, [post, reset]);
 
   useEffect(() => {
@@ -222,6 +229,7 @@ export default function PostEditScreen() {
             ? {
                 ...(post.metadata ?? {}),
                 application_url: values.applicationUrl?.trim() ?? "",
+                ...(board?.slug === "club-promo" ? { club_operation_status: values.clubOperationStatus } : {}),
               }
           : post.metadata,
         attachment_ids: attachments.map((attachment) => attachment.id),
@@ -419,6 +427,14 @@ export default function PostEditScreen() {
           )}
         />
 
+        {board?.slug === "club-promo" ? (
+          <Controller
+            control={control}
+            name="clubOperationStatus"
+            render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} />}
+          />
+        ) : null}
+
         {!isAlbum ? (
           <Controller
             control={control}
@@ -572,6 +588,8 @@ export default function PostEditScreen() {
             )}
             {uploadNotice ? <Text style={styles.errorText}>{uploadNotice}</Text> : null}
           </>
+        ) : isResourceEdit || board?.category === "community" ? (
+          <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} disabled={updateMutation.isPending} />
         ) : null}
 
         <Pressable

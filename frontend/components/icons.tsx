@@ -423,22 +423,12 @@ export function SliderPrevIcon({ size = 28 }: IconProps) {
   );
 }
 
-// 활동 인증 날짜 달력 아이콘 — 디자인 원본 15x15, stroke 1.22.
-// 16px으로 그려도 1.22 × 16/15 = 1.3이라 기존 상세 화면 획 두께와 같다.
-export function CalendarSmallIcon({ size = 16, color = "#6B7280" }: IconProps) {
+// 활동 인증/상조회 날짜 달력 아이콘 — 디자인 원본 15x15, stroke 1.22.
+export function CalendarSmallIcon({ size = 15, color = "#6B7280" }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 15 15" fill="none">
-      <Path
-        d="M11.875 3.125H3.125C2.43464 3.125 1.875 3.68464 1.875 4.375V11.875C1.875 12.5654 2.43464 13.125 3.125 13.125H11.875C12.5654 13.125 13.125 12.5654 13.125 11.875V4.375C13.125 3.68464 12.5654 3.125 11.875 3.125Z"
-        stroke={color}
-        strokeWidth={1.22}
-      />
-      <Path
-        d="M10 1.875V4.375M5 1.875V4.375M1.875 6.25H13.125"
-        stroke={color}
-        strokeWidth={1.22}
-        strokeLinecap="round"
-      />
+      <Path d="M11.875 3.125H3.125C2.43464 3.125 1.875 3.68464 1.875 4.375V11.875C1.875 12.5654 2.43464 13.125 3.125 13.125H11.875C12.5654 13.125 13.125 12.5654 13.125 11.875V4.375C13.125 3.68464 12.5654 3.125 11.875 3.125Z" stroke={color} strokeWidth={1.22} />
+      <Path d="M10 1.875V4.375M5 1.875V4.375M1.875 6.25H13.125" stroke={color} strokeWidth={1.22} strokeLinecap="round" />
     </Svg>
   );
 }

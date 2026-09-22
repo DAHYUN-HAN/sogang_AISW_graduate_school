@@ -28,6 +28,7 @@ class PostCreate(PostMutationBase):
 class PostUpdate(PostMutationBase):
     board_id: int | None = Field(default=None, ge=1)
     attachment_ids: list[int] | None = None
+    replace_evidence: bool = False
     deadline_at: datetime | None = None
 
 

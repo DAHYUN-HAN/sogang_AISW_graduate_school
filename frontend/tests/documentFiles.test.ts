@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { inferDocumentContentType } from "../utils/documentFiles";
+import { assertAllowedDocumentContentTypes, inferDocumentContentType } from "../utils/documentFiles";
 
 test("문서 선택기가 누락하거나 잘못 보고한 MIME을 허용된 확장자로 보정한다", () => {
   assert.equal(inferDocumentContentType("photo.JPG", "application/octet-stream"), "image/jpeg");
@@ -31,4 +31,17 @@ test("문서 선택기가 누락하거나 잘못 보고한 MIME을 허용된 확
 test("알 수 없는 확장자는 선택기가 제공한 MIME 또는 안전한 기본값을 유지한다", () => {
   assert.equal(inferDocumentContentType("archive.unknown", "application/custom"), "application/custom");
   assert.equal(inferDocumentContentType("archive.unknown", ""), "application/octet-stream");
+});
+
+test("제한된 문서 업로드는 확장자로 보정한 MIME을 업로드 전에 검증한다", () => {
+  const allowedImages = ["image/jpeg", "image/png"];
+
+  assert.doesNotThrow(() => assertAllowedDocumentContentTypes([
+    { name: "invitation.JPG", type: "application/octet-stream" },
+    { name: "notice.png", type: "" },
+  ], allowedImages));
+  assert.throws(
+    () => assertAllowedDocumentContentTypes([{ name: "notice.pdf", type: "application/pdf" }], allowedImages),
+    /UNSUPPORTED_DOCUMENT_TYPE/,
+  );
 });

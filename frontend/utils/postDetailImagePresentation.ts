@@ -17,13 +17,12 @@ export function noticeAttachmentFrameAspectRatio(sourceAspectRatio?: number | nu
 }
 
 export function shouldOpenPostAttachment({
-  isNotice,
   contentType,
 }: {
   isNotice: boolean;
   contentType: string;
 }): boolean {
-  return !isNotice || !contentType.startsWith("image/");
+  return !contentType.startsWith("image/");
 }
 
 export function postDetailImagePresentation({

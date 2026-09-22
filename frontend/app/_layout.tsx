@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Image, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 
 import NotificationBootstrap from "../components/NotificationBootstrap";
@@ -23,7 +23,6 @@ if (Platform.OS !== "web") {
 patchDefaultFontFamily();
 
 export default function RootLayout() {
-  const [queryClient] = useState(() => new QueryClient());
   const [minimumSplashDurationElapsed, setMinimumSplashDurationElapsed] = useState(false);
   const { width } = useWindowDimensions();
   const [fontsLoaded] = useFonts(APP_FONTS);
@@ -31,9 +30,15 @@ export default function RootLayout() {
   const hasHydrated = useUserStore((state) => state.hasHydrated);
   const hydrateSession = useUserStore((state) => state.hydrateSession);
   const user = useUserStore((state) => state.user);
+  const sessionKey = isAuthenticated && user ? `${user.id}:${user.role}` : "guest";
+  // A new principal must never inherit private post data or signed media URLs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the principal intentionally controls the cache lifetime.
+  const queryClient = useMemo(() => new QueryClient(), [sessionKey]);
   const isAdmin = isAdminUser(user);
   const isWeb = Platform.OS === "web";
   const useWebFrame = isWeb && width > 430;
+
+  useEffect(() => () => queryClient.clear(), [queryClient]);
 
   useEffect(() => {
     void hydrateSession();
@@ -65,7 +70,7 @@ export default function RootLayout() {
   }
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider key={sessionKey} client={queryClient}>
       <View
         style={[styles.viewport, useWebFrame ? styles.webViewport : null]}
         onLayout={isWeb ? undefined : SplashScreen.hide}

@@ -1,31 +1,32 @@
-import { Ionicons } from "@expo/vector-icons";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
+import { useIsFocused } from "@react-navigation/native";
 import { isAxiosError } from "axios";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { BackHandler, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { BackHandler, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
 import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon, ImagePlaceholderIcon, NoticeAlertIcon, ParticipantAddIcon } from "../../../../components/icons";
 import { useBoardsQuery } from "../../../../hooks/useApi";
-import { resolveMediaAccessUrl } from "../../../../hooks/useMediaAccessUrl";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/usePosts";
 import CompletionState from "../../../../components/CompletionState";
+import ClubOperationStatusField from "../../../../components/ClubOperationStatusField";
+import { clubOperationStatus } from "../../../../utils/participationGuide";
 import LoadingState from "../../../../components/LoadingState";
+import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
 import { MediaImageBackground } from "../../../../components/MediaImage";
 import { duesPayerApi, postApi } from "../../../../services/api";
-import type { MediaAsset, PostListItem } from "../../../../types";
+import type { MediaAsset } from "../../../../types";
 import {
   ACTIVITY_PARTICIPANT_GUIDANCE,
   activityBankAccountFieldState,
   activityParticipantSelectionError,
   activityParticipantsFromMetadata,
   activitySourcePostIdFromMetadata,
-  currentClubActivitySourcePosts,
   buildActivityCertificationMetadata,
   formatActivityParticipant,
   loadPublishedActivitySourcePosts,
@@ -50,7 +51,6 @@ import {
   minimumMutualAidEventDate,
 } from "../../../../utils/dateSelection";
 import { createFormNotice, requiredFieldNotice, type FormNotice } from "../../../../utils/formNotice";
-import { openMediaUrl } from "../../../../utils/mediaOpener";
 import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../utils/mediaPicker";
 import {
   canEditMutualAidRequest,
@@ -92,6 +92,7 @@ const schema = z.object({
   relation: z.string().optional(),
   contact: z.string().optional(),
   applicationUrl: z.string().optional(),
+  clubOperationStatus: z.enum(["active", "ended"]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -132,9 +133,17 @@ function FormField({ label, required, requiredStar, optional, helper, error, chi
 // Figma: 입력 중(포커스) 상태는 1.5px #21262E 테두리
 function FormTextInput({ style, onBlur, onFocus, ...props }: ComponentProps<typeof TextInput>) {
   const [focused, setFocused] = useState(false);
-  return (
+  const inputStyle: TextStyle = StyleSheet.flatten([style, focused ? styles.inputFocused : null]);
+  const scrollableBody = props.multiline && Platform.OS === "android";
+  const iosBody = props.multiline && Platform.OS === "ios";
+  const maximumBodyHeight = 240;
+  const borderWidth = inputStyle?.borderWidth ?? 0;
+  const input = (
     <TextInput
       {...props}
+      // Android uses a nested ScrollView for boundary handoff. iOS keeps its
+      // native scrolling UITextView so text selection and caret reveal stay native.
+      scrollEnabled={scrollableBody ? false : iosBody ? true : props.scrollEnabled}
       onBlur={(event) => {
         setFocused(false);
         onBlur?.(event);
@@ -143,8 +152,38 @@ function FormTextInput({ style, onBlur, onFocus, ...props }: ComponentProps<type
         setFocused(true);
         onFocus?.(event);
       }}
-      style={[style, focused ? styles.inputFocused : null, { outlineStyle: "none" } as never]}
+      style={[
+        inputStyle,
+        scrollableBody ? {
+          borderWidth: 0,
+          borderRadius: 0,
+          minHeight: typeof inputStyle?.minHeight === "number" ? Math.max(0, inputStyle.minHeight - borderWidth * 2) : inputStyle?.minHeight,
+        } : null,
+        iosBody ? { maxHeight: maximumBodyHeight } : null,
+        { outlineStyle: "none" } as never,
+      ]}
     />
+  );
+  if (!scrollableBody) return input;
+
+  return (
+    <ScrollView
+      nestedScrollEnabled
+      keyboardShouldPersistTaps="handled"
+      bounces={false}
+      style={{
+        flexGrow: 0,
+        width: inputStyle?.width,
+        minHeight: inputStyle?.minHeight,
+        maxHeight: maximumBodyHeight,
+        borderWidth,
+        borderColor: inputStyle?.borderColor,
+        borderRadius: inputStyle?.borderRadius,
+        backgroundColor: inputStyle?.backgroundColor,
+      }}
+    >
+      {input}
+    </ScrollView>
   );
 }
 
@@ -331,6 +370,12 @@ type PostCreateRouteParams = {
 
 export default function PostCreateScreen() {
   const params = useLocalSearchParams<PostCreateRouteParams>();
+  const isFocused = useIsFocused();
+  const postId = Number(params.postId);
+  const isEditing = Number.isFinite(postId) && postId > 0;
+  // Tab navigation retains this route. Discard abandoned new-post state,
+  // including pending attachment state, before the next writing session.
+  if (!isFocused && !isEditing) return null;
   return <PostCreateForm key={postCreateFormInstanceKey(params)} params={params} />;
 }
 
@@ -343,7 +388,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   );
   const parsedPostId = Number(params.postId);
   const postId = Number.isFinite(parsedPostId) && parsedPostId > 0 ? parsedPostId : null;
-  const editPostQuery = usePostDetail(postId ?? 0, postId !== null);
+  const editPostQuery = usePostDetail(postId ?? 0, postId !== null, true);
   const existingPost = editPostQuery.data?.data;
   const boardId = existingPost?.board_id ?? selectedBoardId;
 
@@ -357,7 +402,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [selectionSheet, setSelectionSheet] = useState<"activity" | "mutualType" | "mutualRelation" | "board" | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   // 증빙서류는 파일 업로드와 링크 입력 중 하나만 사용한다.
-  // 상조회 신청 초기 화면(Figma MutualAidApply-Initial): 증빙 첨부 방식은 아무것도 선택되지 않은 상태로 시작한다.
   const [evidenceMode, setEvidenceMode] = useState<"file" | "link" | null>(null);
   const [evidenceLink, setEvidenceLink] = useState("");
   const [activitySourcePostId, setActivitySourcePostId] = useState<number | null>(null);
@@ -414,7 +458,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     return boards.find((item) => item.slug === "club-promo");
   }, [board?.slug, boards, isActivity]);
   const activitySourceQuery = useQuery({
-    queryKey: ["activity-source-options", activitySourceBoard?.id, activitySourceBoard?.slug],
+    queryKey: ["posts", activitySourceBoard?.id, "activity-source-options", activitySourceBoard?.slug],
     queryFn: () => loadPublishedActivitySourcePosts(
       activitySourceBoard?.id ?? 0,
       activitySourceBoard?.slug,
@@ -437,6 +481,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       relation: "",
       contact: "",
       applicationUrl: "",
+      clubOperationStatus: "active",
     },
   });
 
@@ -462,6 +507,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       ),
       contact: typeof metadata.contact === "string" ? metadata.contact : "",
       applicationUrl: typeof metadata.application_url === "string" ? metadata.application_url : "",
+      clubOperationStatus: clubOperationStatus(metadata),
     });
     setAttachments(existingPost.attachments);
     // 링크로 신청했던 글이면 링크 탭으로 열린다.
@@ -499,7 +545,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   } = participationGuideImageSections(attachments);
   const albumImageSelectionLimit = postImageSelectionLimit(boardType, attachmentIds.length);
   const isAlbumImageLimitReached = isAlbum && albumImageSelectionLimit === 0;
-  const hasStoredMutualAidEvidence = Boolean(postId && existingPost?.mutual_aid?.has_evidence);
   const syncParticipants = (items: ActivityParticipant[]) => {
     setSelectedParticipants(items);
     setValue("participants", items.map(formatActivityParticipant).join(", "), { shouldValidate: true });
@@ -605,7 +650,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     if (isMutualAid) {
       if (clean(values.eventDate)) metadata.event_date = clean(values.eventDate) as string;
       if (clean(values.relation)) metadata.relation = clean(values.relation) as string;
-      if (evidenceMode === "link" && evidenceLink.trim()) metadata.proof_url = evidenceLink.trim();
+      metadata.proof_url = evidenceMode === "link" ? evidenceLink.trim() : "";
     }
     if (isStudyRecruit) {
       metadata.recruitment_status = values.category === "마감" ? "closed" : "open";
@@ -613,6 +658,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     }
     if (isAdminParticipationPost && clean(values.applicationUrl)) {
       metadata.application_url = clean(values.applicationUrl) as string;
+      if (board?.slug === "club-promo") metadata.club_operation_status = values.clubOperationStatus;
     }
     return Object.keys(metadata).length > 0 ? metadata : undefined;
   };
@@ -717,8 +763,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       }
     } else if (
       requiresAttachment &&
-      (isAdminParticipationPost ? !participationRepresentativeImage : attachmentIds.length === 0) &&
-      !(isMutualAid && hasStoredMutualAidEvidence)
+      (isAdminParticipationPost ? !participationRepresentativeImage : attachmentIds.length === 0)
     ) {
       setFormNotice(createFormNotice(labels.attachment, `${labels.attachmentHelp}을 첨부하세요.`));
       return;
@@ -732,6 +777,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       category: isAlbum ? undefined : clean(values.category),
       metadata: buildMetadata(values),
       attachment_ids: attachmentIds,
+      replace_evidence: Boolean(postId && isMutualAid),
       is_anonymous: isSuggestion,
     };
     if (postId) {
@@ -851,6 +897,24 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     }),
   );
 
+  const selectMutualAidEvidenceImages = () => uploadAttachments(
+    () => pickAndUploadDocuments(undefined, true, {
+      multiple: true,
+      accept: ".jpg,.jpeg,.png,image/jpeg,image/png",
+      types: ["image/jpeg", "image/png"],
+    }),
+  );
+
+  const handleEvidenceModeSelect = (mode: "file" | "link") => {
+    setEvidenceMode(mode);
+    if (mode === "file") {
+      setEvidenceLink("");
+      void selectMutualAidEvidenceImages();
+      return;
+    }
+    setAttachments([]);
+  };
+
   const selectFile = () => uploadAttachments(
     (isAlbum || isActivity || isAdminParticipationPost)
       ? pickPostImages
@@ -862,27 +926,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     documents: () => void uploadAttachments(() => pickAndUploadDocuments()),
   });
 
-  const openAttachment = async (attachment: MediaAsset) => {
-    try {
-      const accessUrl = await resolveMediaAccessUrl(attachment);
-      if (!accessUrl) throw new Error("MISSING_MEDIA_URL");
-      await openMediaUrl(accessUrl, {
-        platform: Platform.OS,
-        assignWebLocation: (url) => window.location.assign(url),
-        openExternalUrl: (url) => Linking.openURL(url),
-      });
-    } catch {
-      setFormNotice(createFormNotice("파일 열기 실패", "첨부 파일에 접근할 수 없습니다. 잠시 후 다시 시도해주세요."));
-    }
-  };
-
   const participantResults = participantSearch.data?.data ?? [];
-  const activitySourcePosts = useMemo(() => {
-    const posts: PostListItem[] = activitySourceQuery.data ?? [];
-    return activitySourceBoard?.slug === "club-promo"
-      ? currentClubActivitySourcePosts(posts)
-      : posts;
-  }, [activitySourceBoard?.slug, activitySourceQuery.data]);
+  const activitySourcePosts = activitySourceQuery.data ?? [];
   const activityOptions: SelectionOption[] = activitySourcePosts.map((post) => ({ key: String(post.id), label: post.title }));
   const mutualAidTypeOptions: SelectionOption[] = [
     { key: "marriage", label: "결혼" },
@@ -890,6 +935,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   ];
   const mutualAidRelationOptions: SelectionOption[] = ["본인", "배우자", "부모", "자녀", "형제/자매"].map((label) => ({ key: label, label }));
   const imageAttachments = attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
+  const nonImageAttachments = attachments.filter((attachment) => !attachment.content_type.startsWith("image/"));
 
   const handleCreateBack = useCallback(() => {
     if (createdPostId) {
@@ -1000,6 +1046,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         style={styles.formScroller}
         contentContainerStyle={[styles.content, isActivity ? styles.activityContent : null, isMutualAid ? styles.contentMutualAid : null]}
         keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
       >
         {isActivity ? (
           <>
@@ -1067,40 +1114,36 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               />
             </View>
 
-            {/* Figma 날짜래퍼: 소제목 13/16 + gap 6 + 41h 날짜선택, 다음 그룹까지 16. */}
-            <View style={styles.activityFieldGroup}>
-              <Text style={styles.activityFieldTitle}>활동한 날짜</Text>
-              <Controller
-                control={control}
-                name="activityDate"
-                render={({ field, fieldState }) => (
-                  <>
-                    <Pressable
-                      accessibilityHint="달력에서 실제 활동 날짜를 선택합니다"
-                      accessibilityLabel="활동일 선택"
-                      accessibilityRole="button"
-                      onPress={() => setDatePickerOpen((open) => !open)}
-                      style={styles.activityInputWithIcon}
-                    >
-                      <Text style={styles.activityDateValue}>{field.value ? formatBoardDate(field.value) : "활동일을 선택하세요"}</Text>
-                      <CalendarSmallIcon size={15} color="#A6ACB7" />
-                    </Pressable>
-                    {datePickerOpen ? (
-                      <InlineCalendar
-                        maximumDate={maximumActivityCertificationDate()}
-                        value={field.value}
-                        onSelect={(dateStr) => {
-                          field.onChange(dateStr);
-                          clearErrors("activityDate");
-                          setDatePickerOpen(false);
-                        }}
-                      />
-                    ) : null}
-                    {fieldState.error?.message ? <Text style={styles.errorText}>{fieldState.error.message}</Text> : null}
-                  </>
-                )}
-              />
-            </View>
+            <Controller
+              control={control}
+              name="activityDate"
+              render={({ field, fieldState }) => (
+                <>
+                  <Pressable
+                    accessibilityHint="달력에서 실제 활동 날짜를 선택합니다"
+                    accessibilityLabel="활동일 선택"
+                    accessibilityRole="button"
+                    onPress={() => setDatePickerOpen((open) => !open)}
+                    style={styles.activityInputWithIcon}
+                  >
+                    <Text style={styles.activityDateValue}>{field.value ? formatBoardDate(field.value) : "활동일을 선택하세요"}</Text>
+                    <CalendarSmallIcon size={15} color="#A6ACB7" />
+                  </Pressable>
+                  {datePickerOpen ? (
+                    <InlineCalendar
+                      maximumDate={maximumActivityCertificationDate()}
+                      value={field.value}
+                      onSelect={(dateStr) => {
+                        field.onChange(dateStr);
+                        clearErrors("activityDate");
+                        setDatePickerOpen(false);
+                      }}
+                    />
+                  ) : null}
+                  {fieldState.error?.message ? <Text style={styles.errorText}>{fieldState.error.message}</Text> : null}
+                </>
+              )}
+            />
 
             <View style={styles.activityFieldGroup}>
               <Text style={styles.activityFieldTitle}>활동비 받을 계좌번호</Text>
@@ -1370,6 +1413,14 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         />
       ) : null}
 
+      {board?.slug === "club-promo" ? (
+        <Controller
+          control={control}
+          name="clubOperationStatus"
+          render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} />}
+        />
+      ) : null}
+
       {isActivity ? (
         <>
           <Controller
@@ -1472,57 +1523,67 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 return (
                   <Pressable
                     key={mode.key}
-                    onPress={() => {
-                      setEvidenceMode(mode.key);
-                      // 한 가지 증빙만 남긴다.
-                      if (mode.key === "file") setEvidenceLink("");
-                      else setAttachments([]);
-                    }}
-                    style={[styles.evidenceModeTab, active ? styles.evidenceModeTabActive : null]}
+                    accessibilityHint={mode.key === "file" ? "JPG 또는 PNG 이미지를 선택합니다." : "청첩장 또는 부고장 링크 입력란을 표시합니다."}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    disabled={isSubmitting}
+                    onPress={() => handleEvidenceModeSelect(mode.key)}
+                    style={styles.evidenceModeTab}
                   >
-                    <Text style={[styles.evidenceModeText, active ? styles.evidenceModeTextActive : null]}>{mode.label}</Text>
+                    <View style={[styles.evidenceModeTabVisual, active ? styles.evidenceModeTabActive : null]}>
+                      <Text style={[styles.evidenceModeText, active ? styles.evidenceModeTextActive : null]}>{mode.label}</Text>
+                    </View>
                   </Pressable>
                 );
               })}
             </View>
             {evidenceMode === "file" ? (
-              <>
-                {attachments.length === 0 ? (
-                  <>
-                    {/* Figma 첨부버튼: 테두리 없는 36h 안내 행(padding 10/0, 13/16 #999EA8). 누르면 파일 선택. */}
-                    <Pressable accessibilityRole="button" disabled={isUploading} onPress={selectFile} style={[styles.evidenceFileButton, isUploading ? styles.attachButtonDisabled : null]}>
-                      <Text style={styles.evidenceFileButtonText}>{isUploading ? "업로드 중" : "※ 청첩장, 부고장 이미지를 첨부할 수 있어요 (JPG, PNG)"}</Text>
-                    </Pressable>
-                  </>
-                ) : (
-                  <View style={styles.evidenceThumbArea}>
-                    {/* Figma 첨부영역: padding-top 12, 80×80 썸네일(#EDF0F5, r8, 이미지 아이콘 24) + 우상단 22px 삭제 버튼 */}
-                    {attachments.map((attachment) => (
-                      <View key={attachment.id} style={styles.evidenceThumbWrap}>
-                        <Pressable
-                          accessibilityLabel={`${attachment.original_filename} 열기`}
-                          accessibilityRole="link"
-                          onPress={() => void openAttachment(attachment)}
-                          style={styles.evidenceThumb}
-                        >
-                          <ImagePlaceholderIcon size={24} color="#999EA8" />
-                          {attachment.content_type.startsWith("image/") ? (
-                            <MediaImageBackground media={attachment} imageStyle={styles.evidenceThumbImage} style={styles.evidenceThumbImageFill} />
-                          ) : null}
-                        </Pressable>
+              <View style={styles.evidenceImageSection}>
+                <Text style={styles.evidenceImageHint}>※ 청첩장, 부고장 이미지를 첨부할 수 있어요 (JPG, PNG)</Text>
+                {imageAttachments.length > 0 ? (
+                  <View style={styles.evidenceImageGrid}>
+                    {imageAttachments.map((attachment) => (
+                      <MediaImageBackground
+                        key={attachment.id}
+                        media={attachment}
+                        imageStyle={styles.evidenceImageTileImage}
+                        style={styles.evidenceImageTile}
+                      >
                         <Pressable
                           accessibilityLabel={`${attachment.original_filename} 삭제`}
-                          hitSlop={8}
+                          accessibilityRole="button"
+                          disabled={isSubmitting}
                           onPress={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}
-                          style={styles.evidenceThumbRemove}
+                          style={styles.evidenceImageRemove}
                         >
-                          <CloseIcon size={10} color="#FFFFFF" />
+                          <View style={styles.evidenceImageRemoveVisual}>
+                            <CloseIcon size={10} color="#FFFFFF" />
+                          </View>
+                        </Pressable>
+                      </MediaImageBackground>
+                    ))}
+                  </View>
+                ) : null}
+                {nonImageAttachments.length > 0 ? (
+                  <View style={styles.evidenceLegacyFiles}>
+                    {nonImageAttachments.map((attachment) => (
+                      <View key={attachment.id} style={styles.evidenceLegacyFile}>
+                        <Ionicons name="document-outline" size={16} color={COLORS.primary} />
+                        <Text numberOfLines={1} style={styles.evidenceLegacyFileName}>{attachment.original_filename}</Text>
+                        <Pressable
+                          accessibilityLabel={`${attachment.original_filename} 삭제`}
+                          accessibilityRole="button"
+                          disabled={isSubmitting}
+                          onPress={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                          style={styles.evidenceLegacyFileRemove}
+                        >
+                          <CloseIcon size={16} color={COLORS.muted} />
                         </Pressable>
                       </View>
                     ))}
                   </View>
-                )}
-              </>
+                ) : null}
+              </View>
             ) : evidenceMode === "link" ? (
               <View style={[styles.evidenceLinkField, evidenceLinkFocused ? styles.evidenceLinkFieldFocused : null]}>
                 <AttachLinkIcon size={16} color={COLORS.muted} />
@@ -1539,7 +1600,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 />
               </View>
             ) : null}
-            {/* Figma 비공개안내는 display:none — 현재 디자인에서는 표시하지 않는다. */}
           </View>
           <Controller
             control={control}
@@ -1622,7 +1682,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         />
       ) : null}
 
-      {isStudyRecruit || isSuggestion || isMutualAid ? null : compactCreate ? (
+      {isStudyRecruit || isSuggestion || isMutualAid ? null : compactCreate && !isAlbum && !isAdminParticipationPost ? (
+        <PostAttachmentEditor attachments={attachments} onChange={setAttachments} onUploadingChange={setIsUploading} disabled={createMutation.isPending || updateMutation.isPending} />
+      ) : compactCreate ? (
         <View style={styles.compactAttachWrap}>
           {!isAdminParticipationPost ? (
             <>
@@ -2586,6 +2648,11 @@ const styles = StyleSheet.create({
   },
   evidenceModeTab: {
     flex: 1,
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  evidenceModeTabVisual: {
+    width: "100%",
     height: 34, // Figma: 34h, padding 9/0
     alignItems: "center",
     justifyContent: "center",
@@ -2607,6 +2674,74 @@ const styles = StyleSheet.create({
   },
   evidenceModeTextActive: {
     color: COLORS.primary,
+  },
+  evidenceImageSection: {
+    gap: 8,
+  },
+  evidenceImageHint: {
+    color: COLORS.muted,
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 15,
+  },
+  evidenceImageGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  evidenceImageTile: {
+    width: 56,
+    height: 56,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: "#E9ECF1",
+  },
+  evidenceImageTileImage: {
+    borderRadius: 8,
+  },
+  evidenceImageRemove: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    width: 44,
+    height: 44,
+    alignItems: "flex-end",
+    paddingTop: 4,
+    paddingRight: 4,
+  },
+  evidenceImageRemoveVisual: {
+    width: 18,
+    height: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 9,
+    backgroundColor: "rgba(17,24,39,0.68)",
+  },
+  evidenceLegacyFiles: {
+    gap: 8,
+  },
+  evidenceLegacyFile: {
+    minHeight: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 0.5,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingLeft: 12,
+  },
+  evidenceLegacyFileName: {
+    flex: 1,
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 15,
+  },
+  evidenceLegacyFileRemove: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   evidenceFileButton: {
     // Figma 첨부버튼: 36h, padding 10/0, 테두리 없음, radius 8.
