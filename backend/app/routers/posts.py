@@ -44,17 +44,17 @@ MUTUAL_AID_MIN_LEAD_DAYS = 0
 SEOUL_TIME_ZONE = ZoneInfo("Asia/Seoul")
 
 
-def _safe_metadata(post: Post, board: Board, *, include_sensitive: bool = False) -> dict | None:
+def _safe_metadata(
+    post: Post, board: Board, *, include_sensitive: bool = False, include_bank_account: bool = False
+) -> dict | None:
     _, normalized = normalize_participation_guide(board.slug, post.content, post.metadata_json)
     if not normalized:
         return None
     metadata = dict(normalized)
-    if board.board_type == "activity_certification" and not include_sensitive:
+    if board.board_type == "activity_certification" and not (include_sensitive or include_bank_account):
         metadata.pop("bank_account", None)
     if board.slug == "study-activity" and not include_sensitive:
         metadata.pop("legacy_original_title", None)
-    if board.board_type == "mutual_aid" and not include_sensitive:
-        metadata.pop("proof_url", None)
     return metadata
 
 
@@ -502,7 +502,6 @@ def _serialize_post_list_item(
     activity_source_title: str | None = None,
 ) -> dict:
     content_preview = post_content_preview(_visible_post_content(post, board), board.slug)
-    hide_mutual_aid_media = board.board_type == "mutual_aid" and current_user.role != "admin"
     return {
         "id": post.id,
         "board_id": post.board_id,
@@ -520,9 +519,9 @@ def _serialize_post_list_item(
         "metadata": _safe_metadata(post, board),
         "suggestion": _suggestion_payload(db, post.id) if board.board_type == "suggestion" else None,
         "mutual_aid": _mutual_aid_payload(db, post.id) if board.board_type == "mutual_aid" else None,
-        "attachment_count": 0 if hide_mutual_aid_media else attachment_count,
-        "thumbnail_media_id": None if hide_mutual_aid_media else thumbnail_media_id,
-        "thumbnail_url": None if hide_mutual_aid_media else thumbnail_url,
+        "attachment_count": attachment_count,
+        "thumbnail_media_id": thumbnail_media_id,
+        "thumbnail_url": thumbnail_url,
         "view_count": post.view_count,
         "like_count": post.like_count,
         "comment_count": post.comment_count,
@@ -767,7 +766,7 @@ def _highlight(text: str, keyword: str | None) -> str:
 
 def _post_attachments(
     db: Session,
-    post_id: int,
+    post: Post,
     board: Board,
     current_user: User,
     *,
@@ -778,7 +777,7 @@ def _post_attachments(
     rows = db.execute(
         select(PostAttachment, MediaAsset)
         .join(MediaAsset, MediaAsset.id == PostAttachment.media_id)
-        .where(PostAttachment.post_id == post_id)
+        .where(PostAttachment.post_id == post.id)
         .order_by(PostAttachment.sort_order.asc(), PostAttachment.id.asc())
     ).all()
     return [
@@ -801,8 +800,6 @@ def _replace_attachments(
     attachment_ids: list[int],
     current_user: User,
     evidence_link: str | None = None,
-    *,
-    preserve_existing_when_empty: bool = False,
 ) -> None:
     post = db.get(Post, post_id)
     board = db.get(Board, post.board_id) if post is not None else None
@@ -1305,7 +1302,12 @@ def get_post_detail(
             "status": post.status,
             "category": post.category,
             "activity_source_title": activity_source_titles.get(_activity_source_post_id(post.metadata_json)),
-            "metadata": _safe_metadata(post, board, include_sensitive=current_user.role == "admin" or include_evidence),
+            "metadata": _safe_metadata(
+                post,
+                board,
+                include_sensitive=current_user.role == "admin" or include_evidence,
+                include_bank_account=for_edit and board.board_type == "activity_certification",
+            ),
             "suggestion": _suggestion_payload(db, post.id),
             "mutual_aid": _mutual_aid_payload(db, post.id),
             "attachments": _post_attachments(db, post.id, board, current_user, include_evidence=include_evidence),
@@ -1483,7 +1485,6 @@ def update_post(
         _upsert_suggestion_extension(db, post, target_board, payload.category)
         _upsert_mutual_aid_extension(db, post, target_board, payload.category, normalized_metadata)
     if payload.attachment_ids is not None:
-        incoming_evidence_link = _evidence_link(normalized_metadata)
         _replace_attachments(
             db,
             post.id,

@@ -37,7 +37,8 @@ def comment_message(content: str) -> str:
 
 
 def like_message(post_title: str) -> str:
-    return f"{quoted_preview(post_title)}에 추천이 달렸어요"
+    # Figma 알림항목: "게시글 제목"이 추천을 받았어요
+    return f"{quoted_preview(post_title)}이 추천을 받았어요"
 
 
 def report_message(nickname: str, target_type: str) -> str:

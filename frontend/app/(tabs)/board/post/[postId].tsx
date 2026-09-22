@@ -40,6 +40,7 @@ import {
 import { commentKeyAction, commentSubmissionValue } from "../../../../utils/commentKeyboard";
 import { formatBoardDate } from "../../../../utils/dateFormat";
 import { openMediaUrl } from "../../../../utils/mediaOpener";
+import { MediaImageBackground } from "../../../../components/MediaImage";
 import { canDeleteMutualAidRequest, canEditMutualAidRequest } from "../../../../utils/mutualAid";
 import { isAdminUser } from "../../../../utils/permissions";
 import { formatCohortName } from "../../../../utils/userLabel";
@@ -499,6 +500,8 @@ export default function PostDetailScreen() {
     (row): row is [string, string] => typeof row[1] === "string" && row[1].trim().length > 0,
   );
   const hasMutualAidNote = isMutualAidRequest && post.content.trim().length > 0;
+  // Figma 상세(링크 버전): 증빙서류 항목에 첨부 링크 행을 정보목록 마지막에 표시한다.
+  const mutualAidProofUrl = isMutualAidRequest && typeof metadata.proof_url === "string" && metadata.proof_url.trim() ? metadata.proof_url.trim() : null;
   const imageAttachments = post.attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
   const normalizedGalleryIndex = Math.min(galleryIndex, Math.max(imageAttachments.length - 1, 0));
   const isActivityCertification = board?.board_type === "activity_certification";
@@ -538,6 +541,8 @@ export default function PostDetailScreen() {
     : hasVisualHero
       ? post.attachments.filter((attachment) => !attachment.content_type.startsWith("image/"))
       : post.attachments;
+  // 상조회 증빙 파일은 원본을 펼치지 않고 96×96 플레이스홀더 타일로만 보여 준다(Figma MutualAidDetail-V2).
+  const hasMutualAidEvidenceFiles = isMutualAidRequest && visibleAttachments.length > 0;
   const appBarTitle =
     board?.board_type === "album"
       ? post.title
@@ -1026,7 +1031,7 @@ export default function PostDetailScreen() {
                   style={[
                     styles.infoRow,
                     isMutualAidRequest ? styles.mutualAidInfoRow : null,
-                    isMutualAidRequest && !hasMutualAidNote && index === visibleDetailRows.length - 1
+                    isMutualAidRequest && !hasMutualAidNote && !mutualAidProofUrl && !hasMutualAidEvidenceFiles && index === visibleDetailRows.length - 1
                       ? styles.mutualAidInfoRowLast
                       : null,
                   ]}
@@ -1040,16 +1045,62 @@ export default function PostDetailScreen() {
           </View>
         ) : null}
 
+        {/* Figma 정보목록: 비고 항목에는 구분선이 없다(증빙서류 항목이 이어져도 줄을 긋지 않는다). */}
         {isMutualAidRequest && post.content.trim() ? (
           <View style={[styles.infoRow, styles.mutualAidInfoRow, styles.mutualAidInfoRowLast]}>
             <Text style={[styles.infoLabel, styles.mutualAidInfoLabel]}>비고</Text>
             <Text style={[styles.infoValue, styles.mutualAidInfoValue]}>{post.content}</Text>
           </View>
         ) : null}
+        {mutualAidProofUrl ? (
+          <View style={[styles.infoRow, styles.mutualAidInfoRow, styles.mutualAidInfoRowLast]}>
+            <Text style={[styles.infoLabel, styles.mutualAidInfoLabel]}>증빙서류</Text>
+            {/* Figma 첨부링크: 42h, padding 12/14, gap 10, 링크 아이콘 16 + URL 13/16 + 외부링크 아이콘 18 */}
+            <Pressable accessibilityRole="link" onPress={() => Linking.openURL(mutualAidProofUrl)} style={styles.mutualAidLinkRow}>
+              <AttachLinkIcon size={16} color="#6B7280" />
+              <Text numberOfLines={1} style={styles.mutualAidLinkText}>{mutualAidProofUrl}</Text>
+              <ExternalLinkIcon size={18} color={COLORS.primary} />
+            </Pressable>
+          </View>
+        ) : null}
+        {hasMutualAidEvidenceFiles ? (
+          <View style={[styles.infoRow, styles.mutualAidInfoRow, styles.mutualAidInfoRowLast]}>
+            <Text style={[styles.infoLabel, styles.mutualAidInfoLabel]}>증빙서류</Text>
+            {/* Figma 증빙이미지: 96×96, #EDF0F5, 테두리 1 #E1E4E9, r8, 이미지 아이콘 24 #999EA8. 원본은 표시하지 않는다. */}
+            <View style={styles.mutualAidEvidenceTiles}>
+              {visibleAttachments.map((attachment) => (
+                <Pressable
+                  key={attachment.id}
+                  accessibilityLabel={`${attachment.original_filename} 열기`}
+                  accessibilityRole="button"
+                  onPress={async () => {
+                    try {
+                      const accessUrl = await resolveMediaAccessUrl(attachment);
+                      if (accessUrl) {
+                        await openMediaUrl(accessUrl, {
+                          platform: Platform.OS,
+                          assignWebLocation: (url) => window.location.assign(url),
+                          openExternalUrl: (url) => Linking.openURL(url),
+                        });
+                      }
+                    } catch {
+                      Alert.alert("파일 열기 실패", "첨부 파일에 접근할 수 없습니다.");
+                    }
+                  }}
+                  style={styles.mutualAidEvidenceTile}
+                >
+                  <ImagePlaceholderIcon size={24} color="#999EA8" />
+                  {attachment.content_type.startsWith("image/") ? (
+                    <MediaImageBackground media={attachment} imageStyle={styles.mutualAidEvidenceTileImage} style={styles.mutualAidEvidenceTileFill} />
+                  ) : null}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
-        {visibleAttachments.length > 0 ? (
-          <View style={[styles.attachmentsList, isMutualAidRequest ? styles.mutualAidAttachments : null]}>
-            {isMutualAidRequest ? <Text style={styles.mutualAidSectionLabel}>증빙서류</Text> : null}
+        {visibleAttachments.length > 0 && !isMutualAidRequest ? (
+          <View style={styles.attachmentsList}>
             {visibleAttachments.map((attachment) => {
               const isImage = attachment.content_type.startsWith("image/");
               const canOpenAttachment = shouldOpenPostAttachment({
@@ -1196,13 +1247,6 @@ export default function PostDetailScreen() {
             {post.mutual_aid.rejection_reason ? (
               <Text style={styles.suggestionBody}>반려 사유: {post.mutual_aid.rejection_reason}</Text>
             ) : null}
-            {typeof metadata.proof_url === "string" && metadata.proof_url.trim() ? (
-              <Pressable onPress={() => Linking.openURL(metadata.proof_url as string)} style={styles.externalLinkButton}>
-                <Ionicons name="link-outline" size={18} color={COLORS.primary} />
-                <Text numberOfLines={1} style={styles.externalLinkText}>{metadata.proof_url}</Text>
-                <Ionicons name="open-outline" size={17} color={COLORS.primary} />
-              </Pressable>
-            ) : null}
             {isAdmin ? (
               <View style={styles.adminReplyBox}>
                 <View style={styles.statusRow}>
@@ -1259,10 +1303,18 @@ export default function PostDetailScreen() {
               <Text style={styles.actionText}>추천 {likeCount}</Text>
             </Pressable>
             {!commentsDisabled ? (
-              <View style={styles.iconAction}>
+              <Pressable
+                accessibilityLabel="댓글 쓰기"
+                // 댓글 수를 누르면 하단 입력창이 바로 열리도록 커서를 준다.
+                onPress={() => {
+                  setReplyTarget(null);
+                  commentInputRef.current?.focus();
+                }}
+                style={styles.iconAction}
+              >
                 <Ionicons name="chatbubble-outline" size={16} color={COLORS.muted} />
                 <Text style={styles.actionText}>댓글 {post.comment_count}</Text>
-              </View>
+              </Pressable>
             ) : null}
           </View>
         ) : null}
@@ -1273,10 +1325,12 @@ export default function PostDetailScreen() {
             {comments.length === 0 ? <Text style={styles.emptyComment}>아직 댓글이 없어요. 첫 댓글을 남겨보세요!</Text> : null}
             {comments.map((comment, index) => (
               <Fragment key={comment.id}>
-                {index > 0 ? <View style={styles.commentThreadDivider} /> : null}
+                {/* 스터디 모집 댓글은 Figma에서 구분선 없이 12px 간격으로만 이어진다. */}
+                {index > 0 && !isStudyRecruit ? <View style={styles.commentThreadDivider} /> : null}
               <CommentItem
                 comment={comment}
                 currentUserId={userId}
+                flat={isStudyRecruit}
                 onDelete={handleDeleteComment}
                 onEdit={async (commentId, content) => {
                   try {
@@ -2072,15 +2126,63 @@ const styles = StyleSheet.create({
     color: "#3B6D11",
   },
   metaMutualAid: {
-    color: "#A6ACB7", // Figma: Regular 12/15
+    color: "#A6ACB7", // Figma: Regular 12/14
     fontSize: 12,
-    lineHeight: 15,
+    lineHeight: 14,
     marginTop: 8,
   },
   mutualAidInfoLabel: {
-    color: "#A6ACB7", // Figma: Regular 12/15
+    color: "#A6ACB7", // Figma: Regular 12/14
     fontSize: 12,
-    lineHeight: 15,
+    lineHeight: 14,
+  },
+  mutualAidLinkRow: {
+    marginTop: 6,
+    minHeight: 42,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 0.5,
+    borderColor: "#E1E4E9",
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  mutualAidLinkText: {
+    flex: 1,
+    minWidth: 0,
+    color: "#15171C",
+    fontSize: 13,
+    fontWeight: "400",
+    lineHeight: 16,
+  },
+  mutualAidEvidenceTiles: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 6,
+  },
+  mutualAidEvidenceTile: {
+    width: 96,
+    height: 96,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E1E4E9",
+    backgroundColor: "#EDF0F5",
+    overflow: "hidden",
+  },
+  // 사진은 타일 안에 작게 꽉 채워 보여 주고, 로딩 전에는 뒤의 이미지 아이콘이 보인다.
+  mutualAidEvidenceTileFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  mutualAidEvidenceTileImage: {
+    borderRadius: 7,
   },
   mutualAidInfoValue: {
     fontSize: 14, // Figma: Regular 14/17, label과 gap 6
@@ -2160,24 +2262,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 16,
   },
-  externalLinkButton: {
-    minHeight: 48,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.divider,
-    backgroundColor: COLORS.surface,
-    paddingHorizontal: 13,
-    marginTop: 14,
-  },
-  externalLinkText: {
-    flex: 1,
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: "800",
-  },
   galleryCaption: {
     marginTop: 4,
   },
@@ -2239,18 +2323,9 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   mutualAidPillText: {
-    fontSize: 12, // Figma: Medium 12/15
+    fontSize: 12, // Figma 상태칩: Medium 12/14, 24h
     fontWeight: "500",
-    lineHeight: 15,
-  },
-  mutualAidSectionLabel: {
-    color: COLORS.subtle,
-    fontSize: 12,
-    fontWeight: "400",
-    lineHeight: 18,
-  },
-  mutualAidAttachments: {
-    marginTop: 26,
+    lineHeight: 14,
   },
   attachmentsList: {
     gap: 12,
@@ -2536,6 +2611,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     lineHeight: 17,
+    marginBottom: 10, // Figma 댓글 라벨: padding 16/0/10
   },
   commentThreadDivider: {
     height: 1,

@@ -86,3 +86,9 @@ test("공식 답변은 PR 전용 이미지, 빈 대표 이미지는 벡터 아�
   assert.match(detail, /<Image source=\{require\("\.\.\/\.\.\/\.\.\/\.\.\/assets\/images\/council-reply\.png"\)\}/);
   assert.doesNotMatch(detail, /<CouncilReplyIcon/);
 });
+
+test("활동 인증 참가자 검색 결과는 학번을 노출하지 않고 기수+이름과 전공만 표시한다", () => {
+  assert.match(create, /<Text style=\{styles\.participantName\}>\{formatActivityParticipant\(participant\)\}<\/Text>/);
+  assert.match(create, /\{participant\.major \? <Text style=\{styles\.participantMeta\}>\{participant\.major\}<\/Text> : null\}/);
+  assert.doesNotMatch(create, /participantMeta\}>\{\[participant\.major, participant\.student_number\]/);
+});

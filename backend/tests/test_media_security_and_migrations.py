@@ -573,9 +573,10 @@ def test_private_mutual_aid_media_allows_only_processing_owner_and_admin(api, me
         db.add(PostAttachment(post_id=1, media_id=media_id, sort_order=0))
         db.commit()
 
+    # 증빙은 신청 글을 읽을 수 있는 원우라면 누구나 열 수 있다.
     other_access = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["other"])
-    assert other_access.status_code == 404
-    assert other_access.json()["code"] == "NOT_FOUND"
+    assert other_access.status_code == 200
+    assert _signed_file_response(api, other_access).content == PDF_BYTES
 
     owner_access = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"])
     assert owner_access.status_code == 200
@@ -586,7 +587,7 @@ def test_private_mutual_aid_media_allows_only_processing_owner_and_admin(api, me
     assert _signed_file_response(api, admin_access).content == PDF_BYTES
 
 
-def test_mutual_aid_owner_can_edit_without_receiving_or_replacing_existing_evidence(api, media_storage) -> None:
+def test_mutual_aid_evidence_is_visible_to_everyone_and_editable_by_the_owner(api, media_storage) -> None:
     uploaded = _upload(
         api,
         filename="evidence.pdf",
@@ -605,11 +606,12 @@ def test_mutual_aid_owner_can_edit_without_receiving_or_replacing_existing_evide
         db.add(PostAttachment(post_id=post.id, media_id=media_id, sort_order=0))
         db.commit()
 
-    detail = api.client.get("/api/posts/1", headers=api.headers["owner"])
-    assert detail.status_code == 200
-    assert detail.json()["data"]["attachments"] == []
-    assert "proof_url" not in detail.json()["data"]["metadata"]
-    assert detail.json()["data"]["mutual_aid"]["has_evidence"] is True
+    for actor in ("owner", "other", "admin"):
+        detail = api.client.get("/api/posts/1", headers=api.headers[actor])
+        assert detail.status_code == 200
+        assert [item["id"] for item in detail.json()["data"]["attachments"]] == [media_id]
+        assert detail.json()["data"]["metadata"]["proof_url"] == "https://example.com/private-proof"
+        assert detail.json()["data"]["mutual_aid"]["has_evidence"] is True
 
     updated = api.client.put(
         "/api/posts/1",
@@ -619,7 +621,8 @@ def test_mutual_aid_owner_can_edit_without_receiving_or_replacing_existing_evide
             "content": "Updated remarks",
             "category": "wedding",
             "metadata": {"event_date": "2026-08-01", "relation": "self"},
-            "attachment_ids": [],
+            # 작성자는 증빙을 직접 확인하므로 그대로 다시 보내면 유지된다.
+            "attachment_ids": [media_id],
             "is_anonymous": False,
         },
     )
@@ -631,7 +634,8 @@ def test_mutual_aid_owner_can_edit_without_receiving_or_replacing_existing_evide
             select(PostAttachment).where(PostAttachment.post_id == post.id)
         ).all()
         assert [attachment.media_id for attachment in attachments] == [media_id]
-        assert post.metadata_json["proof_url"] == "https://example.com/private-proof"
+        # 파일 증빙으로 저장하면 기존 링크 증빙은 대체된다(증빙은 파일 또는 링크 중 하나).
+        assert "proof_url" not in post.metadata_json
 
 
 def _attach_evidence(api, *, actor="owner", private=True, filename="evidence.pdf"):

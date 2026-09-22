@@ -1,10 +1,12 @@
+import pytest
+
 from app.models.board import Board
 from app.models.dues_payer import DuesPayer
 from app.models.media import PostAttachment
 from app.models.post import Post
 
 
-def _create_activity_certification(api) -> tuple[int, int]:
+def _create_activity_certification(api, slug="club-activity-edit-test") -> tuple[int, int]:
     with api.session() as db:
         db.add_all(
             [
@@ -14,7 +16,7 @@ def _create_activity_certification(api) -> tuple[int, int]:
         )
         board = Board(
             name="Club Activity Certification",
-            slug="club-activity-edit-test",
+            slug=slug,
             category="participation",
             board_type="activity_certification",
             read_permission="user",
@@ -113,7 +115,33 @@ def test_activity_certification_owner_updates_date_and_participants_without_losi
         assert [attachment.media_id for attachment in attachments] == [1]
 
 
-def test_activity_certification_owner_replaces_hidden_bank_account(api) -> None:
+@pytest.mark.parametrize("slug", ["club-activity-edit-test", "study-activity", "networking-activity"])
+def test_saved_activity_account_is_available_only_in_authorized_edit_context(api, slug) -> None:
+    board_id, post_id = _create_activity_certification(api, slug)
+    with api.session() as db:
+        post = db.get(Post, post_id)
+        post.metadata_json = {**post.metadata_json, "legacy_original_title": "Private migration snapshot"}
+        db.commit()
+
+    for actor in ("owner", "admin"):
+        response = api.client.get(f"/api/posts/{post_id}?for_edit=true", headers=api.headers[actor])
+        assert response.status_code == 200
+        assert response.json()["data"]["metadata"]["bank_account"] == "Sogang Bank 123-456"
+        if actor == "owner" and slug == "study-activity":
+            assert "legacy_original_title" not in response.json()["data"]["metadata"]
+
+    assert api.client.get(f"/api/posts/{post_id}?for_edit=true", headers=api.headers["other"]).status_code == 403
+    assert api.client.get(f"/api/posts/{post_id}?for_edit=true").status_code == 401
+    for actor in ("owner", "other"):
+        for path in (f"/api/posts/{post_id}", f"/api/boards/{board_id}/posts"):
+            response = api.client.get(path, headers=api.headers[actor])
+            assert response.status_code == 200
+            data = response.json()["data"]
+            post_data = data[0] if isinstance(data, list) else data
+            assert "bank_account" not in post_data["metadata"]
+
+
+def test_activity_certification_owner_replaces_bank_account_and_reopens_it(api) -> None:
     _, post_id = _create_activity_certification(api)
     payload = _update_payload()
     payload["metadata"]["bank_account"] = "Replacement Bank 999-000"
@@ -128,3 +156,6 @@ def test_activity_certification_owner_replaces_hidden_bank_account(api) -> None:
     with api.session() as db:
         post = db.get(Post, post_id)
         assert post.metadata_json["bank_account"] == "Replacement Bank 999-000"
+    reopened = api.client.get(f"/api/posts/{post_id}?for_edit=true", headers=api.headers["owner"])
+    assert reopened.status_code == 200
+    assert reopened.json()["data"]["metadata"]["bank_account"] == "Replacement Bank 999-000"
