@@ -44,12 +44,14 @@ MUTUAL_AID_MIN_LEAD_DAYS = 0
 SEOUL_TIME_ZONE = ZoneInfo("Asia/Seoul")
 
 
-def _safe_metadata(post: Post, board: Board, *, include_sensitive: bool = False) -> dict | None:
+def _safe_metadata(
+    post: Post, board: Board, *, include_sensitive: bool = False, include_bank_account: bool = False
+) -> dict | None:
     _, normalized = normalize_participation_guide(board.slug, post.content, post.metadata_json)
     if not normalized:
         return None
     metadata = dict(normalized)
-    if board.board_type == "activity_certification" and not include_sensitive:
+    if board.board_type == "activity_certification" and not (include_sensitive or include_bank_account):
         metadata.pop("bank_account", None)
     if board.slug == "study-activity" and not include_sensitive:
         metadata.pop("legacy_original_title", None)
@@ -1286,7 +1288,12 @@ def get_post_detail(
             "status": post.status,
             "category": post.category,
             "activity_source_title": activity_source_titles.get(_activity_source_post_id(post.metadata_json)),
-            "metadata": _safe_metadata(post, board, include_sensitive=current_user.role == "admin" or include_evidence),
+            "metadata": _safe_metadata(
+                post,
+                board,
+                include_sensitive=current_user.role == "admin" or include_evidence,
+                include_bank_account=for_edit and board.board_type == "activity_certification",
+            ),
             "suggestion": _suggestion_payload(db, post.id),
             "mutual_aid": _mutual_aid_payload(db, post.id),
             "attachments": _post_attachments(db, post.id, board, current_user, include_evidence=include_evidence),

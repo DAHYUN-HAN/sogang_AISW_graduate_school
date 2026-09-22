@@ -496,7 +496,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       content: existingPost.content,
       activityDate: typeof metadata.activity_date === "string" ? metadata.activity_date : "",
       participants: typeof metadata.participants === "string" ? metadata.participants : "",
-      bankAccount: "",
+      bankAccount: typeof metadata.bank_account === "string" ? metadata.bank_account : "",
       eventDate: normalizeMutualAidEventDate(
         existingPost.mutual_aid?.event_date ??
           (typeof metadata.event_date === "string" ? metadata.event_date : undefined),
@@ -1154,10 +1154,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   />
                 )}
               />
-              <View style={styles.activityWarning}>
-                <Ionicons name="alert-circle-outline" size={14} color="#854F0B" style={styles.activityWarningIcon} />
-                <Text style={styles.activityWarningText}>{bankAccountField.guidance}</Text>
-              </View>
+              {!postId ? (
+                <View style={styles.activityWarning}>
+                  <Ionicons name="alert-circle-outline" size={14} color="#854F0B" style={styles.activityWarningIcon} />
+                  <Text style={styles.activityWarningText}>{bankAccountField.guidance}</Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={[styles.activityFieldGroup, styles.activityParticipantGroup]}>

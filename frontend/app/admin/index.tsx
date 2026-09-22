@@ -12,11 +12,16 @@ import BackButton from "../../components/BackButton";
 import AdminBoardContentPanel, {
   AdminBoardContentQueryState,
   AdminBoardTargetQueryState,
+  NoticeImageUploadFeedback,
   adminBoardContentQueryPolicy,
   beginNoticeEditorOperation,
+  mergeNoticeAttachments,
   noticeEditorBoardTransition,
   noticeEditorOperationResult,
+  noticeImageUploadIssueMessage,
+  noticeUploadButtonLabel,
   publicNoticeBoardSelection,
+  replaceNoticeAttachment,
   type NoticeEditorOperation,
 } from "../../components/admin/AdminBoardContentPanel";
 import AdminBoardManagementNavigator, {
@@ -1653,7 +1658,8 @@ export default function AdminScreen() {
   const [noticeOperationKind, setNoticeOperationKind] = useState<NoticeEditorOperation["kind"] | null>(null);
   const noticeOperationRef = useRef<NoticeEditorOperation | null>(null);
   const noticeOperationIdRef = useRef(0);
-  const [noticeUploadProgress, setNoticeUploadProgress] = useState(0);
+  const [noticeUploadProgress, setNoticeUploadProgress] = useState<number | null>(0);
+  const [noticeUploadIssue, setNoticeUploadIssue] = useState<string | null>(null);
   const [currentCouncils, setCurrentCouncils] = useState<CurrentCouncilFormData[]>([]);
   const [currentCouncilUploading, setCurrentCouncilUploading] = useState<IntroImageTarget | null>(null);
   const [executivesSaving, setExecutivesSaving] = useState(false);
@@ -1883,6 +1889,7 @@ export default function AdminScreen() {
     setNoticeAttachments([]);
     setNoticeMetadata({});
     setNoticeUploadProgress(0);
+    setNoticeUploadIssue(null);
   }, [noticeBoards, noticeQueryPolicy.noticeSource, selectedNoticeBoardId]);
 
   useEffect(() => {
@@ -1904,6 +1911,7 @@ export default function AdminScreen() {
         setNoticeAttachments([]);
         setNoticeMetadata({});
         setNoticeUploadProgress(0);
+        setNoticeUploadIssue(null);
       }
     }
   }, [editingNoticeBoardId, isManagedContentActive, managedContentKind, selectedManagedBoard]);
@@ -2680,6 +2688,7 @@ export default function AdminScreen() {
     setNoticeAttachments([]);
     setNoticeMetadata({});
     setNoticeUploadProgress(0);
+    setNoticeUploadIssue(null);
   };
 
   const handleSelectNoticeBoard = (nextBoardId: number) => {
@@ -2727,20 +2736,24 @@ export default function AdminScreen() {
     const operation = startNoticeEditorOperation("upload");
     if (!operation) return;
     try {
-      setNoticeUploadProgress(0);
-      const uploaded = await pickAndUploadContentImage((progress) => {
-        if (noticeEditorOperationResult(operation, currentNoticeEditorTarget(), "success").apply) {
-          setNoticeUploadProgress(progress);
-        }
+      setNoticeUploadProgress(null);
+      setNoticeUploadIssue(null);
+      const uploaded = await pickAndUploadImages(undefined, {
+        retainSuccessfulUploads: true,
+        onBatchIssue: (issue) => {
+          if (noticeEditorOperationResult(operation, currentNoticeEditorTarget(), "success").apply) {
+            setNoticeUploadIssue(noticeImageUploadIssueMessage(issue));
+          }
+        },
       });
       const result = noticeEditorOperationResult(operation, currentNoticeEditorTarget(), "success");
-      if (uploaded && result.apply) {
-        setNoticeAttachments((current) => (current.some((item) => item.id === uploaded.id) ? current : [...current, uploaded]));
+      if (uploaded.length > 0 && result.apply) {
+        setNoticeAttachments((current) => mergeNoticeAttachments(current, uploaded));
       }
     } catch {
       const result = noticeEditorOperationResult(operation, currentNoticeEditorTarget(), "failure");
       if (result.notification === "failure") {
-        Alert.alert("이미지 업로드 실패", "이미지 파일을 다시 선택해주세요.");
+        setNoticeUploadIssue((current) => current ?? "이미지 파일을 다시 선택해주세요.");
       }
     } finally {
       finishNoticeEditorOperation(operation);
@@ -3196,6 +3209,31 @@ export default function AdminScreen() {
     }
   };
 
+  const handleReplaceNoticeImage = async (attachmentId: number) => {
+    const operation = startNoticeEditorOperation("upload");
+    if (!operation) return;
+    try {
+      setNoticeUploadProgress(0);
+      setNoticeUploadIssue(null);
+      const replacement = await pickAndUploadContentImage((progress) => {
+        if (noticeEditorOperationResult(operation, currentNoticeEditorTarget(), "success").apply) {
+          setNoticeUploadProgress(progress);
+        }
+      });
+      const result = noticeEditorOperationResult(operation, currentNoticeEditorTarget(), "success");
+      if (replacement && result.apply) {
+        setNoticeAttachments((current) => replaceNoticeAttachment(current, attachmentId, replacement));
+      }
+    } catch {
+      const result = noticeEditorOperationResult(operation, currentNoticeEditorTarget(), "failure");
+      if (result.notification === "failure") {
+        setNoticeUploadIssue("이미지 변경에 실패했습니다. 다시 선택해주세요.");
+      }
+    } finally {
+      finishNoticeEditorOperation(operation);
+    }
+  };
+
   const handleReportStatus = async (report: AdminReportItem, status: ReportStatus) => {
     try {
       await reportApi.updateAdminReport(report.id, { status });
@@ -3507,7 +3545,7 @@ export default function AdminScreen() {
               </View>
               <ActionButton
                 icon="image-outline"
-                label={noticeOperationKind === "upload" ? `업로드 ${noticeUploadProgress || 0}%` : "이미지 첨부"}
+                label={noticeOperationKind === "upload" ? noticeUploadButtonLabel(noticeUploadProgress) : "이미지 첨부"}
                 onPress={handleUploadNoticeImage}
                 tone={noticeAttachments.length > 0 ? "outline" : "primary"}
                 disabled={noticeOperationPending}
@@ -3548,12 +3586,32 @@ export default function AdminScreen() {
                       {Math.ceil((attachment.file_size ?? 0) / 1024)} KB
                     </Text>
                   </View>
-                  <Pressable disabled={noticeOperationPending} hitSlop={8} onPress={() => setNoticeAttachments((current) => current.filter((item) => item.id !== attachment.id))}>
-                    <Ionicons name="close-circle" size={22} color={COLORS.subtle} />
-                  </Pressable>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {isImage ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`${attachment.original_filename} 이미지 변경`}
+                        disabled={noticeOperationPending}
+                        hitSlop={8}
+                        onPress={() => void handleReplaceNoticeImage(attachment.id)}
+                      >
+                        <Ionicons name="create-outline" size={22} color={COLORS.subtle} />
+                      </Pressable>
+                    ) : null}
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`${attachment.original_filename} 삭제`}
+                      disabled={noticeOperationPending}
+                      hitSlop={8}
+                      onPress={() => setNoticeAttachments((current) => current.filter((item) => item.id !== attachment.id))}
+                    >
+                      <Ionicons name="close-circle" size={22} color={COLORS.subtle} />
+                    </Pressable>
+                  </View>
                 </View>
               );
             })}
+            <NoticeImageUploadFeedback message={noticeUploadIssue} />
           </View>
           <View style={{ borderRadius: RADIUS.card, borderWidth: 1, borderColor: noticeForm.show_in_council_activity ? COLORS.primary : COLORS.border, backgroundColor: noticeForm.show_in_council_activity ? COLORS.primary50 : COLORS.surfaceAlt, padding: 12, gap: 10 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>

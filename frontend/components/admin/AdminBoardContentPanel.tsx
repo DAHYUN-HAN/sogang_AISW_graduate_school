@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
 
-import type { Board } from "../../types";
+import type { Board, MediaAsset } from "../../types";
 import type { AdminBoardCapability, AdminBoardContentKind } from "../../utils/adminContentManagement";
 import type { AdminBoardContentTargetStatus } from "./AdminBoardManagementNavigator";
 
@@ -84,6 +84,43 @@ export function noticeEditorOperationResult(
     && operation.editingNoticeId === current.editingNoticeId
     && operation.generation === current.generation;
   return { apply, notification: apply ? outcome : null };
+}
+
+export function mergeNoticeAttachments(current: MediaAsset[], uploaded: MediaAsset[]) {
+  const seenIds = new Set(current.map((attachment) => attachment.id));
+  return [
+    ...current,
+    ...uploaded.filter((attachment) => {
+      if (seenIds.has(attachment.id)) return false;
+      seenIds.add(attachment.id);
+      return true;
+    }),
+  ];
+}
+
+export function replaceNoticeAttachment(
+  current: MediaAsset[],
+  targetAttachmentId: number,
+  replacement: MediaAsset,
+) {
+  return current.map((attachment) => (
+    attachment.id === targetAttachmentId ? replacement : attachment
+  ));
+}
+
+export function noticeImageUploadIssueMessage(issue: { uploadedCount: number; failedCount: number }) {
+  return issue.failedCount > 0
+    ? `${issue.uploadedCount}장은 추가했고 ${issue.failedCount}장은 업로드하지 못했습니다.`
+    : null;
+}
+
+export function NoticeImageUploadFeedback({ message }: { message: string | null }) {
+  if (!message) return null;
+  return <Text accessibilityRole="alert" style={{ color: "#D94343", fontSize: 12 }}>{message}</Text>;
+}
+
+export function noticeUploadButtonLabel(progress: number | null) {
+  return progress === null ? "업로드 중" : `업로드 ${progress}%`;
 }
 
 export function noticeEditorBoardTransition(

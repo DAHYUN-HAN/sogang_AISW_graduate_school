@@ -5,7 +5,7 @@ import { createRequire } from "node:module";
 import test from "node:test";
 import ts from "typescript";
 
-import type { Board } from "../types";
+import type { Board, MediaAsset } from "../types";
 import type { AdminBoardCapability } from "../utils/adminContentManagement";
 
 const navigatorSource = readFileSync(
@@ -124,6 +124,17 @@ const board = (id: number, category: string): Board => ({
   read_permission: "user",
   write_permission: "user",
   is_active: true,
+});
+
+const media = (id: number): MediaAsset => ({
+  id,
+  original_filename: `${id}.jpg`,
+  content_type: "image/jpeg",
+  file_size: 1024,
+  url: `/media/${id}`,
+  is_private: false,
+  status: "ready",
+  created_at: "2026-09-21T00:00:00Z",
 });
 
 type RenderedElement = {
@@ -718,6 +729,61 @@ test("공지 저장과 업로드 결과는 시작한 게시판·편집·generati
     editingNoticeId: null,
     generation: 5,
   }, "failure"), { apply: false, notification: null });
+});
+
+test("공지 다중 이미지 추가는 기존 첨부를 유지하고 새 이미지를 선택 순서대로 중복 없이 붙인다", () => {
+  const contentPanelModule = loadContentPanelModule();
+  const current = [media(1), media(2)];
+  const uploaded = [media(2), media(3), media(4), media(3)];
+
+  const next = contentPanelModule.mergeNoticeAttachments(current, uploaded) as MediaAsset[];
+
+  assert.deepEqual(next.map((item) => item.id), [1, 2, 3, 4]);
+  assert.equal(next[0], current[0]);
+  assert.equal(next[1], current[1]);
+  assert.deepEqual(current.map((item) => item.id), [1, 2]);
+});
+
+test("공지 이미지 교체는 선택한 자리만 바꾸고 없는 대상에는 손대지 않는다", () => {
+  const contentPanelModule = loadContentPanelModule();
+  const current = [media(1), media(2), media(3)];
+  const replacement = media(9);
+
+  const next = contentPanelModule.replaceNoticeAttachment(current, 2, replacement) as MediaAsset[];
+  const missing = contentPanelModule.replaceNoticeAttachment(current, 99, replacement) as MediaAsset[];
+
+  assert.deepEqual(next.map((item) => item.id), [1, 9, 3]);
+  assert.equal(next[0], current[0]);
+  assert.equal(next[2], current[2]);
+  assert.deepEqual(missing.map((item) => item.id), [1, 2, 3]);
+  assert.deepEqual(current.map((item) => item.id), [1, 2, 3]);
+});
+
+test("공지 다중 업로드 실패 안내는 실패한 사진이 있을 때만 표시한다", () => {
+  const contentPanelModule = loadContentPanelModule();
+
+  assert.equal(contentPanelModule.noticeImageUploadIssueMessage({ uploadedCount: 2, failedCount: 1 }), "2장은 추가했고 1장은 업로드하지 못했습니다.");
+  assert.equal(contentPanelModule.noticeImageUploadIssueMessage({ uploadedCount: 2, failedCount: 0 }), null);
+});
+
+test("공지 이미지 업로드 오류는 웹에서도 보이는 접근 가능한 화면 요소로 표시한다", () => {
+  const contentPanelModule = loadContentPanelModule();
+  const rendered = contentPanelModule.NoticeImageUploadFeedback({ message: "1장은 업로드하지 못했습니다." }) as {
+    type: string;
+    props: { accessibilityRole: string; children: string };
+  };
+
+  assert.equal(rendered.type, "Text");
+  assert.equal(rendered.props.accessibilityRole, "alert");
+  assert.equal(rendered.props.children, "1장은 업로드하지 못했습니다.");
+  assert.equal(contentPanelModule.NoticeImageUploadFeedback({ message: null }), null);
+});
+
+test("공지 다중 업로드는 개별 사진의 100%를 전체 완료율처럼 표시하지 않는다", () => {
+  const contentPanelModule = loadContentPanelModule();
+
+  assert.equal(contentPanelModule.noticeUploadButtonLabel(null), "업로드 중");
+  assert.equal(contentPanelModule.noticeUploadButtonLabel(40), "업로드 40%");
 });
 
 test("관리자 게시판 대상은 전체/null만 집계하고 loading, error, orphan, 빈 그룹을 구분한다", () => {

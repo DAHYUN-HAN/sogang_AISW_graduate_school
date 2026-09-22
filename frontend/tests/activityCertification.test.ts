@@ -96,17 +96,9 @@ test("다른 활동 인증 목록의 기존 전체 미리보기 폴백을 유지
 });
 
 
-test("활동 인증 작성 계좌는 필수이고 수정 계좌는 새 값만 선택 입력한다", () => {
-  assert.deepEqual(activityBankAccountFieldState(null), {
-    required: true,
-    placeholder: "은행 / 계좌번호를 입력하세요",
-    guidance: "계좌는 본인 명의로만 등록 가능해요",
-  });
-  assert.deepEqual(activityBankAccountFieldState(503), {
-    required: false,
-    placeholder: "새 계좌번호를 입력하면 변경돼요",
-    guidance: "기존 계좌는 표시되지 않아요. 변경할 경우 새 계좌를 입력해주세요.",
-  });
+test("활동 인증 작성 계좌는 필수이고 수정은 계좌 재입력 없이 저장할 수 있다", () => {
+  assert.equal(activityBankAccountFieldState(null).required, true);
+  assert.equal(activityBankAccountFieldState(503).required, false);
 });
 
 test("수정에서 입력한 새 계좌만 metadata에 포함한다", () => {

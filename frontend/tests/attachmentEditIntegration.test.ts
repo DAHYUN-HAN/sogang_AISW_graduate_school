@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 import ts from "typescript";
+import { activityParticipantsFromMetadata, activitySourcePostIdFromMetadata } from "../utils/activityCertification";
+import { clubOperationStatus } from "../utils/participationGuide";
+import { mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate } from "../utils/mutualAid";
 
 const edit = ts.createSourceFile("edit.tsx", readFileSync("app/(tabs)/board/post/edit/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const create = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -19,6 +22,28 @@ function expression(source: ts.SourceFile, find: (node: ts.Node) => boolean) {
     compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "element" },
   }).outputText;
 }
+
+test("activity edit restores its saved account once and does not overwrite an in-progress replacement", () => {
+  const code = expression(create, (node) => ts.isArrowFunction(node) && ts.isCallExpression(node.parent)
+    && node.parent.expression.getText(create) === "useEffect"
+    && node.getText(create).includes("hydratedPostId.current === postId"));
+  const form = { bankAccount: "" };
+  const hydratedPostId = { current: null as number | null };
+  const hydrate = runInNewContext(code, {
+    postId: 42, hydratedPostId,
+    existingPost: { id: 42, title: "Activity", content: "Reflection", metadata: { bank_account: "Test Bank 123-456" }, attachments: [] },
+    reset: (values: typeof form) => Object.assign(form, values),
+    activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, clubOperationStatus,
+    mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate,
+    setAttachments: () => {}, setEvidenceLink: () => {}, setEvidenceMode: () => {},
+    setSelectedParticipants: () => {}, setParticipantQuery: () => {}, setActivitySourcePostId: () => {},
+  });
+  hydrate();
+  assert.equal(form.bankAccount, "Test Bank 123-456");
+  form.bankAccount = "New Bank 999-000";
+  hydrate();
+  assert.equal(form.bankAccount, "New Bank 999-000");
+});
 
 test("resource edit exposes existing mixed attachments and writes the user's removal back to form state", () => {
   let attachments = [{ id: 12, content_type: "image/png" }, { id: 34, content_type: "application/pdf" }];
