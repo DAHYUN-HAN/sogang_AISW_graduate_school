@@ -64,7 +64,7 @@ Alembic head: `0029_roster_dues_separation`
 | 명령 | 결과 |
 | --- | --- |
 | `cd backend && python -m pytest -q` | `447 passed, 1 skipped, 1 warning` |
-| `cd frontend && npm test` | `676 passed, 0 failed` |
+| `cd frontend && npm test` | `678 passed, 0 failed` |
 | `cd frontend && npm run typecheck` | 종료 코드 0 |
 | `cd frontend && npm run lint` | 종료 코드 0, 기존 경고 6개, 오류 0개 |
 | `cd backend && python -m compileall -q app alembic` | 종료 코드 0 |

@@ -51,6 +51,41 @@ test("개별 행사 등록은 기존 납부 상태와 무관하게 게시판을 
   );
 });
 
+test("개별 행사 편집 상태는 게시판 선택 후 ONCE API payload를 만들고 일반 편집 상태를 보존한다", () => {
+  const utils = duesUtils as typeof duesUtils & {
+    selectDuesPaymentBoard?: (
+      draft: { scope: "ALL" | "ONCE" | "UNPAID"; selectedBoardId: number | null },
+      boardId: number,
+    ) => { scope: "ALL" | "ONCE" | "UNPAID"; selectedBoardId: number | null };
+    createDuesPaymentWritePayload?: (
+      draft: { scope: "ALL" | "ONCE" | "UNPAID"; selectedBoardId: number | null },
+    ) => unknown;
+  };
+  assert.equal(typeof utils.selectDuesPaymentBoard, "function");
+  assert.equal(typeof utils.createDuesPaymentWritePayload, "function");
+
+  const onceDraft = utils.createDuesPaymentEditorDraft(
+    { payment_scope: "ONCE", once_board_id: 17 },
+    "REGISTER_ONCE",
+  );
+  assert.equal(utils.createDuesPaymentWritePayload?.(onceDraft), null);
+  const selectedDraft = utils.selectDuesPaymentBoard?.(onceDraft, 23);
+  assert.deepEqual(selectedDraft, { scope: "ONCE", selectedBoardId: 23 });
+  assert.deepEqual(utils.createDuesPaymentWritePayload?.(selectedDraft!), {
+    payment_scope: "ONCE",
+    once_board_id: 23,
+  });
+
+  const editDraft = utils.createDuesPaymentEditorDraft(
+    { payment_scope: "ALL", once_board_id: null },
+    "EDIT",
+  );
+  assert.deepEqual(utils.createDuesPaymentWritePayload?.(editDraft), {
+    payment_scope: "ALL",
+    once_board_id: null,
+  });
+});
+
 test("전체 납부 업로드 결과는 기존 삭제와 신규 등록 건수를 안내한다", () => {
   assert.equal(
     formatPaymentImportSummary({ cleared: 4, registered: 3, total_rows: 3 }),

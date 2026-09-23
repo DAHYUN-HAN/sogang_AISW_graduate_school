@@ -2,6 +2,7 @@ import type {
   AdminDuesPaymentItem,
   AdminRosterItem,
   DuesPaymentImportResult,
+  DuesPaymentWritePayload,
   DuesRosterImportResult,
 } from "../types";
 
@@ -23,14 +24,47 @@ export function formatDuesScope(
 
 export type DuesPaymentEditorMode = "EDIT" | "REGISTER_ONCE";
 
+export type DuesPaymentEditorDraft = {
+  scope: AdminDuesPaymentItem["payment_scope"];
+  selectedBoardId: number | null;
+};
+
 export function createDuesPaymentEditorDraft(
   item: Pick<AdminDuesPaymentItem, "payment_scope" | "once_board_id">,
   mode: DuesPaymentEditorMode,
-) {
+): DuesPaymentEditorDraft {
   if (mode === "REGISTER_ONCE") {
     return { scope: "ONCE" as const, selectedBoardId: null };
   }
   return { scope: item.payment_scope, selectedBoardId: item.once_board_id };
+}
+
+export function selectDuesPaymentScope(
+  draft: DuesPaymentEditorDraft,
+  scope: AdminDuesPaymentItem["payment_scope"],
+): DuesPaymentEditorDraft {
+  return {
+    scope,
+    selectedBoardId: scope === "ONCE" ? draft.selectedBoardId : null,
+  };
+}
+
+export function selectDuesPaymentBoard(
+  _draft: DuesPaymentEditorDraft,
+  boardId: number,
+): DuesPaymentEditorDraft {
+  return { scope: "ONCE", selectedBoardId: boardId };
+}
+
+export function createDuesPaymentWritePayload(
+  draft: DuesPaymentEditorDraft,
+): DuesPaymentWritePayload | null {
+  if (draft.scope === "ONCE" && draft.selectedBoardId === null) return null;
+
+  return {
+    payment_scope: draft.scope,
+    once_board_id: draft.scope === "ONCE" ? draft.selectedBoardId : null,
+  };
 }
 
 export function formatRosterImportSummary(result: DuesRosterImportResult) {

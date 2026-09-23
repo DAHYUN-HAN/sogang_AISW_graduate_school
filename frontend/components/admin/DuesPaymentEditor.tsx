@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 
 import type {
@@ -9,6 +9,9 @@ import type {
 } from "../../types";
 import {
   createDuesPaymentEditorDraft,
+  createDuesPaymentWritePayload,
+  selectDuesPaymentBoard,
+  selectDuesPaymentScope,
   type DuesPaymentEditorMode,
 } from "../../utils/duesPayers";
 import { DUES_ADMIN_COLORS as COLORS, DuesAdminButton } from "./DuesAdminPrimitives";
@@ -30,39 +33,29 @@ type Props = {
   onSave: (payload: DuesPaymentWritePayload) => void;
 };
 
-export default function DuesPaymentEditor({
-  visible,
+type ContentProps = Omit<Props, "visible" | "item"> & {
+  item: AdminDuesPaymentItem;
+};
+
+export function DuesPaymentEditorContent({
   item,
   mode = "EDIT",
   activityBoards,
   saving,
   onClose,
   onSave,
-}: Props) {
-  const [scope, setScope] = useState<DuesPaymentScope>("UNPAID");
-  const [selectedBoardId, setSelectedBoardId] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!visible || !item) return;
-    const draft = createDuesPaymentEditorDraft(item, mode);
-    setScope(draft.scope);
-    setSelectedBoardId(draft.selectedBoardId);
-  }, [item, mode, visible]);
-
-  if (!item) return null;
-  const canSave = !saving && (scope !== "ONCE" || selectedBoardId !== null);
+}: ContentProps) {
+  const [draft, setDraft] = useState(() => createDuesPaymentEditorDraft(item, mode));
+  const { scope, selectedBoardId } = draft;
+  const payload = createDuesPaymentWritePayload(draft);
+  const canSave = !saving && payload !== null;
   const submit = () => {
-    if (!canSave) return;
-    const payload: DuesPaymentWritePayload = {
-      payment_scope: scope,
-      once_board_id: scope === "ONCE" ? selectedBoardId : null,
-    };
+    if (!canSave || !payload) return;
     onSave(payload);
   };
 
   return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(11,31,86,0.35)", padding: 18 }}>
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(11,31,86,0.35)", padding: 18 }}>
         <View style={{ width: "100%", maxWidth: 560, maxHeight: "88%", borderRadius: 10, backgroundColor: COLORS.surface, overflow: "hidden" }}>
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
             <View style={{ gap: 5 }}>
@@ -91,10 +84,7 @@ export default function DuesPaymentEditor({
                       key={option.value}
                       accessibilityRole="radio"
                       accessibilityState={{ checked: selected }}
-                      onPress={() => {
-                        setScope(option.value);
-                        if (option.value !== "ONCE") setSelectedBoardId(null);
-                      }}
+                      onPress={() => setDraft((current) => selectDuesPaymentScope(current, option.value))}
                       style={{
                         borderRadius: 8,
                         borderWidth: 1,
@@ -123,7 +113,9 @@ export default function DuesPaymentEditor({
                   return (
                     <Pressable
                       key={board.id}
-                      onPress={() => setSelectedBoardId(board.id)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected }}
+                      onPress={() => setDraft((current) => selectDuesPaymentBoard(current, board.id))}
                       style={{
                         borderRadius: 8,
                         borderWidth: 1,
@@ -153,7 +145,32 @@ export default function DuesPaymentEditor({
             </View>
           </ScrollView>
         </View>
-      </View>
+    </View>
+  );
+}
+
+export default function DuesPaymentEditor({
+  visible,
+  item,
+  mode = "EDIT",
+  activityBoards,
+  saving,
+  onClose,
+  onSave,
+}: Props) {
+  if (!item) return null;
+
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+      <DuesPaymentEditorContent
+        key={`${mode}:${item.id}`}
+        item={item}
+        mode={mode}
+        activityBoards={activityBoards}
+        saving={saving}
+        onClose={onClose}
+        onSave={onSave}
+      />
     </Modal>
   );
 }
