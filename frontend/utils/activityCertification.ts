@@ -1,4 +1,4 @@
-import type { ApiSuccess, PostListItem } from "../types";
+import type { ApiSuccess, DuesPayerSearchItem, PostListItem } from "../types";
 import { clubOperationStatus } from "./participationGuide";
 
 export type ActivityParticipant = {
@@ -66,8 +66,23 @@ export async function loadPublishedActivitySourcePosts<T extends ActivitySourceP
   return response.data;
 }
 
+export const ACTIVITY_PARTICIPANT_PAID_COLOR = "#212429";
+export const ACTIVITY_PARTICIPANT_UNPAID_COLOR = "#8A919C";
+
+export function activityParticipantTextColor(
+  participant: Pick<DuesPayerSearchItem, "is_paid_for_board">,
+) {
+  return participant.is_paid_for_board
+    ? ACTIVITY_PARTICIPANT_PAID_COLOR
+    : ACTIVITY_PARTICIPANT_UNPAID_COLOR;
+}
+
+export function activityParticipantSearchKey(boardId: number, query: string) {
+  return ["dues-payer-search", boardId, query] as const;
+}
+
 export const ACTIVITY_PARTICIPANT_GUIDANCE =
-  "참가자 이름 색상 구분: 검정 납부 · 회색 미납 · 주황 1회 납부(5만원). 지원금은 참가자 목록 기준 지급되니 본인도 검색해서 추가해주세요.";
+  "참가자 이름 색상 구분: 검정은 현재 활동 기준 납부, 회색은 현재 활동 기준 미납입니다. 지원금은 참가자 목록 기준 지급되니 본인도 검색해서 추가해주세요.";
 
 export function activityBankAccountFieldState(postId: number | null) {
   if (postId) {
