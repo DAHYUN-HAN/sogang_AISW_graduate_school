@@ -1,4 +1,4 @@
-from app import dues_payer_service
+from app import dues_payment_service
 
 
 class _Dialect:
@@ -24,7 +24,7 @@ class _RecordingSession:
 
 
 def test_dues_mutation_lock_uses_one_postgres_transaction_advisory_lock() -> None:
-    lock = getattr(dues_payer_service, "lock_dues_payer_mutation", None)
+    lock = getattr(dues_payment_service, "lock_dues_mutation", None)
     assert lock is not None
     session = _RecordingSession()
 
@@ -36,7 +36,7 @@ def test_dues_mutation_lock_uses_one_postgres_transaction_advisory_lock() -> Non
 
 
 def test_dues_mutation_lock_is_a_noop_outside_postgres() -> None:
-    lock = getattr(dues_payer_service, "lock_dues_payer_mutation", None)
+    lock = getattr(dues_payment_service, "lock_dues_mutation", None)
     assert lock is not None
     session = _RecordingSession("sqlite")
 

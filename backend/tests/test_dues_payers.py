@@ -2,15 +2,20 @@ from io import BytesIO
 
 import pytest
 from openpyxl import Workbook
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
+from app.dues_payer_import import DuesPayerRow
+from app.dues_payment_service import replace_payment_snapshot
 from app.errors import AppException
 from app.models.audit import OperationalAuditLog
 from app.models.board import Board
+from app.models.dues_payment import DuesPayment
 from app.models.dues_payer import DuesPayer
+from app.models.student_roster import StudentRosterMember
 from app.routers import dues_payers as dues_payers_router
+from app.student_roster_service import import_roster
 
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -140,6 +145,118 @@ def test_member_search_returns_all_roster_states_with_board_eligibility_only(api
     )
     assert by_number.status_code == 200
     assert by_number.json()["data"] == []
+
+
+def _parsed_rows(rows: list[tuple[str, str, str]]) -> list[DuesPayerRow]:
+    return [
+        DuesPayerRow(
+            row_number=index,
+            name=name,
+            major=major,
+            student_number=student_number,
+        )
+        for index, (name, major, student_number) in enumerate(rows, start=1)
+    ]
+
+
+def test_roster_service_overwrites_identity_without_touching_payment(api) -> None:
+    board_id = _activity_board(api, slug="roster-overwrite-board")
+    with api.session() as db:
+        member = StudentRosterMember(
+            name="이전이름",
+            major="이전전공",
+            student_number="A74001",
+        )
+        db.add(member)
+        db.flush()
+        db.add(
+            DuesPayment(
+                roster_member_id=member.id,
+                scope="ONCE",
+                once_board_id=board_id,
+            )
+        )
+        stable_id = member.id
+        db.commit()
+
+    with api.session() as db:
+        result = import_roster(db, _parsed_rows([("새이름", "새전공", "A74001")]))
+        db.commit()
+
+    assert result == {"created": 0, "updated": 1, "unchanged": 0, "total_rows": 1}
+    with api.session() as db:
+        member = db.get(StudentRosterMember, stable_id)
+        payment = db.scalar(
+            select(DuesPayment).where(DuesPayment.roster_member_id == stable_id)
+        )
+        assert member is not None
+        assert payment is not None
+        assert (member.name, member.major) == ("새이름", "새전공")
+        assert (payment.scope, payment.once_board_id) == ("ONCE", board_id)
+
+
+def test_payment_service_replaces_every_existing_scope(api) -> None:
+    board_id = _activity_board(api, slug="snapshot-replacement-board")
+    with api.session() as db:
+        first = StudentRosterMember(name="첫번째", major="AI", student_number="A74001")
+        second = StudentRosterMember(name="두번째", major="AI", student_number="A74002")
+        third = StudentRosterMember(name="세번째", major="AI", student_number="A74003")
+        db.add_all([first, second, third])
+        db.flush()
+        db.add_all(
+            [
+                DuesPayment(roster_member_id=first.id, scope="ALL"),
+                DuesPayment(
+                    roster_member_id=second.id,
+                    scope="ONCE",
+                    once_board_id=board_id,
+                ),
+            ]
+        )
+        third_id = third.id
+        db.commit()
+
+    with api.session() as db:
+        result = replace_payment_snapshot(
+            db,
+            _parsed_rows([("세번째", "무시되는전공", "A74003")]),
+        )
+        db.commit()
+
+    assert result == {"cleared": 2, "registered": 1, "total_rows": 1}
+    with api.session() as db:
+        payments = db.scalars(select(DuesPayment)).all()
+        assert len(payments) == 1
+        assert (payments[0].roster_member_id, payments[0].scope) == (third_id, "ALL")
+
+
+def test_invalid_payment_snapshot_does_not_clear_existing_payments(api) -> None:
+    board_id = _activity_board(api, slug="snapshot-validation-board")
+    with api.session() as db:
+        first = StudentRosterMember(name="첫번째", major="AI", student_number="A74001")
+        second = StudentRosterMember(name="두번째", major="AI", student_number="A74002")
+        db.add_all([first, second])
+        db.flush()
+        db.add_all(
+            [
+                DuesPayment(roster_member_id=first.id, scope="ALL"),
+                DuesPayment(
+                    roster_member_id=second.id,
+                    scope="ONCE",
+                    once_board_id=board_id,
+                ),
+            ]
+        )
+        db.commit()
+
+    with api.session() as db:
+        with pytest.raises(AppException) as error:
+            replace_payment_snapshot(
+                db,
+                _parsed_rows([("다른이름", "AI", "A74001")]),
+            )
+        assert error.value.code == "DUES_IMPORT_ROSTER_MISMATCH"
+        assert db.scalar(select(func.count(DuesPayment.id))) == 2
 
 
 def test_member_search_rejects_missing_inactive_ordinary_and_unknown_boards(api) -> None:
