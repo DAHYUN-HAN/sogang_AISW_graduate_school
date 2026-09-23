@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 21.3.0 < 22.0.0",
+    "version": ">= 24.4.1 < 25.0.0",
     "appVersionSource": "remote",
     "requireCommit": true
   },
@@ -26,6 +26,13 @@
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6809467636"
       }
     }
   }

@@ -378,6 +378,8 @@ Definition of done:
 
 ## Work Package 9: Phase 4 Full Frontend-Backend Integration
 
+- 2026-09-24 WP9 iOS submission tooling: EAS CLI 21.3.0 fails Apple Developer login with `iTunes service key is empty`; Expo resolved this in 24.4.1. The CLI range now requires that fix, and the production iOS submit profile uses the existing App Store Connect app ID so EAS can reuse its stored API key without an Apple ID session. Static release configuration checks pass; this does not change the built app binary.
+
 - 2026-09-17 WP5/WP9 non-admin upload audit (`Phase 5 QA`): mapped four resource categories, three activity certification boards, private mutual-aid evidence and profile images; separated album/six legacy route implementations from current menu entry points. Resource and retained generic edit forms omit attachment controls; activity/album/profile controls exist, while mutual-aid existing evidence is intentionally protected. Source inventory and verification limits: `docs/qa/USER_ATTACHMENT_UPLOAD_AUDIT_2026-09-17.md`.
 
 - 2026-09-17 WP5/WP9 resource attachment edit investigation (`Phase 5 QA`): current Android source reproduces missing attachment controls when editing an image-bearing resource post. The edit form loads/saves attachment IDs but renders management only for participation guides/albums. Confirmed frontend visibility condition; backend replacement support exists in source. Investigation only; evidence and repair scope: `docs/qa/RESOURCE_EDIT_ATTACHMENTS_2026-09-17.md`.
