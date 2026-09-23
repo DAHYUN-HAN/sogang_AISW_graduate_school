@@ -3,8 +3,10 @@ import test from "node:test";
 
 import {
   DUES_DELETE_CONFIRMATION,
-  formatDuesImportSummary,
+  formatDuesScope,
+  formatPaymentImportSummary,
   formatDuesPayer,
+  formatRosterImportSummary,
   isExactDuesDeleteConfirmation,
 } from "../utils/duesPayers";
 
@@ -15,10 +17,26 @@ test("원우회비 납부자는 이름 전공 학번을 띄어쓰기로 표시�
   );
 });
 
-test("엑셀 upsert 결과를 신규 수정 유지 건수로 안내한다", () => {
+test("전체 원우 명부 업로드 결과를 신규 수정 유지 건수로 안내한다", () => {
   assert.equal(
-    formatDuesImportSummary({ created: 2, updated: 3, unchanged: 4, total_rows: 9 }),
+    formatRosterImportSummary({ created: 2, updated: 3, unchanged: 4, total_rows: 9 }),
     "총 9명 · 신규 2명 · 수정 3명 · 유지 4명",
+  );
+});
+
+test("관리자 원우 상태는 전체·게시판 전용·미납으로 표시한다", () => {
+  assert.equal(formatDuesScope({ payment_scope: "ALL", once_board_name: null }), "전체 납부");
+  assert.equal(
+    formatDuesScope({ payment_scope: "ONCE", once_board_name: "스터디 활동 인증" }),
+    "1회 납부 · 스터디 활동 인증",
+  );
+  assert.equal(formatDuesScope({ payment_scope: "UNPAID", once_board_name: null }), "미납");
+});
+
+test("전체 납부 업로드 결과는 활성·초기화·유지 수를 안내한다", () => {
+  assert.equal(
+    formatPaymentImportSummary({ activated: 2, reset: 3, unchanged: 4, total_rows: 6 }),
+    "총 6명 · 전체 납부 전환 2명 · 미납 초기화 3명 · 유지 4명",
   );
 });
 

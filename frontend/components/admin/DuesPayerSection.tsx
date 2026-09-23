@@ -5,13 +5,18 @@ import * as DocumentPicker from "expo-document-picker";
 import { useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View } from "react-native";
 
+import { useBoardsQuery } from "../../hooks/useApi";
 import { duesPayerApi } from "../../services/api";
+import type { AdminDuesPayerItem, DuesPayerWritePayload } from "../../types";
 import {
   DUES_DELETE_CONFIRMATION,
-  formatDuesImportSummary,
+  formatDuesScope,
+  formatPaymentImportSummary,
   formatDuesPayer,
+  formatRosterImportSummary,
   isExactDuesDeleteConfirmation,
 } from "../../utils/duesPayers";
+import DuesPayerEditor from "./DuesPayerEditor";
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const COLORS = {
@@ -137,7 +142,11 @@ export default function DuesPayerSection() {
   const [search, setSearch] = useState("");
   const [appliedSearch, setAppliedSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [uploading, setUploading] = useState(false);
+  const [uploadingRoster, setUploadingRoster] = useState(false);
+  const [uploadingPayments, setUploadingPayments] = useState(false);
+  const [editorVisible, setEditorVisible] = useState(false);
+  const [editorItem, setEditorItem] = useState<AdminDuesPayerItem | null>(null);
+  const [saving, setSaving] = useState(false);
   const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleting, setDeleting] = useState(false);
@@ -148,22 +157,64 @@ export default function DuesPayerSection() {
   });
   const payers = payersQuery.data?.data ?? [];
   const pagination = payersQuery.data?.pagination;
+  const { data: boardsResponse } = useBoardsQuery();
+  const activityBoards = (boardsResponse?.data ?? [])
+    .flatMap((group) => group.boards)
+    .filter((board) => board.is_active && board.board_type === "activity_certification");
+  const busy = uploadingRoster || uploadingPayments || saving || deleting;
 
-  const importWorkbook = async () => {
+  const importRosterWorkbook = async () => {
     const file = await pickWorkbook();
     if (!file) return;
-    setUploading(true);
+    setUploadingRoster(true);
     try {
-      const response = await duesPayerApi.importWorkbook(file);
+      const response = await duesPayerApi.importRosterWorkbook(file);
       await queryClient.invalidateQueries({ queryKey: ["admin-dues-payers"] });
-      Alert.alert("업로드 완료", formatDuesImportSummary(response.data));
+      Alert.alert("명부 업로드 완료", formatRosterImportSummary(response.data));
     } catch (error) {
       Alert.alert(
-        "업로드 실패",
+        "명부 업로드 실패",
         apiErrorMessage(error, "엑셀 형식을 확인해 주세요. 명단은 변경되지 않았습니다."),
       );
     } finally {
-      setUploading(false);
+      setUploadingRoster(false);
+    }
+  };
+
+  const importPaymentWorkbook = async () => {
+    const file = await pickWorkbook();
+    if (!file) return;
+    setUploadingPayments(true);
+    try {
+      const response = await duesPayerApi.importPaymentWorkbook(file);
+      await queryClient.invalidateQueries({ queryKey: ["admin-dues-payers"] });
+      Alert.alert("전체 납부자 업로드 완료", formatPaymentImportSummary(response.data));
+    } catch (error) {
+      Alert.alert(
+        "전체 납부자 업로드 실패",
+        apiErrorMessage(error, "학번과 이름이 전체 원우 명부와 일치하는지 확인해 주세요. 납부 상태는 변경되지 않았습니다."),
+      );
+    } finally {
+      setUploadingPayments(false);
+    }
+  };
+
+  const savePayer = async (payload: DuesPayerWritePayload) => {
+    setSaving(true);
+    try {
+      if (editorItem) {
+        await duesPayerApi.updatePayer(editorItem.id, payload);
+      } else {
+        await duesPayerApi.createPayer(payload);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["admin-dues-payers"] });
+      setEditorVisible(false);
+      setEditorItem(null);
+      Alert.alert("저장 완료", "원우의 납부 범위를 저장했습니다.");
+    } catch (error) {
+      Alert.alert("저장 실패", apiErrorMessage(error, "원우 납부 범위를 저장하지 못했습니다."));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -189,19 +240,41 @@ export default function DuesPayerSection() {
       <View style={{ borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, padding: 16, gap: 12 }}>
         <Text style={{ color: COLORS.primary900, fontSize: 18, fontWeight: "900" }}>원우회비 납부자 명부</Text>
         <Text style={{ color: COLORS.muted, lineHeight: 20 }}>
-          회원 계정과 분리된 명부입니다. 엑셀의 각 행을 이름 전공 학번 순서로 읽고, 학번을 기준으로 신규 추가하거나 기존 정보를 수정합니다.
+          회원 계정과 분리된 전체 원우 명부를 먼저 등록한 뒤, 전체 납부자 엑셀이나 개별 등록으로 납부 범위를 관리합니다.
         </Text>
         <View style={{ borderRadius: 6, backgroundColor: COLORS.primary50, padding: 12, gap: 4 }}>
           <Text style={{ color: COLORS.primary900, fontWeight: "900" }}>업로드 규칙</Text>
           <Text style={{ color: COLORS.primary900, fontSize: 13, lineHeight: 19 }}>
-            헤더 없이 이름 전공 학번 3열을 사용합니다. 빈 값, A+숫자 5자리가 아닌 학번, 파일 안의 중복 학번이 하나라도 있으면 전체 업로드를 거절합니다.
+            두 파일 모두 헤더 없이 이름 전공 학번 3열을 사용합니다. 전체 납부자 업로드는 매번 ALL 상태를 새 목록으로 교체하며, 특정 행사 1회 납부자는 목록에서 빠져도 유지됩니다.
           </Text>
         </View>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+          <View style={{ flex: 1, minWidth: 180 }}>
+            <Button
+              icon="people-outline"
+              label={uploadingRoster ? "명부 업로드 중..." : "전체 원우 명부 업로드"}
+              onPress={() => void importRosterWorkbook()}
+              disabled={busy}
+            />
+          </View>
+          <View style={{ flex: 1, minWidth: 180 }}>
+            <Button
+              icon="cloud-upload-outline"
+              label={uploadingPayments ? "납부자 업로드 중..." : "전체 납부자 업로드"}
+              onPress={() => void importPaymentWorkbook()}
+              disabled={busy}
+            />
+          </View>
+        </View>
         <Button
-          icon="cloud-upload-outline"
-          label={uploading ? "업로드 중..." : "원우회비 엑셀 업로드"}
-          onPress={() => void importWorkbook()}
-          disabled={uploading || deleting}
+          icon="person-add-outline"
+          label="개별 등록"
+          tone="outline"
+          disabled={busy}
+          onPress={() => {
+            setEditorItem(null);
+            setEditorVisible(true);
+          }}
         />
       </View>
 
@@ -237,8 +310,24 @@ export default function DuesPayerSection() {
         </View>
       ) : null}
       {payers.map((payer) => (
-        <View key={payer.id} style={{ borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, padding: 14, gap: 5 }}>
-          <Text style={{ color: COLORS.text, fontWeight: "900" }}>{formatDuesPayer(payer)}</Text>
+        <View key={payer.id} style={{ borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, padding: 14, gap: 8 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Text style={{ color: COLORS.text, fontWeight: "900" }}>{formatDuesPayer(payer)}</Text>
+              <Text style={{ color: payer.payment_scope === "UNPAID" ? COLORS.muted : COLORS.primary, fontSize: 13, fontWeight: "800" }}>
+                {formatDuesScope(payer)}
+              </Text>
+            </View>
+            <Button
+              label="수정"
+              tone="outline"
+              disabled={busy}
+              onPress={() => {
+                setEditorItem(payer);
+                setEditorVisible(true);
+              }}
+            />
+          </View>
         </View>
       ))}
 
@@ -253,7 +342,7 @@ export default function DuesPayerSection() {
       <View style={{ borderRadius: 8, borderWidth: 1, borderColor: "#F7B8B8", backgroundColor: COLORS.error50, padding: 16, gap: 10 }}>
         <Text style={{ color: COLORS.error, fontSize: 17, fontWeight: "900" }}>명부 전체 삭제</Text>
         {deleteStep === 0 ? (
-          <Button label="전체 삭제 시작" tone="danger" onPress={() => setDeleteStep(1)} disabled={uploading} />
+          <Button label="전체 삭제 시작" tone="danger" onPress={() => setDeleteStep(1)} disabled={busy} />
         ) : null}
         {deleteStep === 1 ? (
           <>
@@ -292,6 +381,19 @@ export default function DuesPayerSection() {
           </>
         ) : null}
       </View>
+
+      <DuesPayerEditor
+        visible={editorVisible}
+        item={editorItem}
+        activityBoards={activityBoards}
+        saving={saving}
+        onClose={() => {
+          if (saving) return;
+          setEditorVisible(false);
+          setEditorItem(null);
+        }}
+        onSave={(payload) => void savePayer(payload)}
+      />
     </View>
   );
 }
