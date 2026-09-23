@@ -11,6 +11,7 @@ QA 144 supersedes the 2026-08-02 D+2 decision: a new or changed mutual-aid event
 Security/integration decision checked on 2026-07-27:
 
 - The approved mobile IA keeps five bottom tabs: Home, Notices, Community, Participation, and Student Council.
+- Per the 2026-09-17 user correction (WP5/WP9 P0), activity-certification authors can load their saved bank account in the authorized edit context and change it without re-entering it on every edit. Ordinary member list/detail responses still redact the account; other members cannot access the edit response.
 - Mutual-aid application content is readable by authenticated members. Per the 2026-09-17 user decision (WP5/WP9 P0), the author may view, remove or replace existing evidence while their request is processing through an explicitly authorized edit response. Administrators retain evidence access; other members and non-processing requesters receive `404 NOT_FOUND` for evidence lookup. Ordinary member detail/list responses continue to omit evidence.
 - Uploaded media is member-only. The public `/uploads` mount is not part of the launch architecture; browser-rendered images and file downloads use short-lived signed URLs issued only after authorization.
 - Email is the login identifier. A separate "find ID" flow is intentionally omitted; the login and recovery copy tells users to use their school email and provides password reset.
