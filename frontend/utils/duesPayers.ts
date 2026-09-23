@@ -21,6 +21,18 @@ export function formatDuesScope(
   return "미납";
 }
 
+export type DuesPaymentEditorMode = "EDIT" | "REGISTER_ONCE";
+
+export function createDuesPaymentEditorDraft(
+  item: Pick<AdminDuesPaymentItem, "payment_scope" | "once_board_id">,
+  mode: DuesPaymentEditorMode,
+) {
+  if (mode === "REGISTER_ONCE") {
+    return { scope: "ONCE" as const, selectedBoardId: null };
+  }
+  return { scope: item.payment_scope, selectedBoardId: item.once_board_id };
+}
+
 export function formatRosterImportSummary(result: DuesRosterImportResult) {
   return `총 ${result.total_rows}명 · 신규 ${result.created}명 · 수정 ${result.updated}명 · 유지 ${result.unchanged}명`;
 }

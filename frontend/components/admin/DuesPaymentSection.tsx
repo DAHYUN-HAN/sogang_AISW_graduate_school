@@ -5,7 +5,12 @@ import { ActivityIndicator, Alert, Text, TextInput, View } from "react-native";
 import { useBoardsQuery } from "../../hooks/useApi";
 import { duesPayerApi } from "../../services/api";
 import type { AdminDuesPaymentItem, DuesPaymentWritePayload } from "../../types";
-import { formatDuesPayer, formatDuesScope, formatPaymentImportSummary } from "../../utils/duesPayers";
+import {
+  formatDuesPayer,
+  formatDuesScope,
+  formatPaymentImportSummary,
+  type DuesPaymentEditorMode,
+} from "../../utils/duesPayers";
 import {
   DUES_ADMIN_COLORS as COLORS,
   DuesAdminButton,
@@ -24,6 +29,8 @@ export default function DuesPaymentSection() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [importConfirmVisible, setImportConfirmVisible] = useState(false);
+  const [onceRegistrationMode, setOnceRegistrationMode] = useState(false);
+  const [editorMode, setEditorMode] = useState<DuesPaymentEditorMode>("EDIT");
   const [editorItem, setEditorItem] = useState<AdminDuesPaymentItem | null>(null);
   const paymentsQuery = useQuery({
     queryKey: ["admin-dues-payments", appliedSearch, page],
@@ -67,7 +74,13 @@ export default function DuesPaymentSection() {
       await duesPayerApi.updatePayment(editorItem.id, payload);
       await queryClient.invalidateQueries({ queryKey: ["admin-dues-payments"] });
       setEditorItem(null);
-      Alert.alert("저장 완료", "현재 학기 납부 범위를 저장했습니다.");
+      setEditorMode("EDIT");
+      Alert.alert(
+        editorMode === "REGISTER_ONCE" ? "1회 납부 등록 완료" : "저장 완료",
+        editorMode === "REGISTER_ONCE"
+          ? "선택한 활동인증 게시판의 1회 납부자로 등록했습니다."
+          : "현재 학기 납부 범위를 저장했습니다.",
+      );
     } catch (error) {
       Alert.alert("저장 실패", duesApiErrorMessage(error, "납부 범위를 저장하지 못했습니다."));
     } finally {
@@ -94,10 +107,32 @@ export default function DuesPaymentSection() {
           disabled={uploading || saving}
           onPress={() => setImportConfirmVisible(true)}
         />
+        <DuesAdminButton
+          label="개별 행사 1회 납부 등록"
+          tone="outline"
+          disabled={uploading || saving}
+          onPress={() => setOnceRegistrationMode(true)}
+        />
       </View>
 
       <View style={{ borderRadius: 8, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surface, padding: 16, gap: 10 }}>
-        <Text style={{ color: COLORS.text, fontWeight: "900" }}>원우 검색</Text>
+        {onceRegistrationMode ? (
+          <View style={{ borderRadius: 8, backgroundColor: COLORS.primary50, padding: 12, gap: 8 }}>
+            <Text style={{ color: COLORS.primary900, fontWeight: "900" }}>개별 행사 1회 납부 등록 중</Text>
+            <Text style={{ color: COLORS.primary900, fontSize: 13, lineHeight: 19 }}>
+              원우를 검색한 뒤 1회 납부 등록을 누르고 활동인증 게시판을 선택하세요.
+            </Text>
+            <DuesAdminButton
+              label="일반 납부 관리로 돌아가기"
+              tone="outline"
+              disabled={uploading || saving}
+              onPress={() => setOnceRegistrationMode(false)}
+            />
+          </View>
+        ) : null}
+        <Text style={{ color: COLORS.text, fontWeight: "900" }}>
+          {onceRegistrationMode ? "등록할 원우 검색" : "원우 검색"}
+        </Text>
         <TextInput
           value={search}
           onChangeText={setSearch}
@@ -126,7 +161,15 @@ export default function DuesPaymentSection() {
                 {formatDuesScope(item)}
               </Text>
             </View>
-            <DuesAdminButton label="납부 설정" tone="outline" disabled={uploading || saving} onPress={() => setEditorItem(item)} />
+            <DuesAdminButton
+              label={onceRegistrationMode ? "1회 납부 등록" : "납부 설정"}
+              tone="outline"
+              disabled={uploading || saving}
+              onPress={() => {
+                setEditorMode(onceRegistrationMode ? "REGISTER_ONCE" : "EDIT");
+                setEditorItem(item);
+              }}
+            />
           </View>
         </View>
       ))}
@@ -142,10 +185,14 @@ export default function DuesPaymentSection() {
       <DuesPaymentEditor
         visible={editorItem !== null}
         item={editorItem}
+        mode={editorMode}
         activityBoards={activityBoards}
         saving={saving}
         onClose={() => {
-          if (!saving) setEditorItem(null);
+          if (!saving) {
+            setEditorItem(null);
+            setEditorMode("EDIT");
+          }
         }}
         onSave={(payload) => void savePayment(payload)}
       />

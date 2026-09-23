@@ -7,6 +7,10 @@ import type {
   DuesPaymentScope,
   DuesPaymentWritePayload,
 } from "../../types";
+import {
+  createDuesPaymentEditorDraft,
+  type DuesPaymentEditorMode,
+} from "../../utils/duesPayers";
 import { DUES_ADMIN_COLORS as COLORS, DuesAdminButton } from "./DuesAdminPrimitives";
 
 
@@ -19,6 +23,7 @@ const SCOPE_OPTIONS: { value: DuesPaymentScope; label: string; description: stri
 type Props = {
   visible: boolean;
   item: AdminDuesPaymentItem | null;
+  mode?: DuesPaymentEditorMode;
   activityBoards: Board[];
   saving: boolean;
   onClose: () => void;
@@ -28,6 +33,7 @@ type Props = {
 export default function DuesPaymentEditor({
   visible,
   item,
+  mode = "EDIT",
   activityBoards,
   saving,
   onClose,
@@ -38,9 +44,10 @@ export default function DuesPaymentEditor({
 
   useEffect(() => {
     if (!visible || !item) return;
-    setScope(item.payment_scope);
-    setSelectedBoardId(item.once_board_id);
-  }, [item, visible]);
+    const draft = createDuesPaymentEditorDraft(item, mode);
+    setScope(draft.scope);
+    setSelectedBoardId(draft.selectedBoardId);
+  }, [item, mode, visible]);
 
   if (!item) return null;
   const canSave = !saving && (scope !== "ONCE" || selectedBoardId !== null);
@@ -59,8 +66,14 @@ export default function DuesPaymentEditor({
         <View style={{ width: "100%", maxWidth: 560, maxHeight: "88%", borderRadius: 10, backgroundColor: COLORS.surface, overflow: "hidden" }}>
           <ScrollView contentContainerStyle={{ padding: 20, gap: 16 }}>
             <View style={{ gap: 5 }}>
-              <Text style={{ color: COLORS.primary900, fontSize: 20, fontWeight: "900" }}>원우회비 납부 설정</Text>
-              <Text style={{ color: COLORS.muted, lineHeight: 20 }}>신원 정보는 원우 명부에서 관리합니다.</Text>
+              <Text style={{ color: COLORS.primary900, fontSize: 20, fontWeight: "900" }}>
+                {mode === "REGISTER_ONCE" ? "개별 행사 1회 납부 등록" : "원우회비 납부 설정"}
+              </Text>
+              <Text style={{ color: COLORS.muted, lineHeight: 20 }}>
+                {mode === "REGISTER_ONCE"
+                  ? "선택한 활동인증 게시판에서만 검은색 납부자로 표시됩니다."
+                  : "신원 정보는 원우 명부에서 관리합니다."}
+              </Text>
             </View>
 
             <View style={{ borderRadius: 8, backgroundColor: COLORS.surfaceAlt, padding: 14, gap: 6 }}>
@@ -69,33 +82,35 @@ export default function DuesPaymentEditor({
               <Text style={{ color: COLORS.muted }}>{item.major}</Text>
             </View>
 
-            <View style={{ gap: 8 }}>
-              {SCOPE_OPTIONS.map((option) => {
-                const selected = scope === option.value;
-                return (
-                  <Pressable
-                    key={option.value}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selected }}
-                    onPress={() => {
-                      setScope(option.value);
-                      if (option.value !== "ONCE") setSelectedBoardId(null);
-                    }}
-                    style={{
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: selected ? COLORS.primary : COLORS.border,
-                      backgroundColor: selected ? COLORS.primary50 : COLORS.surface,
-                      padding: 13,
-                      gap: 4,
-                    }}
-                  >
-                    <Text style={{ color: selected ? COLORS.primary900 : COLORS.text, fontWeight: "900" }}>{option.label}</Text>
-                    <Text style={{ color: COLORS.muted, fontSize: 13 }}>{option.description}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            {mode === "EDIT" ? (
+              <View style={{ gap: 8 }}>
+                {SCOPE_OPTIONS.map((option) => {
+                  const selected = scope === option.value;
+                  return (
+                    <Pressable
+                      key={option.value}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: selected }}
+                      onPress={() => {
+                        setScope(option.value);
+                        if (option.value !== "ONCE") setSelectedBoardId(null);
+                      }}
+                      style={{
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: selected ? COLORS.primary : COLORS.border,
+                        backgroundColor: selected ? COLORS.primary50 : COLORS.surface,
+                        padding: 13,
+                        gap: 4,
+                      }}
+                    >
+                      <Text style={{ color: selected ? COLORS.primary900 : COLORS.text, fontWeight: "900" }}>{option.label}</Text>
+                      <Text style={{ color: COLORS.muted, fontSize: 13 }}>{option.description}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
 
             {scope === "ONCE" ? (
               <View style={{ gap: 8 }}>
@@ -129,7 +144,11 @@ export default function DuesPaymentEditor({
                 <DuesAdminButton label="취소" tone="outline" disabled={saving} onPress={onClose} />
               </View>
               <View style={{ flex: 1 }}>
-                <DuesAdminButton label={saving ? "저장 중..." : "저장"} disabled={!canSave} onPress={submit} />
+                <DuesAdminButton
+                  label={saving ? "저장 중..." : mode === "REGISTER_ONCE" ? "1회 납부 등록" : "저장"}
+                  disabled={!canSave}
+                  onPress={submit}
+                />
               </View>
             </View>
           </ScrollView>

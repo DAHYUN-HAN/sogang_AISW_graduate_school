@@ -13,6 +13,7 @@ Alembic head: `0029_roster_dues_separation`
 | 원우 명부 | 학교를 거쳐간 사람을 누적한다. 업로드 시 학번 기준 신규 추가, 기존 이름/전공 덮어쓰기, 누락 원우 유지 | API/서비스/화면 검증 통과 |
 | 현재 학기 납부 | 업로드 파일 전체를 먼저 검증한 뒤 기존 `ALL`과 `ONCE`를 모두 지우고 업로드 원우를 `ALL`로 등록 | 원자성·교체 테스트 통과 |
 | 개별 납부 설정 | 신원은 읽기 전용이고 `ALL`, 활동인증 보드 하나의 `ONCE`, `UNPAID`만 변경 | API/UI 테스트 통과 |
+| 개별 행사 바로 등록 | 원우회비 탭에서 전용 등록 모드를 열고 원우 검색 → 활동인증 게시판 선택 → `ONCE` 저장 | 실제 관리자 화면 저장 검증 통과 |
 | 활동인증 검색 | 모든 명부 원우를 검색·선택 가능. `ALL`/현재 보드 `ONCE`는 검정, 미납/다른 보드 `ONCE`는 회색 | 실제 렌더링 및 색상 값 검증 통과 |
 
 ## 화면 검증 데이터
@@ -28,6 +29,8 @@ Alembic head: `0029_roster_dues_separation`
 
 관리자 명부 검색은 네 원우의 이름·학번·전공과 `총 4명`을 확인했다. 원우회비 화면은 전체 납부, 두 개의 보드별 1회 납부, 미납을 함께 표시했다. 교차 플랫폼 확인 모달에서 업로드가 기존 전체/1회 납부를 모두 초기화한다는 경고를 확인했고, `엑셀 선택`을 누르면 Chrome DevTools Protocol의 `Page.fileChooserOpened` 이벤트가 실제 발생하는 것도 검증했다.
 
+추가로 `개별 행사 1회 납부 등록` 전용 동선에서 `QA검증미납`을 네트워킹 활동인증으로 저장했다. 관리자 목록은 `1회 납부 · 네트워킹 활동 인증`으로 갱신됐고, 참가자 검색 이름 색상은 네트워킹 보드에서 `rgb(33, 36, 41)`, 스터디 보드에서 `rgb(138, 145, 156)`으로 확인했다.
+
 ## 증빙 화면
 
 ### 원우 명부
@@ -42,6 +45,16 @@ Alembic head: `0029_roster_dues_separation`
 
 ![기존 전체 및 1회 납부 초기화 확인 모달](evidence/roster-dues-separation/admin-dues-import-confirm.png)
 
+### 개별 행사 1회 납부 등록
+
+![원우 선택 후 활동인증 게시판 지정](evidence/roster-dues-separation/admin-once-payment-registration.png)
+
+### 개별 행사 적용 색상
+
+![지정한 네트워킹 보드에서 검정 표시](evidence/roster-dues-separation/once-payment-networking-black.png)
+
+![다른 스터디 보드에서 회색 표시](evidence/roster-dues-separation/once-payment-study-gray.png)
+
 ### 활동인증 참가자 색상
 
 ![전체·현재행사 검정 및 미납·다른행사 회색](evidence/roster-dues-separation/activity-participant-colors.png)
@@ -51,7 +64,7 @@ Alembic head: `0029_roster_dues_separation`
 | 명령 | 결과 |
 | --- | --- |
 | `cd backend && python -m pytest -q` | `447 passed, 1 skipped, 1 warning` |
-| `cd frontend && npm test` | `675 passed, 0 failed` |
+| `cd frontend && npm test` | `676 passed, 0 failed` |
 | `cd frontend && npm run typecheck` | 종료 코드 0 |
 | `cd frontend && npm run lint` | 종료 코드 0, 기존 경고 6개, 오류 0개 |
 | `cd backend && python -m compileall -q app alembic` | 종료 코드 0 |
