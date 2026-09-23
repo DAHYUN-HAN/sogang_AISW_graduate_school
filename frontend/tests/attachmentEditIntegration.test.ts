@@ -33,10 +33,12 @@ test("activity edit restores its saved account once and does not overwrite an in
   const hydratedPostId = { current: null as number | null };
   const hydrate = runInNewContext(code, {
     postId: 42, hydratedPostId,
+    board: { slug: "networking-activity" },
     existingPost: { id: 42, title: "Activity", content: "Reflection", metadata: { bank_account: "Test Bank 123-456" }, attachments: [] },
     reset: (values: typeof form) => Object.assign(form, values),
     activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, clubOperationStatus,
     mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate,
+    resourceFields: null, resourcePostFieldValues: () => ({}), unsavedBaseline: { current: null },
     setAttachments: () => {}, setEvidenceLink: () => {}, setEvidenceMode: () => {},
     setSelectedParticipants: () => {}, setParticipantQuery: () => {}, setActivitySourcePostId: () => {},
   });

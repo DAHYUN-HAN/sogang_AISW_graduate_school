@@ -121,7 +121,7 @@ export default function PostCard({ post, onPress, boardType, boardSlug, isLast }
   const isWorkflowRequest = isMutualAid || isSuggestion;
   const showAuthor = !isLectureReview && !isSuggestion;
   // Figma 스터디카드 메타: "72기 김민석 · 26.06.23(금) · 댓글 3" — 댓글 수는 노출하고 추천 수만 감춘다.
-  const showCommentCount = !isWorkflowRequest;
+  const showCommentCount = !isLectureReview && !isWorkflowRequest;
   const showLikeCount = !isWorkflowRequest && !isStudyRecruit;
 
   return (
