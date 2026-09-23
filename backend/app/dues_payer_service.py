@@ -3,7 +3,53 @@ from sqlalchemy.orm import Session
 
 from app.dues_payer_import import DuesPayerRow
 from app.errors import AppException
+from app.models.board import Board
 from app.models.dues_payer import DuesPayer
+
+
+def payment_scope(item: DuesPayer) -> str:
+    if item.is_full_paid:
+        return "ALL"
+    if item.once_board_id is not None:
+        return "ONCE"
+    return "UNPAID"
+
+
+def require_activity_dues_board(db: Session, board_id: int) -> Board:
+    board = db.get(Board, board_id)
+    if board is None or not board.is_active or board.board_type != "activity_certification":
+        raise AppException(
+            status_code=422,
+            message="Select an active activity certification board.",
+            code="INVALID_DUES_BOARD",
+        )
+    return board
+
+
+def apply_payment_scope(
+    db: Session,
+    item: DuesPayer,
+    scope: str,
+    once_board_id: int | None,
+) -> Board | None:
+    if scope == "ALL" and once_board_id is None:
+        item.is_full_paid = True
+        item.once_board_id = None
+        return None
+    if scope == "UNPAID" and once_board_id is None:
+        item.is_full_paid = False
+        item.once_board_id = None
+        return None
+    if scope == "ONCE" and once_board_id is not None:
+        board = require_activity_dues_board(db, once_board_id)
+        item.is_full_paid = False
+        item.once_board_id = board.id
+        return board
+    raise AppException(
+        status_code=422,
+        message="Invalid payment scope.",
+        code="INVALID_DUES_SCOPE",
+    )
 
 
 def import_roster(db: Session, rows: list[DuesPayerRow]) -> dict[str, int]:

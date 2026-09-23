@@ -6,6 +6,7 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.models.audit import OperationalAuditLog
+from app.models.board import Board
 from app.models.dues_payer import DuesPayer
 
 
@@ -285,6 +286,44 @@ def test_payment_snapshot_resets_omitted_all_preserves_once_and_promotes_matches
         ],
     )
 
+
+def _activity_board(api, *, name: str = "스터디 인증", slug: str = "study-dues", is_active: bool = True) -> int:
+    with api.session() as db:
+        board = Board(
+            name=name,
+            slug=slug,
+            category="participation",
+            board_type="activity_certification",
+            read_permission="user",
+            write_permission="user",
+            is_active=is_active,
+        )
+        db.add(board)
+        db.commit()
+        db.refresh(board)
+        return board.id
+
+
+def _create_payer(
+    api,
+    *,
+    student_number: str,
+    payment_scope: str,
+    once_board_id: int | None = None,
+    actor: str = "admin",
+):
+    return api.client.post(
+        "/api/dues-payers/admin/payers",
+        headers=api.headers[actor],
+        json={
+            "name": f"검증{student_number}",
+            "major": "인공지능",
+            "student_number": student_number,
+            "payment_scope": payment_scope,
+            "once_board_id": once_board_id,
+        },
+    )
+
     assert response.status_code == 200
     assert response.json()["data"] == {"activated": 2, "reset": 1, "unchanged": 1, "total_rows": 3}
     with api.session() as db:
@@ -342,3 +381,180 @@ def test_payment_snapshot_roster_mismatch_rolls_back_all_state_and_audits_no_pii
         assert log.details == {"activated": 1, "reset": 1, "unchanged": 0, "total_rows": 1}
         assert "정확한이름" not in str(log.details)
         assert "A74002" not in str(log.details)
+
+
+def test_admin_can_create_all_once_and_unpaid_payment_scopes(api) -> None:
+    board_id = _activity_board(api)
+
+    all_paid = _create_payer(api, student_number="A74101", payment_scope="ALL")
+    once = _create_payer(
+        api,
+        student_number="A74102",
+        payment_scope="ONCE",
+        once_board_id=board_id,
+    )
+    unpaid = _create_payer(api, student_number="A74103", payment_scope="UNPAID")
+
+    assert all_paid.status_code == 200
+    assert all_paid.json()["data"] == {
+        "id": 1,
+        "name": "검증A74101",
+        "major": "인공지능",
+        "student_number": "A74101",
+        "payment_scope": "ALL",
+        "is_full_paid": True,
+        "once_board_id": None,
+        "once_board_name": None,
+    }
+    assert once.status_code == 200
+    assert once.json()["data"]["payment_scope"] == "ONCE"
+    assert once.json()["data"]["is_full_paid"] is False
+    assert once.json()["data"]["once_board_id"] == board_id
+    assert once.json()["data"]["once_board_name"] == "스터디 인증"
+    assert unpaid.status_code == 200
+    assert unpaid.json()["data"]["payment_scope"] == "UNPAID"
+
+    with api.session() as db:
+        logs = db.scalars(
+            select(OperationalAuditLog)
+            .where(OperationalAuditLog.action == "dues_payer.create")
+            .order_by(OperationalAuditLog.id)
+        ).all()
+        assert [log.details["payment_scope"] for log in logs] == ["ALL", "ONCE", "UNPAID"]
+        assert "검증A74101" not in str([log.details for log in logs])
+        assert "A74101" not in str([log.details for log in logs])
+
+
+def test_invalid_dues_scope_shapes_and_boards_are_rejected(api) -> None:
+    inactive_board_id = _activity_board(api, slug="inactive-dues", is_active=False)
+
+    all_with_board = _create_payer(
+        api,
+        student_number="A74201",
+        payment_scope="ALL",
+        once_board_id=1,
+    )
+    once_without_board = _create_payer(api, student_number="A74202", payment_scope="ONCE")
+    once_non_activity = _create_payer(
+        api,
+        student_number="A74203",
+        payment_scope="ONCE",
+        once_board_id=2,
+    )
+    once_inactive = _create_payer(
+        api,
+        student_number="A74204",
+        payment_scope="ONCE",
+        once_board_id=inactive_board_id,
+    )
+    blank_name = api.client.post(
+        "/api/dues-payers/admin/payers",
+        headers=api.headers["admin"],
+        json={
+            "name": "   ",
+            "major": "인공지능",
+            "student_number": "A74205",
+            "payment_scope": "UNPAID",
+        },
+    )
+
+    assert all_with_board.status_code == 422
+    assert all_with_board.json()["code"] == "VALIDATION_ERROR"
+    assert once_without_board.status_code == 422
+    assert once_without_board.json()["code"] == "VALIDATION_ERROR"
+    assert once_non_activity.status_code == 422
+    assert once_non_activity.json()["code"] == "INVALID_DUES_BOARD"
+    assert once_inactive.status_code == 422
+    assert once_inactive.json()["code"] == "INVALID_DUES_BOARD"
+    assert blank_name.status_code == 422
+    assert blank_name.json()["code"] == "VALIDATION_ERROR"
+
+
+def test_admin_can_update_payment_scope_and_list_uses_current_board_name(api) -> None:
+    board_id = _activity_board(api, name="변경 전 행사")
+    created = _create_payer(api, student_number="A74301", payment_scope="UNPAID")
+    payer_id = created.json()["data"]["id"]
+
+    updated = api.client.put(
+        f"/api/dues-payers/admin/payers/{payer_id}",
+        headers=api.headers["admin"],
+        json={
+            "name": "수정된 이름",
+            "major": "데이터사이언스",
+            "student_number": "a74301",
+            "payment_scope": "ONCE",
+            "once_board_id": board_id,
+        },
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["data"]["student_number"] == "A74301"
+    assert updated.json()["data"]["once_board_name"] == "변경 전 행사"
+
+    with api.session() as db:
+        board = db.get(Board, board_id)
+        assert board is not None
+        board.name = "변경 후 행사"
+        db.commit()
+
+    renamed = api.client.get(
+        "/api/dues-payers/admin/payers",
+        headers=api.headers["admin"],
+        params={"q": "A74301"},
+    )
+    assert renamed.status_code == 200
+    assert renamed.json()["data"][0]["once_board_name"] == "변경 후 행사"
+
+    with api.session() as db:
+        board = db.get(Board, board_id)
+        assert board is not None
+        db.delete(board)
+        db.commit()
+
+    deleted = api.client.get(
+        "/api/dues-payers/admin/payers",
+        headers=api.headers["admin"],
+        params={"q": "A74301"},
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["data"][0]["payment_scope"] == "UNPAID"
+    assert deleted.json()["data"][0]["once_board_id"] is None
+    assert deleted.json()["data"][0]["once_board_name"] is None
+
+
+def test_individual_payment_scope_conflict_missing_and_member_authorization(api) -> None:
+    created = _create_payer(api, student_number="A74401", payment_scope="ALL")
+    duplicate = _create_payer(api, student_number="a74401", payment_scope="UNPAID")
+    missing = api.client.put(
+        "/api/dues-payers/admin/payers/9999",
+        headers=api.headers["admin"],
+        json={
+            "name": "없음",
+            "major": "인공지능",
+            "student_number": "A74402",
+            "payment_scope": "UNPAID",
+        },
+    )
+    forbidden_create = _create_payer(
+        api,
+        student_number="A74403",
+        payment_scope="UNPAID",
+        actor="owner",
+    )
+    forbidden_update = api.client.put(
+        f"/api/dues-payers/admin/payers/{created.json()['data']['id']}",
+        headers=api.headers["owner"],
+        json={
+            "name": "권한없음",
+            "major": "인공지능",
+            "student_number": "A74401",
+            "payment_scope": "UNPAID",
+        },
+    )
+
+    assert duplicate.status_code == 409
+    assert duplicate.json()["code"] == "DUES_STUDENT_NUMBER_CONFLICT"
+    assert missing.status_code == 404
+    assert missing.json()["code"] == "DUES_PAYER_NOT_FOUND"
+    assert forbidden_create.status_code == 403
+    assert forbidden_update.status_code == 403
