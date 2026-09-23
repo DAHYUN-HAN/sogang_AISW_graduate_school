@@ -127,7 +127,7 @@ export function councilGalleryFields({
 }
 
 function hasCompleteCouncilMembers(members: CouncilMemberFormData[]): boolean {
-  return members.length > 0 && members.every((member) => (
+  return members.every((member) => (
     Boolean(member.name.trim())
     && Boolean(member.cohort.trim())
     && Boolean(member.role.trim())

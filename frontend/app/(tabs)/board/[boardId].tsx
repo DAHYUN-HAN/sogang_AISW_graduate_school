@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, PanResponder,
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import MediaImage, { MediaImageBackground } from "../../../components/MediaImage";
-import { BackIcon, EmptyCalendarIcon, LedgerIcon, PersonAvatarIcon, SearchBackIcon, SearchIcon } from "../../../components/icons";
+import { BackIcon, EmptyCalendarIcon, LedgerIcon, SearchBackIcon, SearchIcon } from "../../../components/icons";
 import LoadingState from "../../../components/LoadingState";
 import PostCard from "../../../components/PostCard";
 import { useBoardsQuery } from "../../../hooks/useApi";
@@ -27,7 +27,6 @@ import {
   cohortLeaderFormsFromMetadata,
   councilIntroductionContent,
   currentCouncilScreenState,
-  fixedCouncilMemberProfile,
   pastCouncilFormsFromMetadata,
   sortCouncilCardsDescending,
   type CouncilMemberFormData,
@@ -270,34 +269,6 @@ function executiveMembersFromForms(members: CouncilMemberFormData[]): ExecutiveM
   }] : []);
 }
 
-function FixedCouncilMemberProfileCard({
-  member,
-  fallbackCohort = "",
-}: {
-  member: ExecutiveMember;
-  fallbackCohort?: string;
-}) {
-  const profile = fixedCouncilMemberProfile({
-    name: member.name,
-    cohort: member.cohort ?? "",
-    role: member.role,
-    image_url: member.imageUrl ?? "",
-    intro: "",
-  }, fallbackCohort);
-
-  return (
-    <View style={styles.executiveCard}>
-      {imageUrl(profile.imageUrl) ? (
-        <MediaImage media={{ url: profile.imageUrl }} style={styles.executiveAvatarImage} />
-      ) : <PersonAvatarIcon size={48} />}
-      <View style={styles.executiveText}>
-        <Text style={styles.executiveName}>{profile.name}</Text>
-        <Text style={styles.executiveRole}>{profile.subtitle}</Text>
-      </View>
-    </View>
-  );
-}
-
 function currentCouncilFromMetadata(metadata: Record<string, unknown> | null | undefined): CurrentCouncilSummary | null {
   const state = currentCouncilScreenState(metadata);
   if (state.kind === "empty") return null;
@@ -455,8 +426,6 @@ function CohortLeaderScreen({
           bannerImageUrl={selected.bannerImageUrl}
           greeting={selected.greeting}
           intro={selected.intro}
-          members={selected.members}
-          fallbackCohort={selected.cohort}
         />
       ) : (
         <FlatList
@@ -562,16 +531,12 @@ function CouncilIntroductionDetail({
   bannerImageUrl,
   greeting,
   intro,
-  members,
-  fallbackCohort = "",
 }: {
   id: string;
   photoUrls: string[];
   bannerImageUrl?: string;
   greeting?: string;
   intro?: string;
-  members: ExecutiveMember[];
-  fallbackCohort?: string;
 }) {
   const content = councilIntroductionContent({ photoUrls, bannerImageUrl, greeting, intro });
 
@@ -582,13 +547,6 @@ function CouncilIntroductionDetail({
         <Text key={section.kind} style={section.kind === "greeting" ? styles.cohortGreeting : styles.cohortIntroText}>
           {section.text}
         </Text>
-      ))}
-      {members.map((member, index) => (
-        <FixedCouncilMemberProfileCard
-          key={`${member.name}-${member.role}-${index}`}
-          member={member}
-          fallbackCohort={fallbackCohort}
-        />
       ))}
     </ScrollView>
   );
@@ -626,7 +584,6 @@ function PastCouncilScreen({
           bannerImageUrl={selected.bannerImageUrl}
           greeting={selected.greeting}
           intro={selected.intro}
-          members={selected.members}
         />
       ) : (
         <FlatList
@@ -677,13 +634,12 @@ function ExecutiveIntroScreen({ board, topInset, onBack }: { board?: Board | nul
           bannerImageUrl={council.bannerImageUrl}
           greeting={council.greeting}
           intro={council.intro}
-          members={council.members}
         />
       ) : (
         <View style={styles.executiveEmptyState}>
           <Ionicons name="people-outline" size={32} color="#AAB2BF" />
           <Text style={styles.executiveEmptyTitle}>등록된 원우회 소개가 없어요</Text>
-          <Text style={styles.executiveEmptyDescription}>관리자에서 대표 이미지, 소개와 임원 카드를 등록해주세요</Text>
+          <Text style={styles.executiveEmptyDescription}>관리자에서 대표 이미지와 소개를 등록해주세요</Text>
         </View>
       )}
     </View>
@@ -1828,31 +1784,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     paddingBottom: 28,
-  },
-  executiveCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    borderRadius: 10,
-    borderWidth: 0.5,
-    borderColor: "#E1E4E9",
-    backgroundColor: COLORS.surface,
-    padding: 14,
-    marginBottom: 10,
-  },
-  executiveAvatar: {
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 24,
-    backgroundColor: "#E8F5FF",
-  },
-  executiveAvatarImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#E8F5FF",
   },
   executiveText: {
     flex: 1,
