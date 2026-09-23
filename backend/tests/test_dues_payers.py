@@ -23,7 +23,15 @@ def _workbook_bytes(rows: list[tuple[object, ...]]) -> bytes:
     return output.getvalue()
 
 
-def _import(api, rows: list[tuple[object, ...]], *, actor: str = "admin"):
+def _import_roster(api, rows: list[tuple[object, ...]], *, actor: str = "admin"):
+    return api.client.post(
+        "/api/dues-payers/admin/roster/import",
+        files={"file": ("dues.xlsx", _workbook_bytes(rows), XLSX_MIME)},
+        headers=api.headers[actor],
+    )
+
+
+def _import_payments(api, rows: list[tuple[object, ...]], *, actor: str = "admin"):
     return api.client.post(
         "/api/dues-payers/admin/import",
         files={"file": ("dues.xlsx", _workbook_bytes(rows), XLSX_MIME)},
@@ -31,15 +39,15 @@ def _import(api, rows: list[tuple[object, ...]], *, actor: str = "admin"):
     )
 
 
-def test_admin_import_upserts_by_student_number_and_members_search_name_or_number(api) -> None:
-    first = _import(
+def test_admin_roster_import_upserts_by_student_number_and_members_search_name_or_number(api) -> None:
+    first = _import_roster(
         api,
         [
             ("김민준", "데이터사이언스", "A74003"),
             ("이현화", "정보처리", "A34011"),
         ],
     )
-    second = _import(
+    second = _import_roster(
         api,
         [
             ("김민준", "인공지능", "a74003"),
@@ -74,7 +82,7 @@ def test_admin_import_upserts_by_student_number_and_members_search_name_or_numbe
 
 
 def test_admin_roster_search_is_paginated_and_not_available_to_members(api) -> None:
-    _import(
+    _import_roster(
         api,
         [
             ("가나다", "인공지능", "A74001"),
@@ -92,13 +100,15 @@ def test_admin_roster_search_is_paginated_and_not_available_to_members(api) -> N
         "/api/dues-payers/admin/payers",
         headers=api.headers["owner"],
     )
-    forbidden_import = _import(api, [("추가", "인공지능", "A74004")], actor="owner")
+    forbidden_roster_import = _import_roster(api, [("추가", "인공지능", "A74004")], actor="owner")
+    forbidden_payment_import = _import_payments(api, [("추가", "인공지능", "A74004")], actor="owner")
 
     assert page.status_code == 200
     assert [item["student_number"] for item in page.json()["data"]] == ["A74003"]
     assert page.json()["pagination"] == {"page": 2, "size": 2, "total": 3, "total_pages": 2}
     assert forbidden_list.status_code == 403
-    assert forbidden_import.status_code == 403
+    assert forbidden_roster_import.status_code == 403
+    assert forbidden_payment_import.status_code == 403
 
 
 @pytest.mark.parametrize(
@@ -118,7 +128,7 @@ def test_invalid_rows_reject_the_entire_workbook(api, rows, expected_code: str, 
         db.add(DuesPayer(name="기존", major="정보처리", student_number="A34011"))
         db.commit()
 
-    response = _import(api, rows)
+    response = _import_roster(api, rows)
 
     assert response.status_code == 422
     assert response.json()["code"] == expected_code
@@ -130,11 +140,11 @@ def test_invalid_rows_reject_the_entire_workbook(api, rows, expected_code: str, 
 
 def test_invalid_or_empty_workbook_is_rejected_without_changes(api) -> None:
     invalid = api.client.post(
-        "/api/dues-payers/admin/import",
+        "/api/dues-payers/admin/roster/import",
         files={"file": ("dues.xlsx", b"not a workbook", XLSX_MIME)},
         headers=api.headers["admin"],
     )
-    empty = _import(api, [])
+    empty = _import_roster(api, [])
 
     assert invalid.status_code == 422
     assert invalid.json()["code"] == "INVALID_DUES_WORKBOOK"
@@ -151,12 +161,12 @@ def test_admin_import_accepts_exact_limit_and_rejects_one_byte_over_without_chan
     monkeypatch.setattr(settings, "media_upload_max_bytes", len(workbook))
 
     accepted = api.client.post(
-        "/api/dues-payers/admin/import",
+        "/api/dues-payers/admin/roster/import",
         files={"file": ("dues.xlsx", workbook, XLSX_MIME)},
         headers=api.headers["admin"],
     )
     rejected = api.client.post(
-        "/api/dues-payers/admin/import",
+        "/api/dues-payers/admin/roster/import",
         files={"file": ("dues.xlsx", workbook + b"x", XLSX_MIME)},
         headers=api.headers["admin"],
     )
@@ -171,7 +181,7 @@ def test_admin_import_accepts_exact_limit_and_rejects_one_byte_over_without_chan
 
 
 def test_exact_confirmation_permanently_deletes_roster_and_audits_counts_without_pii(api) -> None:
-    _import(api, [("홍길동", "인공지능", "A74001"), ("김서강", "보안", "A74002")])
+    _import_roster(api, [("홍길동", "인공지능", "A74001"), ("김서강", "보안", "A74002")])
 
     wrong = api.client.post(
         "/api/dues-payers/admin/delete-all",
@@ -199,7 +209,7 @@ def test_exact_confirmation_permanently_deletes_roster_and_audits_counts_without
             .order_by(OperationalAuditLog.id)
         ).all()
         assert [(log.action, log.details) for log in logs] == [
-            ("dues_payer.import", {"created": 2, "updated": 0, "unchanged": 0, "total_rows": 2}),
+            ("dues_payer.roster_import", {"created": 2, "updated": 0, "unchanged": 0, "total_rows": 2}),
             ("dues_payer.delete_all", {"deleted": 2}),
         ]
         assert "홍길동" not in str([(log.action, log.details) for log in logs])
@@ -216,3 +226,119 @@ def test_admin_user_api_does_not_expose_or_change_legacy_dues_status(api) -> Non
     assert update.status_code == 422
     assert listing.status_code == 200
     assert all("dues_status" not in item for item in listing.json()["data"])
+
+
+def test_roster_import_updates_identity_without_changing_payment_scope(api) -> None:
+    with api.session() as db:
+        db.add(
+            DuesPayer(
+                name="기존이름",
+                major="기존전공",
+                student_number="A74001",
+                is_full_paid=False,
+                once_board_id=1,
+            )
+        )
+        db.commit()
+
+    response = _import_roster(api, [("변경이름", "변경전공", "A74001")])
+
+    assert response.status_code == 200
+    assert response.json()["data"] == {"created": 0, "updated": 1, "unchanged": 0, "total_rows": 1}
+    with api.session() as db:
+        payer = db.scalar(select(DuesPayer).where(DuesPayer.student_number == "A74001"))
+        assert payer is not None
+        assert (payer.name, payer.major) == ("변경이름", "변경전공")
+        assert payer.is_full_paid is False
+        assert payer.once_board_id == 1
+
+
+def test_payment_snapshot_resets_omitted_all_preserves_once_and_promotes_matches(api) -> None:
+    with api.session() as db:
+        db.add_all(
+            [
+                DuesPayer(name="전체누락", major="인공지능", student_number="A74001", is_full_paid=True),
+                DuesPayer(
+                    name="행사유지",
+                    major="인공지능",
+                    student_number="A74002",
+                    once_board_id=1,
+                ),
+                DuesPayer(
+                    name="행사승격",
+                    major="인공지능",
+                    student_number="A74003",
+                    once_board_id=2,
+                ),
+                DuesPayer(name="전체유지", major="인공지능", student_number="A74004", is_full_paid=True),
+                DuesPayer(name="미납승격", major="인공지능", student_number="A74005"),
+            ]
+        )
+        db.commit()
+
+    response = _import_payments(
+        api,
+        [
+            ("행사승격", "무시되는전공", "A74003"),
+            ("전체유지", "무시되는전공", "A74004"),
+            ("미납승격", "무시되는전공", "A74005"),
+        ],
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"] == {"activated": 2, "reset": 1, "unchanged": 1, "total_rows": 3}
+    with api.session() as db:
+        payers = {
+            payer.student_number: payer
+            for payer in db.scalars(select(DuesPayer).order_by(DuesPayer.student_number)).all()
+        }
+        assert (payers["A74001"].is_full_paid, payers["A74001"].once_board_id) == (False, None)
+        assert (payers["A74002"].is_full_paid, payers["A74002"].once_board_id) == (False, 1)
+        assert (payers["A74003"].is_full_paid, payers["A74003"].once_board_id) == (True, None)
+        assert (payers["A74004"].is_full_paid, payers["A74004"].once_board_id) == (True, None)
+        assert (payers["A74005"].is_full_paid, payers["A74005"].once_board_id) == (True, None)
+
+
+def test_payment_snapshot_roster_mismatch_rolls_back_all_state_and_audits_no_pii(api) -> None:
+    with api.session() as db:
+        db.add_all(
+            [
+                DuesPayer(name="전체납부", major="인공지능", student_number="A74001", is_full_paid=True),
+                DuesPayer(name="정확한이름", major="인공지능", student_number="A74002"),
+            ]
+        )
+        db.commit()
+
+    rejected = _import_payments(
+        api,
+        [
+            ("전체납부", "인공지능", "A74001"),
+            ("다른이름", "인공지능", "A74002"),
+        ],
+    )
+
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "DUES_IMPORT_ROSTER_MISMATCH"
+    assert "2" in rejected.json()["message"]
+    with api.session() as db:
+        payers = {
+            payer.student_number: payer
+            for payer in db.scalars(select(DuesPayer).order_by(DuesPayer.student_number)).all()
+        }
+        assert payers["A74001"].is_full_paid is True
+        assert payers["A74002"].is_full_paid is False
+        assert db.scalar(
+            select(OperationalAuditLog).where(OperationalAuditLog.action == "dues_payer.payment_import")
+        ) is None
+
+    accepted = _import_payments(api, [("정확한이름", "인공지능", "A74002")])
+
+    assert accepted.status_code == 200
+    with api.session() as db:
+        log = db.scalar(
+            select(OperationalAuditLog).where(OperationalAuditLog.action == "dues_payer.payment_import")
+        )
+        assert log is not None
+        assert log.details == {"activated": 1, "reset": 1, "unchanged": 0, "total_rows": 1}
+        assert "정확한이름" not in str(log.details)
+        assert "A74002" not in str(log.details)

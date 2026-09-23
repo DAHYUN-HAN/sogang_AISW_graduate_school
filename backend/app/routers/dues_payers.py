@@ -8,6 +8,7 @@ from app.audit import log_admin_action
 from app.config import settings
 from app.deps import get_current_user, get_db, require_admin
 from app.dues_payer_import import parse_dues_payer_workbook
+from app.dues_payer_service import apply_full_payment_snapshot, import_roster
 from app.errors import AppException
 from app.models.dues_payer import DuesPayer
 from app.models.user import User
@@ -16,6 +17,26 @@ from app.schemas.dues_payer import DuesPayerDeleteRequest
 
 
 router = APIRouter()
+
+
+async def _parse_workbook_upload(file: UploadFile):
+    try:
+        if Path(file.filename or "").suffix.lower() != ".xlsx":
+            raise AppException(
+                status_code=422,
+                message="Only .xlsx dues payer workbooks are supported.",
+                code="INVALID_DUES_WORKBOOK",
+            )
+        content = await file.read(settings.media_upload_max_bytes + 1)
+        if len(content) > settings.media_upload_max_bytes:
+            raise AppException(
+                status_code=413,
+                message="The dues payer workbook is too large.",
+                code="PAYLOAD_TOO_LARGE",
+            )
+        return parse_dues_payer_workbook(content)
+    finally:
+        await file.close()
 
 
 def _dues_payer_payload(item: DuesPayer) -> dict:
@@ -75,68 +96,37 @@ def get_admin_dues_payers(
     )
 
 
-@router.post("/admin/import")
-async def import_dues_payers(
+@router.post("/admin/roster/import")
+async def import_dues_payer_roster(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    try:
-        if Path(file.filename or "").suffix.lower() != ".xlsx":
-            raise AppException(
-                status_code=422,
-                message="Only .xlsx dues payer workbooks are supported.",
-                code="INVALID_DUES_WORKBOOK",
-            )
-        content = await file.read(settings.media_upload_max_bytes + 1)
-        if len(content) > settings.media_upload_max_bytes:
-            raise AppException(
-                status_code=413,
-                message="The dues payer workbook is too large.",
-                code="PAYLOAD_TOO_LARGE",
-            )
-        rows = parse_dues_payer_workbook(content)
-    finally:
-        await file.close()
-
-    student_numbers = [row.student_number for row in rows]
-    existing = {
-        item.student_number: item
-        for item in db.scalars(
-            select(DuesPayer).where(DuesPayer.student_number.in_(student_numbers))
-        ).all()
-    }
-    created = 0
-    updated = 0
-    unchanged = 0
-    for row in rows:
-        item = existing.get(row.student_number)
-        if item is None:
-            db.add(
-                DuesPayer(
-                    name=row.name,
-                    major=row.major,
-                    student_number=row.student_number,
-                )
-            )
-            created += 1
-        elif (item.name, item.major) != (row.name, row.major):
-            item.name = row.name
-            item.major = row.major
-            updated += 1
-        else:
-            unchanged += 1
-
-    result = {
-        "created": created,
-        "updated": updated,
-        "unchanged": unchanged,
-        "total_rows": len(rows),
-    }
+    rows = await _parse_workbook_upload(file)
+    result = import_roster(db, rows)
     log_admin_action(
         db,
         actor_id=admin.id,
-        action="dues_payer.import",
+        action="dues_payer.roster_import",
+        target_type="dues_payer",
+        details=result,
+    )
+    db.commit()
+    return success_response(result)
+
+
+@router.post("/admin/import")
+async def import_dues_payer_payments(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    rows = await _parse_workbook_upload(file)
+    result = apply_full_payment_snapshot(db, rows)
+    log_admin_action(
+        db,
+        actor_id=admin.id,
+        action="dues_payer.payment_import",
         target_type="dues_payer",
         details=result,
     )
