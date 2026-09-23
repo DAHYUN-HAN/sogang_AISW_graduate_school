@@ -1,5 +1,6 @@
 import type {
-  AdminDuesPayerItem,
+  AdminDuesPaymentItem,
+  AdminRosterItem,
   DuesPaymentImportResult,
   DuesRosterImportResult,
 } from "../types";
@@ -7,13 +8,13 @@ import type {
 export const DUES_RESET_CONFIRMATION = "납부자 초기화";
 
 export function formatDuesPayer(
-  item: Pick<AdminDuesPayerItem, "id" | "name" | "major" | "student_number">,
+  item: Pick<AdminRosterItem, "id" | "name" | "major" | "student_number">,
 ) {
   return `${item.name} ${item.major} ${item.student_number}`;
 }
 
 export function formatDuesScope(
-  item: Pick<AdminDuesPayerItem, "payment_scope" | "once_board_name">,
+  item: Pick<AdminDuesPaymentItem, "payment_scope" | "once_board_name">,
 ) {
   if (item.payment_scope === "ALL") return "전체 납부";
   if (item.payment_scope === "ONCE") {
@@ -27,7 +28,7 @@ export function formatRosterImportSummary(result: DuesRosterImportResult) {
 }
 
 export function formatPaymentImportSummary(result: DuesPaymentImportResult) {
-  return `총 ${result.total_rows}명 · 전체 납부 전환 ${result.activated}명 · 미납 초기화 ${result.reset}명 · 유지 ${result.unchanged}명`;
+  return `기존 납부 ${result.cleared}명 초기화 · 현재 학기 전체 납부 ${result.registered}명 등록`;
 }
 
 export function isExactDuesResetConfirmation(value: string) {

@@ -33,10 +33,10 @@ test("관리자 원우 상태는 전체·게시판 전용·미납으로 표시�
   assert.equal(formatDuesScope({ payment_scope: "UNPAID", once_board_name: null }), "미납");
 });
 
-test("전체 납부 업로드 결과는 활성·초기화·유지 수를 안내한다", () => {
+test("전체 납부 업로드 결과는 기존 삭제와 신규 등록 건수를 안내한다", () => {
   assert.equal(
-    formatPaymentImportSummary({ activated: 2, reset: 3, unchanged: 4, total_rows: 6 }),
-    "총 6명 · 전체 납부 전환 2명 · 미납 초기화 3명 · 유지 4명",
+    formatPaymentImportSummary({ cleared: 4, registered: 3, total_rows: 3 }),
+    "기존 납부 4명 초기화 · 현재 학기 전체 납부 3명 등록",
   );
 });
 

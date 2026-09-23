@@ -11,6 +11,8 @@ import type {
   AccountDeletionVerifyRequest,
   ApiSuccess,
   AdminDuesPayerItem,
+  AdminDuesPaymentItem,
+  AdminRosterItem,
   AdminReportItem,
   AdminAuditLog,
   AdminStats,
@@ -28,6 +30,7 @@ import type {
   DuesPayerSearchItem,
   DuesPayerWritePayload,
   DuesPaymentImportResult,
+  DuesPaymentWritePayload,
   DuesPaymentResetResult,
   DuesRosterImportResult,
   NotificationItem,
@@ -789,10 +792,25 @@ export const duesPayerApi = {
     const response = await api.get<ApiSuccess<AdminDuesPayerItem[]>>("/dues-payers/admin/payers", { params });
     return response.data;
   },
+  getAdminRoster: async (params?: { q?: string; page?: number; size?: number }) => {
+    const response = await api.get<ApiSuccess<AdminRosterItem[]>>("/dues-payers/admin/roster", { params });
+    return response.data;
+  },
+  getAdminPayments: async (params?: { q?: string; page?: number; size?: number }) => {
+    const response = await api.get<ApiSuccess<AdminDuesPaymentItem[]>>("/dues-payers/admin/payments", { params });
+    return response.data;
+  },
   importRosterWorkbook: (file: File | { uri: string; name: string; type: string }) =>
     postDuesWorkbook<DuesRosterImportResult>("/dues-payers/admin/roster/import", file),
   importPaymentWorkbook: (file: File | { uri: string; name: string; type: string }) =>
-    postDuesWorkbook<DuesPaymentImportResult>("/dues-payers/admin/import", file),
+    postDuesWorkbook<DuesPaymentImportResult>("/dues-payers/admin/payments/import", file),
+  updatePayment: async (rosterMemberId: number, payload: DuesPaymentWritePayload) => {
+    const response = await api.put<ApiSuccess<AdminDuesPaymentItem>>(
+      `/dues-payers/admin/payments/${rosterMemberId}`,
+      payload,
+    );
+    return response.data;
+  },
   createPayer: async (payload: DuesPayerWritePayload) => {
     const response = await api.post<ApiSuccess<AdminDuesPayerItem>>("/dues-payers/admin/payers", payload);
     return response.data;

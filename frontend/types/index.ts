@@ -363,6 +363,24 @@ export type DuesPayerSearchItem = {
   is_paid_for_board: boolean;
 };
 
+export type AdminRosterItem = {
+  id: number;
+  name: string;
+  major: string;
+  student_number: string;
+};
+
+export type AdminDuesPaymentItem = AdminRosterItem & {
+  payment_scope: DuesPaymentScope;
+  once_board_id: number | null;
+  once_board_name: string | null;
+};
+
+export type DuesPaymentWritePayload = {
+  payment_scope: DuesPaymentScope;
+  once_board_id: number | null;
+};
+
 export type AdminDuesPayerItem = {
   id: number;
   name: string;
@@ -390,9 +408,8 @@ export type DuesRosterImportResult = {
 };
 
 export type DuesPaymentImportResult = {
-  activated: number;
-  reset: number;
-  unchanged: number;
+  cleared: number;
+  registered: number;
   total_rows: number;
 };
 
