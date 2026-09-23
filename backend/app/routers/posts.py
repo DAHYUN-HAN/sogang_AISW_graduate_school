@@ -76,7 +76,7 @@ def _participant_label(payer: DuesPayer) -> str:
 def _invalid_dues_payer() -> AppException:
     return AppException(
         status_code=422,
-        message="Select every participant from the dues payer roster.",
+        message="Select every participant from the full student roster.",
         code="INVALID_DUES_PAYER",
     )
 

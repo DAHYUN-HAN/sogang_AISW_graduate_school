@@ -64,6 +64,73 @@ def test_activity_certification_uses_roster_names_in_selected_order(api) -> None
         assert "participant_user_ids" not in post.metadata_json
 
 
+def test_activity_certification_accepts_unpaid_and_current_board_once_participants(api) -> None:
+    board_id = _activity_board(api)
+    with api.session() as db:
+        unpaid = DuesPayer(name="검증미납", major="인공지능", student_number="A74011")
+        once = DuesPayer(
+            name="검증현재행사",
+            major="인공지능",
+            student_number="A74012",
+            once_board_id=board_id,
+        )
+        db.add_all([unpaid, once])
+        db.commit()
+        payer_ids = [unpaid.id, once.id]
+
+    created = api.client.post(
+        f"/api/boards/{board_id}/posts",
+        json=_payload(payer_ids),
+        headers=api.headers["owner"],
+    )
+
+    assert created.status_code == 200
+    with api.session() as db:
+        post = db.get(Post, created.json()["data"]["id"])
+        assert post.metadata_json["participant_dues_payer_ids"] == payer_ids
+        assert post.metadata_json["participants"] == "74기 검증미납, 74기 검증현재행사"
+
+
+def test_activity_participant_snapshot_survives_payment_state_change_during_edit(api) -> None:
+    board_id = _activity_board(api)
+    first_id, second_id = _seed_payers(api)
+    created = api.client.post(
+        f"/api/boards/{board_id}/posts",
+        json=_payload([first_id, second_id]),
+        headers=api.headers["owner"],
+    )
+    assert created.status_code == 200
+
+    with api.session() as db:
+        first = db.get(DuesPayer, first_id)
+        second = db.get(DuesPayer, second_id)
+        first.is_full_paid = True
+        second.once_board_id = board_id
+        db.commit()
+
+    edited = api.client.put(
+        f"/api/posts/{created.json()['data']['id']}",
+        json={
+            "title": "수정된 인증",
+            "content": "수정된 소감",
+            "category": "테스트 활동",
+            "metadata": {
+                "activity_date": "2026.08.12",
+                "participants": "74기 홍길동, 74기 김서강",
+            },
+            "attachment_ids": [1],
+            "is_anonymous": False,
+        },
+        headers=api.headers["owner"],
+    )
+
+    assert edited.status_code == 200
+    with api.session() as db:
+        post = db.get(Post, created.json()["data"]["id"])
+        assert post.metadata_json["participant_dues_payer_ids"] == [first_id, second_id]
+        assert post.metadata_json["participants"] == "74기 홍길동, 74기 김서강"
+
+
 def test_activity_certification_rejects_missing_empty_or_duplicate_payer_ids(api) -> None:
     board_id = _activity_board(api)
     first_id, _ = _seed_payers(api)

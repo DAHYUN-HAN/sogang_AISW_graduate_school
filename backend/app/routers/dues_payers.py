@@ -14,6 +14,7 @@ from app.dues_payer_service import (
     apply_payment_scope,
     import_roster,
     payment_scope,
+    require_activity_dues_board,
 )
 from app.errors import AppException
 from app.models.board import Board
@@ -80,10 +81,18 @@ def _commit_individual_change(db: Session) -> None:
 @router.get("/search")
 def search_dues_payers(
     q: str = Query(..., min_length=1),
+    board_id: int | None = Query(None, ge=1),
     size: int = Query(8, ge=1, le=20),
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
+    if board_id is None:
+        raise AppException(
+            status_code=422,
+            message="Select an active activity certification board.",
+            code="INVALID_DUES_BOARD",
+        )
+    board = require_activity_dues_board(db, board_id)
     trimmed = q.strip()
     if not trimmed:
         return success_response([])
@@ -95,7 +104,15 @@ def search_dues_payers(
         .order_by(DuesPayer.name.asc(), DuesPayer.student_number.asc(), DuesPayer.id.asc())
         .limit(size)
     ).all()
-    return success_response([_dues_payer_payload(item) for item in payers])
+    return success_response(
+        [
+            {
+                **_dues_payer_payload(item),
+                "is_paid_for_board": item.is_full_paid or item.once_board_id == board.id,
+            }
+            for item in payers
+        ]
+    )
 
 
 @router.get("/admin/payers")

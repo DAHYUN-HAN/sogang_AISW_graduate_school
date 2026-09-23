@@ -41,6 +41,7 @@ def _import_payments(api, rows: list[tuple[object, ...]], *, actor: str = "admin
 
 
 def test_admin_roster_import_upserts_by_student_number_and_members_search_name_or_number(api) -> None:
+    board_id = _activity_board(api)
     first = _import_roster(
         api,
         [
@@ -64,22 +65,112 @@ def test_admin_roster_import_upserts_by_student_number_and_members_search_name_o
 
     by_name = api.client.get(
         "/api/dues-payers/search",
-        params={"q": "김민"},
+        params={"q": "김민", "board_id": board_id},
         headers=api.headers["owner"],
     )
     by_number = api.client.get(
         "/api/dues-payers/search",
-        params={"q": "A34011"},
+        params={"q": "A34011", "board_id": board_id},
         headers=api.headers["owner"],
     )
 
     assert by_name.status_code == 200
     assert by_name.json()["data"] == [
-        {"id": 1, "name": "김민준", "major": "인공지능", "student_number": "A74003"}
+        {
+            "id": 1,
+            "name": "김민준",
+            "major": "인공지능",
+            "student_number": "A74003",
+            "is_paid_for_board": False,
+        }
     ]
     # 학번으로는 검색되지 않아야 한다(이름 전용).
     assert by_number.status_code == 200
     assert by_number.json()["data"] == []
+
+
+def test_member_search_returns_all_roster_states_with_board_eligibility_only(api) -> None:
+    current_board_id = _activity_board(api, name="현재 행사", slug="current-activity-dues")
+    other_board_id = _activity_board(api, name="다른 행사", slug="other-activity-dues")
+    with api.session() as db:
+        db.add_all(
+            [
+                DuesPayer(name="검증기존전체", major="인공지능", student_number="A74501", is_full_paid=True),
+                DuesPayer(
+                    name="검증현재행사",
+                    major="인공지능",
+                    student_number="A74502",
+                    once_board_id=current_board_id,
+                ),
+                DuesPayer(
+                    name="검증다른행사",
+                    major="인공지능",
+                    student_number="A74503",
+                    once_board_id=other_board_id,
+                ),
+                DuesPayer(name="검증미납", major="인공지능", student_number="A74504"),
+            ]
+        )
+        db.commit()
+
+    response = api.client.get(
+        "/api/dues-payers/search",
+        params={"q": "검증", "board_id": current_board_id},
+        headers=api.headers["owner"],
+    )
+    by_number = api.client.get(
+        "/api/dues-payers/search",
+        params={"q": "A745", "board_id": current_board_id},
+        headers=api.headers["owner"],
+    )
+
+    assert response.status_code == 200
+    assert [(item["name"], item["is_paid_for_board"]) for item in response.json()["data"]] == [
+        ("검증기존전체", True),
+        ("검증다른행사", False),
+        ("검증미납", False),
+        ("검증현재행사", True),
+    ]
+    assert all(
+        "payment_scope" not in item and "once_board_id" not in item
+        for item in response.json()["data"]
+    )
+    assert by_number.status_code == 200
+    assert by_number.json()["data"] == []
+
+
+def test_member_search_rejects_missing_inactive_ordinary_and_unknown_boards(api) -> None:
+    inactive_board_id = _activity_board(api, slug="inactive-search-dues", is_active=False)
+
+    responses = [
+        api.client.get(
+            "/api/dues-payers/search",
+            params={"q": "검증"},
+            headers=api.headers["owner"],
+        ),
+        api.client.get(
+            "/api/dues-payers/search",
+            params={"q": "검증", "board_id": inactive_board_id},
+            headers=api.headers["owner"],
+        ),
+        api.client.get(
+            "/api/dues-payers/search",
+            params={"q": "검증", "board_id": 2},
+            headers=api.headers["owner"],
+        ),
+        api.client.get(
+            "/api/dues-payers/search",
+            params={"q": "검증", "board_id": 9999},
+            headers=api.headers["owner"],
+        ),
+    ]
+
+    assert [(response.status_code, response.json()["code"]) for response in responses] == [
+        (422, "INVALID_DUES_BOARD"),
+        (422, "INVALID_DUES_BOARD"),
+        (422, "INVALID_DUES_BOARD"),
+        (422, "INVALID_DUES_BOARD"),
+    ]
 
 
 def test_admin_roster_search_is_paginated_and_not_available_to_members(api) -> None:
