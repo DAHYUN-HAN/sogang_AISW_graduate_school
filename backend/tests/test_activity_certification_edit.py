@@ -1,17 +1,17 @@
 import pytest
 
 from app.models.board import Board
-from app.models.dues_payer import DuesPayer
 from app.models.media import PostAttachment
 from app.models.post import Post
+from app.models.student_roster import StudentRosterMember
 
 
 def _create_activity_certification(api, slug="club-activity-edit-test") -> tuple[int, int]:
     with api.session() as db:
         db.add_all(
             [
-                DuesPayer(name="Owner payer", major="AI", student_number="A74001"),
-                DuesPayer(name="Other payer", major="Security", student_number="A74002"),
+                StudentRosterMember(name="Owner payer", major="AI", student_number="A74001"),
+                StudentRosterMember(name="Other payer", major="Security", student_number="A74002"),
             ]
         )
         board = Board(

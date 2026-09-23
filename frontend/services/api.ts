@@ -10,6 +10,8 @@ import type {
   AccountDeletionResult,
   AccountDeletionVerifyRequest,
   ApiSuccess,
+  AdminDuesPaymentItem,
+  AdminRosterItem,
   AdminReportItem,
   AdminAuditLog,
   AdminStats,
@@ -24,8 +26,10 @@ import type {
   EventItem,
   EventPayload,
   FAQItem,
-  DuesPayerImportResult,
-  DuesPayerItem,
+  DuesPayerSearchItem,
+  DuesPaymentImportResult,
+  DuesPaymentWritePayload,
+  DuesRosterImportResult,
   NotificationItem,
   NotificationSettings,
   MediaAsset,
@@ -775,33 +779,46 @@ export const adminApi = {
 };
 
 export const duesPayerApi = {
-  search: async (q: string, size = 8) => {
-    const response = await api.get<ApiSuccess<DuesPayerItem[]>>("/dues-payers/search", {
-      params: { q, size },
+  search: async (q: string, boardId: number, size = 8) => {
+    const response = await api.get<ApiSuccess<DuesPayerSearchItem[]>>("/dues-payers/search", {
+      params: { q, board_id: boardId, size },
     });
     return response.data;
   },
-  getAdminPayers: async (params?: { q?: string; page?: number; size?: number }) => {
-    const response = await api.get<ApiSuccess<DuesPayerItem[]>>("/dues-payers/admin/payers", { params });
+  getAdminRoster: async (params?: { q?: string; page?: number; size?: number }) => {
+    const response = await api.get<ApiSuccess<AdminRosterItem[]>>("/dues-payers/admin/roster", { params });
     return response.data;
   },
-  importWorkbook: async (file: File | { uri: string; name: string; type: string }) => {
-    const formData = new FormData();
-    formData.append("file", file as any);
-    const response = await api.post<ApiSuccess<DuesPayerImportResult>>(
-      "/dues-payers/admin/import",
-      formData,
-      {
-        headers: { "Content-Type": "multipart/form-data" },
-        timeout: MEDIA_UPLOAD_TIMEOUT_MS,
-      },
+  getAdminPayments: async (params?: { q?: string; page?: number; size?: number }) => {
+    const response = await api.get<ApiSuccess<AdminDuesPaymentItem[]>>("/dues-payers/admin/payments", { params });
+    return response.data;
+  },
+  importRosterWorkbook: (file: File | { uri: string; name: string; type: string }) =>
+    postDuesWorkbook<DuesRosterImportResult>("/dues-payers/admin/roster/import", file),
+  importPaymentWorkbook: (file: File | { uri: string; name: string; type: string }) =>
+    postDuesWorkbook<DuesPaymentImportResult>("/dues-payers/admin/payments/import", file),
+  updatePayment: async (rosterMemberId: number, payload: DuesPaymentWritePayload) => {
+    const response = await api.put<ApiSuccess<AdminDuesPaymentItem>>(
+      `/dues-payers/admin/payments/${rosterMemberId}`,
+      payload,
     );
     return response.data;
   },
-  deleteAll: async (confirmation: string) => {
-    const response = await api.post<ApiSuccess<{ deleted: number }>>("/dues-payers/admin/delete-all", {
-      confirmation,
-    });
-    return response.data;
-  },
 };
+
+async function postDuesWorkbook<Result>(
+  path: string,
+  file: File | { uri: string; name: string; type: string },
+) {
+  const formData = new FormData();
+  formData.append("file", file as any);
+  const response = await api.post<ApiSuccess<Result>>(
+    path,
+    formData,
+    {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: MEDIA_UPLOAD_TIMEOUT_MS,
+    },
+  );
+  return response.data;
+}

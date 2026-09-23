@@ -29,7 +29,9 @@ import type { MediaAsset } from "../../../../types";
 import {
   ACTIVITY_PARTICIPANT_GUIDANCE,
   activityBankAccountFieldState,
+  activityParticipantSearchKey,
   activityParticipantSelectionError,
+  activityParticipantTextColor,
   activityParticipantsFromMetadata,
   activitySourcePostIdFromMetadata,
   buildActivityCertificationMetadata,
@@ -447,9 +449,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   }, [boardsRes?.data, boardId, params.boardGroup]);
   const trimmedParticipantQuery = participantQuery.trim();
   const participantSearch = useQuery({
-    queryKey: ["dues-payer-search", trimmedParticipantQuery],
-    queryFn: () => duesPayerApi.search(trimmedParticipantQuery, 8),
-    enabled: isActivity && trimmedParticipantQuery.length > 0,
+    queryKey: activityParticipantSearchKey(boardId, trimmedParticipantQuery),
+    queryFn: () => duesPayerApi.search(trimmedParticipantQuery, boardId, 8),
+    enabled: isActivity && boardId > 0 && trimmedParticipantQuery.length > 0,
     retry: false,
   });
   const activitySourceBoard = useMemo(() => {
@@ -1347,6 +1349,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                         <View style={styles.participantResultBox}>
                           {participantResults.map((participant) => {
                             const selected = selectedParticipants.some((item) => item.id === participant.id);
+                            const participantColor = activityParticipantTextColor(participant);
                             return (
                               <Pressable
                                 key={participant.id}
@@ -1359,8 +1362,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                                 </View>
                                 <View style={styles.participantTextBlock}>
                                   {/* Figma 참가자검색행: 학번은 노출하지 않고 "72기 이름" + 전공만 표시한다. */}
-                                  <Text style={styles.participantName}>{formatActivityParticipant(participant)}</Text>
-                                  {participant.major ? <Text style={styles.participantMeta}>{participant.major}</Text> : null}
+                                  <Text style={[styles.participantName, { color: participantColor }]}>
+                                    {formatActivityParticipant(participant)}
+                                  </Text>
+                                  {participant.major ? (
+                                    <Text style={[styles.participantMeta, { color: participantColor }]}>{participant.major}</Text>
+                                  ) : null}
                                 </View>
                                 {selected ? (
                                   <Ionicons name="checkmark-circle" size={28} color={COLORS.primary} />

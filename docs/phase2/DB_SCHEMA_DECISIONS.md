@@ -1,6 +1,6 @@
 # Phase 2 DB Schema Decisions
 
-Status: implemented baseline through `0024_faq_attachments`, checked 2026-08-04
+Status: implemented baseline through `0029_roster_dues_separation`, checked 2026-09-23
 
 ## 1. Core Decisions
 
@@ -89,18 +89,33 @@ Indexes:
 - Index `role`
 - Index `is_active`
 
-### `dues_payers`
+### `student_roster`
 
-The current dues-payer roster is intentionally independent from `users`; there is no user foreign key and no year/semester dimension.
+The permanent student roster is intentionally independent from `users`; it records everyone who passed through the school and has no user foreign key or year/semester dimension.
 
 - `id INTEGER PRIMARY KEY`
 - `student_number VARCHAR(20) NOT NULL`, unique, normalized to `^A\d{5}$`
 - `name VARCHAR(50) NOT NULL`, indexed for search
-- `major VARCHAR(100) NOT NULL`
+- `major VARCHAR(100) NOT NULL`, indexed for search
 - `created_at DATETIME NOT NULL`
 - `updated_at DATETIME NOT NULL`
 
-The roster is populated only through the admin XLSX upsert. Raw workbooks and row-level PII never belong in migrations, seed data, or operational audit details. Activity-certification metadata stores ordered `participant_dues_payer_ids` plus a server-generated `participants` name snapshot, so clearing the current roster does not erase historical participant names.
+The headerless roster XLSX is an identity upsert keyed by student number: existing rows overwrite name/major, new rows are inserted, omitted rows are retained, and no payment row is created or changed.
+
+### `dues_payments`
+
+The current-term payment table is a sparse child of the permanent roster. No row means `UNPAID`.
+
+- `id INTEGER PRIMARY KEY`
+- `roster_member_id INTEGER NOT NULL REFERENCES student_roster(id) ON DELETE CASCADE`, unique
+- `scope VARCHAR(10) NOT NULL`, restricted to `ALL` or `ONCE`
+- `once_board_id INTEGER NULL REFERENCES boards(id) ON DELETE CASCADE`, indexed
+- `created_at DATETIME NOT NULL`
+- `updated_at DATETIME NOT NULL`
+
+The check constraint requires `ALL` with no board or `ONCE` with exactly one board. Deleting an activity board removes its board-specific payment row, so that roster member becomes `UNPAID`. Migration `0029_roster_dues_separation` copies every legacy identity into `student_roster`, copies only legacy `ALL`/`ONCE` states into `dues_payments`, preserves existing IDs, synchronizes PostgreSQL sequences, and removes `dues_payers`.
+
+Each payment XLSX upload first validates every name/student-number pair against the roster, then atomically deletes all existing current-term `ALL` and `ONCE` rows and inserts the uploaded rows as `ALL`. Administrators may individually set a roster member to `ALL`, one-board `ONCE`, or `UNPAID`; identity fields are read-only in this workflow. Every administrator roster/payment mutation holds the same PostgreSQL transaction advisory lock. Raw workbooks and row-level PII never belong in migrations, seed data, or operational audit details. Activity-certification metadata stores ordered roster IDs in `participant_dues_payer_ids` plus a server-generated `participants` name snapshot, so later roster or payment changes do not erase historical participant names. Payment state controls only the black/gray member presentation for the requested activity board; it is not an activity-post storage gate.
 
 ### `boards`
 
@@ -607,7 +622,7 @@ The receipt deliberately has no user ID, email, IP address, free-form reason, or
 
 ## 6. Existing Database Bootstrap Safety
 
-- The Alembic graph must have one head, currently `0024_faq_attachments`.
+- The Alembic graph must have one head, currently `0029_roster_dues_separation`.
 - A database without `alembic_version` is never stamped directly to `head` merely because a few tables or columns exist.
 - The bootstrap helper may stamp only a revision whose complete, versioned schema signature is recognized. Known legacy signatures and their target revisions are covered by tests.
 - An unknown or mixed signature fails without changing data and prints recovery guidance: back up the database, inspect the schema, and perform an explicit operator-approved stamp/migration.
@@ -621,5 +636,10 @@ Checked on 2026-08-02: a clean isolated PostgreSQL database upgraded to `0022`, 
 Checked on 2026-08-04: the local backend suite passes 203 tests and Alembic reports the single
 `0024_faq_attachments` head. The `0024` migration has SQLite create/drop regression coverage and
 an isolated PostgreSQL database passed clean upgrade plus `0023`→`0024`→`0023`→`0024` rehearsal.
+
+Checked on 2026-09-23: the local backend suite passes 447 tests with 1 skip and Alembic reports the
+single `0029_roster_dues_separation` head. Migration coverage verifies identity/scope preservation and
+board-delete behavior on SQLite. A live PostgreSQL `0029` rehearsal is pending because Docker Desktop
+was unavailable; the exact environmental limitation is recorded in the roster/payment QA report.
 
 - 2026-09-17 WP5/WP9: club operational lifecycle uses the existing `posts.metadata` JSONB field on `club-promo` guides: `club_operation_status` is `active` or `ended`, independent of recruitment category/status. Missing legacy values mean active; no table, column, migration, or bulk backfill is required. The API validates explicit writes and preserves the value when older clients omit the key. Existing `activity_source_post_id` links retain historical certification access after operation ends.

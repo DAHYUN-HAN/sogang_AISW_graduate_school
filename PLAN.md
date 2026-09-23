@@ -55,7 +55,7 @@ Phase 2 converted the Notion planning into concrete API, DB, auth, route, and im
 | --- | --- | --- | --- |
 | Core feature B: notifications/notices | Implemented; device delivery QA pending | 2026-06-01 to 2026-06-14 | Notice workflows, notification triggers/settings, Expo push token/provider adapter, ticket/receipt tracking, and local fallback exist. Production FCM/APNs credentials and physical-device delivery remain. |
 | Core feature C: schedule/events | Implemented; device QA pending | 2026-06-14 to 2026-06-21 | Event API, Home calendar, day/detail screens, admin CRUD, and idempotent D-day/D-1 hooks exist. Recurring events are deferred to v1.1. |
-| Admin page development | Implemented; QA pending | 2026-06-14 to 2026-06-25 | Admin surface covers launch-critical users, the independent dues-payer roster, notices, posts/comments, reports, FAQs, events, registration settings, and statistics. Keep both the protected route and backend admin dependencies. |
+| Admin page development | Implemented; roster/payment split visually verified | 2026-06-14 to 2026-06-25 | Admin exposes separate `원우 명부` and `원우회비` tabs. The permanent roster import inserts new student numbers and overwrites name/major for existing student numbers without deleting omitted alumni. Each current-term payment import validates the whole workbook, then replaces every prior `ALL`/`ONCE` payment with the uploaded rows as `ALL`; individual payment editing assigns `ALL`, one activity-board `ONCE`, or `UNPAID` while identity remains read-only. Keep both the protected route and backend admin dependencies. Evidence is recorded under `docs/qa/evidence/roster-dues-separation/`. |
 | Frontend-backend full integration | Local P0 hardening passed; store/device QA pending | 2026-06-21 to 2026-06-28 | Current-head PostgreSQL/API/production-Compose/web checks and an unsigned Android release-bundle rehearsal pass. Physical Android/iOS, production credentials, signed native release builds, live hosting, and store submission inputs remain. |
 
 ## Product Scope To Preserve
@@ -86,7 +86,7 @@ P0 features:
 - Search keyword highlighting.
 - IA redesign.
 - Quick menu.
-- Independent current dues-payer roster for subsidy activity-certification participants, with admin XLSX upsert and permanent-delete safeguards.
+- Implemented a permanent student roster plus a separate replaceable current-term payment table for subsidy activity-certification participants. Admin identity XLSX upserts never delete omitted alumni; each payment XLSX replaces all prior `ALL`/`ONCE` rows, while individual editing assigns `ALL`, one-board `ONCE`, or `UNPAID`. Board-specific black/gray presentation keeps every roster row selectable.
 
 P1 features:
 
@@ -142,7 +142,7 @@ Phase 5 QA can start when:
 - All P0 mobile routes are reachable.
 - Guest/user/admin permissions, mutual-aid owner scope, and media access are verified by API tests.
 - Backend compile checks and frontend typecheck pass.
-- Alembic has one head at `0024_faq_attachments`; the local migration/model regression and isolated PostgreSQL `0023`→`0024`→`0023`→`0024` rehearsal pass.
+- Alembic has one head at `0029_roster_dues_separation`. The local migration/model regression passes; the latest isolated PostgreSQL rehearsal passed through `0024`, while the `0029` PostgreSQL rehearsal remains pending because Docker Desktop was unavailable during the 2026-09-23 verification.
 - Known issues are tagged as `Phase 5 QA`, `v1.1`, or `blocked`.
 
 Checked on 2026-07-27: these local entry conditions pass. This is not a store-release approval. Signed mobile artifacts, physical-device checks, live-host checks, the 18 external release inputs, and the frontend dependency-risk decision remain open and are tracked in `CODEX.md`.

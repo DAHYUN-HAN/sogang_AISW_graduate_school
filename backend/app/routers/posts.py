@@ -13,11 +13,11 @@ from app.deps import can_read_board, can_write_board, get_current_user, get_db, 
 from app.errors import AppException
 from app.models.board import Board
 from app.models.bookmark import Bookmark
-from app.models.dues_payer import DuesPayer
 from app.models.like import Like
 from app.models.media import MediaAsset, PostAttachment
 from app.models.post import Post
 from app.models.post_extension import PostMutualAid, PostSuggestion
+from app.models.student_roster import StudentRosterMember
 from app.models.user import User
 from app.models.user_block import UserBlock
 from app.notifications import (
@@ -63,7 +63,7 @@ def _visible_post_content(post: Post, board: Board) -> str:
     return content
 
 
-def _participant_label(payer: DuesPayer) -> str:
+def _participant_label(payer: StudentRosterMember) -> str:
     # 학번 A73006의 A 다음 두 자리가 기수 → "73기 홍길동"으로 표기한다.
     # ponytail: 기수 2자리(99기까지)는 학번 체계(A+5자리)의 한계 — 100기부터는 학번 형식이
     # 바뀌어야 하며, 그 경우 이 규칙에 안 걸려 이름만 표기된다(오파싱 없음). 형식 확정 시 갱신.
@@ -76,7 +76,7 @@ def _participant_label(payer: DuesPayer) -> str:
 def _invalid_dues_payer() -> AppException:
     return AppException(
         status_code=422,
-        message="Select every participant from the dues payer roster.",
+        message="Select every participant from the full student roster.",
         code="INVALID_DUES_PAYER",
     )
 
@@ -230,7 +230,9 @@ def _canonical_activity_metadata(
 
     payers_by_id = {
         payer.id: payer
-        for payer in db.scalars(select(DuesPayer).where(DuesPayer.id.in_(payer_ids))).all()
+        for payer in db.scalars(
+            select(StudentRosterMember).where(StudentRosterMember.id.in_(payer_ids))
+        ).all()
     }
     if len(payers_by_id) != len(payer_ids):
         raise _invalid_dues_payer()
@@ -766,18 +768,16 @@ def _highlight(text: str, keyword: str | None) -> str:
 
 def _post_attachments(
     db: Session,
-    post: Post,
+    post_id: int,
     board: Board,
     current_user: User,
     *,
     include_evidence: bool = False,
 ) -> list[dict]:
-    if board.board_type == "mutual_aid" and current_user.role != "admin" and not include_evidence:
-        return []
     rows = db.execute(
         select(PostAttachment, MediaAsset)
         .join(MediaAsset, MediaAsset.id == PostAttachment.media_id)
-        .where(PostAttachment.post_id == post.id)
+        .where(PostAttachment.post_id == post_id)
         .order_by(PostAttachment.sort_order.asc(), PostAttachment.id.asc())
     ).all()
     return [
@@ -790,7 +790,11 @@ def _post_attachments(
             "is_private": media.is_private,
         }
         for _, media in rows
-        if include_evidence or not media.is_private or media.owner_id == current_user.id or current_user.role == "admin"
+        if include_evidence
+        or not media.is_private
+        or board.board_type == "mutual_aid"
+        or media.owner_id == current_user.id
+        or current_user.role == "admin"
     ]
 
 
@@ -800,6 +804,8 @@ def _replace_attachments(
     attachment_ids: list[int],
     current_user: User,
     evidence_link: str | None = None,
+    *,
+    preserve_existing_when_empty: bool = False,
 ) -> None:
     post = db.get(Post, post_id)
     board = db.get(Board, post.board_id) if post is not None else None
@@ -1485,6 +1491,7 @@ def update_post(
         _upsert_suggestion_extension(db, post, target_board, payload.category)
         _upsert_mutual_aid_extension(db, post, target_board, payload.category, normalized_metadata)
     if payload.attachment_ids is not None:
+        incoming_evidence_link = _evidence_link(normalized_metadata)
         _replace_attachments(
             db,
             post.id,

@@ -38,7 +38,8 @@ import AdminBoardManagementNavigator, {
   type AdminBoardNavigationIntent,
 } from "../../components/admin/AdminBoardManagementNavigator";
 import AdminBoardSettingsPanel, { adminBoardPermissionOptions } from "../../components/admin/AdminBoardSettingsPanel";
-import DuesPayerSection from "../../components/admin/DuesPayerSection";
+import DuesPaymentSection from "../../components/admin/DuesPaymentSection";
+import DuesRosterSection from "../../components/admin/DuesRosterSection";
 import AdminPostDeleteConfirm from "../../components/admin/AdminPostDeleteConfirm";
 import AdminSaveSuccessModal from "../../components/admin/AdminSaveSuccessModal";
 import MediaImage, { MediaImageBackground } from "../../components/MediaImage";
@@ -170,7 +171,7 @@ const eventSchema = z.object({
 type EventForm = z.infer<typeof eventSchema>;
 type AdminBoardsQueryData = ApiSuccess<Board[]>;
 type OptimisticManagedBoard = { board: Board; insertedGeneration: number };
-type AdminSection = "dashboard" | "banners" | "boardManagement" | "accounts" | "duesPayers" | "reports" | "registration";
+type AdminSection = "dashboard" | "banners" | "boardManagement" | "accounts" | "studentRoster" | "duesPayments" | "reports" | "registration";
 type AdminPostMode = "all" | "notice" | "pinned";
 type SuggestionAdminFilter = "received" | "answered" | "all";
 type IconName = keyof typeof Ionicons.glyphMap;
@@ -324,7 +325,8 @@ const SECTIONS: { key: AdminSection; label: string; icon: IconName }[] = [
   { key: "banners", label: "배너", icon: "albums-outline" },
   { key: "boardManagement", label: "게시판 관리", icon: "grid-outline" },
   { key: "accounts", label: "계정", icon: "people-outline" },
-  { key: "duesPayers", label: "원우회비", icon: "receipt-outline" },
+  { key: "studentRoster", label: "원우 명부", icon: "people-circle-outline" },
+  { key: "duesPayments", label: "원우회비", icon: "receipt-outline" },
   { key: "reports", label: "신고", icon: "flag-outline" },
   { key: "registration", label: "가입 설정", icon: "person-add-outline" },
 ];
@@ -4646,7 +4648,8 @@ export default function AdminScreen() {
           </View>
         ) : null}
 
-        {section === "duesPayers" ? <DuesPayerSection /> : null}
+        {section === "studentRoster" ? <DuesRosterSection /> : null}
+        {section === "duesPayments" ? <DuesPaymentSection /> : null}
 
         {section === "reports" ? (
           <View style={{ gap: 12 }}>

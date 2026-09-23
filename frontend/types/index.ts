@@ -353,17 +353,44 @@ export type AdminUserItem = {
   privacy_consented_at?: string | null;
 };
 
-export type DuesPayerItem = {
+export type DuesPaymentScope = "ALL" | "ONCE" | "UNPAID";
+
+export type DuesPayerSearchItem = {
+  id: number;
+  name: string;
+  major: string;
+  student_number: string;
+  is_paid_for_board: boolean;
+};
+
+export type AdminRosterItem = {
   id: number;
   name: string;
   major: string;
   student_number: string;
 };
 
-export type DuesPayerImportResult = {
+export type AdminDuesPaymentItem = AdminRosterItem & {
+  payment_scope: DuesPaymentScope;
+  once_board_id: number | null;
+  once_board_name: string | null;
+};
+
+export type DuesPaymentWritePayload = {
+  payment_scope: DuesPaymentScope;
+  once_board_id: number | null;
+};
+
+export type DuesRosterImportResult = {
   created: number;
   updated: number;
   unchanged: number;
+  total_rows: number;
+};
+
+export type DuesPaymentImportResult = {
+  cleared: number;
+  registered: number;
   total_rows: number;
 };
 

@@ -4,6 +4,8 @@ import type { PostListItem } from "../types";
 
 import {
   ACTIVITY_PARTICIPANT_GUIDANCE,
+  activityParticipantSearchKey,
+  activityParticipantTextColor,
   activityBankAccountFieldState,
   activityCertificationBadgeLabel,
   activityCertificationPreview,
@@ -19,9 +21,19 @@ import {
   formatActivityParticipant,
 } from "../utils/activityCertification";
 
-test("참가자 안내는 이름 색상 구분과 본인 추가를 설명한다", () => {
-  assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /검정 납부 · 회색 미납 · 주황 1회 납부\(5만원\)/);
+test("현재 게시판 납부 효력은 검정과 회색 두 색으로만 표시한다", () => {
+  assert.equal(activityParticipantTextColor({ is_paid_for_board: true }), "#212429");
+  assert.equal(activityParticipantTextColor({ is_paid_for_board: false }), "#8A919C");
+  assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /검정.*납부.*회색.*미납/);
   assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /본인도 검색해서 추가해주세요/);
+  assert.doesNotMatch(ACTIVITY_PARTICIPANT_GUIDANCE, /주황|5만원|1회 납부/);
+});
+
+test("참가자 검색 캐시는 활동 게시판별로 분리한다", () => {
+  assert.notDeepEqual(
+    activityParticipantSearchKey(12, "검증"),
+    activityParticipantSearchKey(13, "검증"),
+  );
 });
 
 test("스터디 활동 인증 목록은 카드 배지를 숨긴다", () => {

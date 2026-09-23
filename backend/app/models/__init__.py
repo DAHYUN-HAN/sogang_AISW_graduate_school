@@ -17,4 +17,5 @@ from app.models.report import Report
 from app.models.user_block import UserBlock
 from app.models.rate_limit import RateLimitBucket
 from app.models.registration import MajorOption, PrivacyPolicyVersion
-from app.models.dues_payer import DuesPayer
+from app.models.student_roster import StudentRosterMember
+from app.models.dues_payment import DuesPayment

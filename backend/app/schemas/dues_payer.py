@@ -1,7 +1,21 @@
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
-class DuesPayerDeleteRequest(BaseModel):
+PaymentScope = Literal["ALL", "ONCE", "UNPAID"]
+
+
+class DuesPaymentWriteRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    confirmation: str = Field(min_length=1, max_length=20)
+    payment_scope: PaymentScope
+    once_board_id: int | None = Field(default=None, ge=1)
+
+    @model_validator(mode="after")
+    def validate_scope(self):
+        if self.payment_scope == "ONCE" and self.once_board_id is None:
+            raise ValueError("ONCE requires once_board_id")
+        if self.payment_scope != "ONCE" and self.once_board_id is not None:
+            raise ValueError("once_board_id is allowed only for ONCE")
+        return self

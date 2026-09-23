@@ -144,7 +144,7 @@ Checklist:
 
 2026-07-27 implementation addendum:
 
-- Current Alembic head is `0024_faq_attachments`.
+- At the 2026-07-27 checkpoint, the Alembic head was `0024_faq_attachments`; later addenda supersede it.
 - Account deletion uses server-verified current-password hard deletion and a non-enumerating public email flow; it is not account deactivation.
 - SQLite and isolated PostgreSQL each pass 104/104 backend tests.
 - Local production Compose, web deep-link, migration, and backup/restore rehearsals pass.
@@ -159,6 +159,15 @@ tests, and operator documentation belong in Git.
 `0024_faq_attachments`. Local attachment sources are copied into protected persistent storage and
 verified with a DB/filesystem manifest. An isolated PostgreSQL database passed clean upgrade plus
 `0023`→`0024`→`0023`→`0024` rehearsal, and a full local-data review passed API and web rendering.
+
+2026-09-23 roster/payment addendum: migration `0029_roster_dues_separation` replaces the combined
+`dues_payers` table with permanent `student_roster` identities and sparse current-term
+`dues_payments`. Delivery order was migration/model coverage, atomic roster/payment services,
+separate admin/member API contracts, activity-post validation, client contracts, then the two admin
+tabs and native-width visual verification. The roster import is a non-destructive identity upsert;
+the payment import validates first and then replaces every prior `ALL`/`ONCE` row. SQLite migration
+coverage and the full backend/frontend suites passed; a live PostgreSQL Alembic rehearsal remains an
+environmental follow-up because Docker Desktop was unavailable during this local verification.
 
 ## Recommended First Pull Requests
 

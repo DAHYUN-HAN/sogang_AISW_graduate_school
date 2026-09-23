@@ -6,11 +6,12 @@ from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
-class DuesPayer(Base):
-    __tablename__ = "dues_payers"
+class StudentRosterMember(Base):
+    __tablename__ = "student_roster"
     __table_args__ = (
-        UniqueConstraint("student_number", name="uq_dues_payers_student_number"),
-        Index("ix_dues_payers_name", "name"),
+        UniqueConstraint("student_number", name="uq_student_roster_student_number"),
+        Index("ix_student_roster_name", "name"),
+        Index("ix_student_roster_major", "major"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

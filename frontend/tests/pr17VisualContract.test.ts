@@ -88,7 +88,9 @@ test("공식 답변은 PR 전용 이미지, 빈 대표 이미지는 벡터 아�
 });
 
 test("활동 인증 참가자 검색 결과는 학번을 노출하지 않고 기수+이름과 전공만 표시한다", () => {
-  assert.match(create, /<Text style=\{styles\.participantName\}>\{formatActivityParticipant\(participant\)\}<\/Text>/);
-  assert.match(create, /\{participant\.major \? <Text style=\{styles\.participantMeta\}>\{participant\.major\}<\/Text> : null\}/);
+  assert.match(create, /queryKey: activityParticipantSearchKey\(boardId, trimmedParticipantQuery\)/);
+  assert.match(create, /const participantColor = activityParticipantTextColor\(participant\)/);
+  assert.match(create, /<Text style=\{\[styles\.participantName, \{ color: participantColor \}\]\}>/);
+  assert.match(create, /<Text style=\{\[styles\.participantMeta, \{ color: participantColor \}\]\}>/);
   assert.doesNotMatch(create, /participantMeta\}>\{\[participant\.major, participant\.student_number\]/);
 });

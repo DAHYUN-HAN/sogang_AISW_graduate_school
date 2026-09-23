@@ -479,8 +479,8 @@ def _mutual_aid_evidence_access(db: Session, media: MediaAsset, user: User) -> t
             Board.board_type == "mutual_aid",
         )
     ).all()
-    for post, status in rows:
-        if post.author_id != user.id or post.deleted_at is not None or status != "processing":
+    for post, _status in rows:
+        if post.deleted_at is not None:
             continue
         try:
             require_post_read(db, post, user)
@@ -496,10 +496,11 @@ def require_media_access(db: Session, media: MediaAsset | None, user: User) -> M
     if user.role == "admin":
         return media
     # Evidence policy takes precedence even for legacy non-private assets or
-    # assets also referenced by an ordinary post/profile.
-    is_evidence, can_edit_evidence = _mutual_aid_evidence_access(db, media, user)
+    # assets also referenced by an ordinary post/profile. Mutual-aid evidence
+    # follows the post's read policy; editability is checked separately.
+    is_evidence, can_read_evidence = _mutual_aid_evidence_access(db, media, user)
     if is_evidence:
-        if can_edit_evidence:
+        if can_read_evidence:
             return media
         raise AppException(status_code=404, message="Media not found.", code="NOT_FOUND")
     if media.is_private:
