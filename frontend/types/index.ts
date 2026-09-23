@@ -175,6 +175,12 @@ export type PostListItem = {
   } | null;
 };
 
+export type ActivityCertificationParticipantDetail = {
+  id: number | null;
+  label: string;
+  is_paid_for_board: boolean | null;
+};
+
 export type PostDetail = {
   id: number;
   board_id: number;
@@ -189,6 +195,7 @@ export type PostDetail = {
   status: string;
   category?: string;
   activity_source_title?: string | null;
+  activity_participants?: ActivityCertificationParticipantDetail[] | null;
   metadata?: Record<string, unknown>;
   suggestion?: SuggestionDetail | null;
   mutual_aid?: MutualAidDetail | null;

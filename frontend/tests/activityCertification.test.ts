@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { PostListItem } from "../types";
+import * as activityCertification from "../utils/activityCertification";
 
 import {
   ACTIVITY_PARTICIPANT_GUIDANCE,
@@ -21,12 +22,54 @@ import {
   formatActivityParticipant,
 } from "../utils/activityCertification";
 
+type DetailParticipant = {
+  id: number | null;
+  label: string;
+  is_paid_for_board: boolean | null;
+};
+
+const detailParticipants = (
+  activityCertification as typeof activityCertification & {
+    activityDetailParticipants?: (
+      participants: DetailParticipant[] | null | undefined,
+      metadata?: Record<string, unknown> | null,
+    ) => DetailParticipant[];
+  }
+).activityDetailParticipants;
+
 test("현재 게시판 납부 효력은 검정과 회색 두 색으로만 표시한다", () => {
   assert.equal(activityParticipantTextColor({ is_paid_for_board: true }), "#212429");
   assert.equal(activityParticipantTextColor({ is_paid_for_board: false }), "#8A919C");
   assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /검정.*납부.*회색.*미납/);
   assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /본인도 검색해서 추가해주세요/);
   assert.doesNotMatch(ACTIVITY_PARTICIPANT_GUIDANCE, /주황|5만원|1회 납부/);
+});
+
+test("활동인증 상세는 현재 게시판 납부 상태와 이름 순서를 함께 표시한다", () => {
+  assert.ok(detailParticipants, "상세 참가자 표시 변환기가 필요하다");
+  const participants: DetailParticipant[] = [
+    { id: 1, label: "99기 검증미납", is_paid_for_board: false },
+    { id: 2, label: "99기 검증다른행사", is_paid_for_board: false },
+    { id: 3, label: "99기 검증전체", is_paid_for_board: true },
+  ];
+
+  assert.deepEqual(detailParticipants(participants, { participants: "잘못된 폴백" }), participants);
+  assert.equal(activityParticipantTextColor(participants[0]), "#8A919C");
+  assert.equal(activityParticipantTextColor(participants[1]), "#8A919C");
+  assert.equal(activityParticipantTextColor(participants[2]), "#212429");
+});
+
+test("납부 상태를 판별할 수 없는 과거 참가자는 기존 검정색을 유지한다", () => {
+  assert.ok(detailParticipants, "상세 참가자 표시 변환기가 필요하다");
+  const participants = detailParticipants(undefined, {
+    participants: "72기 기존 참가자, 73기 과거 참가자",
+  });
+
+  assert.deepEqual(participants, [
+    { id: null, label: "72기 기존 참가자", is_paid_for_board: null },
+    { id: null, label: "73기 과거 참가자", is_paid_for_board: null },
+  ]);
+  assert.equal(activityParticipantTextColor(participants[0]), "#212429");
 });
 
 test("참가자 검색 캐시는 활동 게시판별로 분리한다", () => {

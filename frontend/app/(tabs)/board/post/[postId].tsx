@@ -44,7 +44,11 @@ import { MediaImageBackground } from "../../../../components/MediaImage";
 import { canDeleteMutualAidRequest, canEditMutualAidRequest } from "../../../../utils/mutualAid";
 import { isAdminUser } from "../../../../utils/permissions";
 import { formatCohortName } from "../../../../utils/userLabel";
-import { activityCertificationBadgeLabel } from "../../../../utils/activityCertification";
+import {
+  activityCertificationBadgeLabel,
+  activityDetailParticipants,
+  activityParticipantTextColor,
+} from "../../../../utils/activityCertification";
 import { activityCertificationDetailHeading } from "../../../../utils/activityDetailPresentation";
 import { activityImageLayoutFromMetadata, resolveActivityImageRule } from "../../../../utils/activityImageLayout";
 import { createPhotoSwipeConfig } from "../../../../utils/photoCarouselSwipe";
@@ -505,6 +509,9 @@ export default function PostDetailScreen() {
   const imageAttachments = post.attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
   const normalizedGalleryIndex = Math.min(galleryIndex, Math.max(imageAttachments.length - 1, 0));
   const isActivityCertification = board?.board_type === "activity_certification";
+  const activityParticipants = isActivityCertification
+    ? activityDetailParticipants(post.activity_participants, metadata)
+    : [];
   const activityImageLayout = activityImageLayoutFromMetadata(board?.metadata?.activity_image_layout);
   const isStudyRecruit = board?.slug === "study-recruit";
   const activityDetailHeading = isActivityCertification
@@ -998,17 +1005,20 @@ export default function PostDetailScreen() {
                 <Text style={styles.certDateText}>{formatBoardDate(metadata.activity_date)}</Text>
               </View>
             ) : null}
-            {typeof metadata.participants === "string" && metadata.participants.trim() ? (
+            {activityParticipants.length > 0 ? (
               <>
                 <Text style={styles.certParticipantLabel}>참가자</Text>
                 <View style={styles.certParticipantList}>
-                  {metadata.participants
-                    .split(",")
-                    .map((name) => name.trim())
-                    .filter(Boolean)
-                    .map((name, index) => (
-                      <View key={`${name}-${index}`} style={styles.certParticipantChip}>
-                        <Text style={styles.certParticipantChipText}>{name}</Text>
+                  {activityParticipants.map((participant, index) => (
+                      <View key={`${participant.id ?? participant.label}-${index}`} style={styles.certParticipantChip}>
+                        <Text
+                          style={[
+                            styles.certParticipantChipText,
+                            { color: activityParticipantTextColor(participant) },
+                          ]}
+                        >
+                          {participant.label}
+                        </Text>
                       </View>
                     ))}
                 </View>

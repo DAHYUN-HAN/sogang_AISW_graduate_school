@@ -13,6 +13,7 @@ from app.deps import can_read_board, can_write_board, get_current_user, get_db, 
 from app.errors import AppException
 from app.models.board import Board
 from app.models.bookmark import Bookmark
+from app.models.dues_payment import DuesPayment
 from app.models.like import Like
 from app.models.media import MediaAsset, PostAttachment
 from app.models.post import Post
@@ -71,6 +72,47 @@ def _participant_label(payer: StudentRosterMember) -> str:
     if len(number) == 6 and number[0] == "A" and number[1:].isdigit():
         return f"{int(number[1:3])}기 {payer.name}"
     return payer.name
+
+
+def _activity_participant_details(db: Session, board: Board, post: Post) -> list[dict] | None:
+    if board.board_type != "activity_certification":
+        return None
+
+    metadata = dict(post.metadata_json or {})
+    raw_labels = metadata.get("participants")
+    labels = (
+        [label.strip() for label in raw_labels.split(",") if label.strip()]
+        if isinstance(raw_labels, str)
+        else []
+    )
+    payer_ids = metadata.get("participant_dues_payer_ids")
+    if (
+        not isinstance(payer_ids, list)
+        or len(payer_ids) != len(labels)
+        or any(not isinstance(payer_id, int) or isinstance(payer_id, bool) for payer_id in payer_ids)
+    ):
+        return [
+            {"id": None, "label": label, "is_paid_for_board": None}
+            for label in labels
+        ]
+
+    payments_by_roster_id = {
+        payment.roster_member_id: payment
+        for payment in db.scalars(
+            select(DuesPayment).where(DuesPayment.roster_member_id.in_(payer_ids))
+        ).all()
+    }
+    return [
+        {
+            "id": payer_id,
+            "label": label,
+            "is_paid_for_board": bool(
+                (payment := payments_by_roster_id.get(payer_id))
+                and (payment.scope == "ALL" or payment.once_board_id == board.id)
+            ),
+        }
+        for payer_id, label in zip(payer_ids, labels, strict=True)
+    ]
 
 
 def _invalid_dues_payer() -> AppException:
@@ -1308,6 +1350,7 @@ def get_post_detail(
             "status": post.status,
             "category": post.category,
             "activity_source_title": activity_source_titles.get(_activity_source_post_id(post.metadata_json)),
+            "activity_participants": _activity_participant_details(db, board, post),
             "metadata": _safe_metadata(
                 post,
                 board,

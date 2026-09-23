@@ -155,6 +155,48 @@ def test_search_derives_board_payment_from_optional_payment_row(api) -> None:
     }
 
 
+def test_activity_certification_detail_exposes_current_board_payment_states(api) -> None:
+    board_id = _activity_board(api)
+    other_board_id = _activity_board(api, slug="other-detail-activity-dues-test")
+    with api.session() as db:
+        unpaid = StudentRosterMember(name="검증미납", major="AI", student_number="A99001")
+        other_once = StudentRosterMember(name="검증다른행사", major="AI", student_number="A99002")
+        all_paid = StudentRosterMember(name="검증전체", major="AI", student_number="A99003")
+        db.add_all([unpaid, other_once, all_paid])
+        db.flush()
+        db.add_all(
+            [
+                DuesPayment(
+                    roster_member_id=other_once.id,
+                    scope="ONCE",
+                    once_board_id=other_board_id,
+                ),
+                DuesPayment(roster_member_id=all_paid.id, scope="ALL"),
+            ]
+        )
+        db.commit()
+        payer_ids = [unpaid.id, other_once.id, all_paid.id]
+
+    created = api.client.post(
+        f"/api/boards/{board_id}/posts",
+        json=_payload(payer_ids),
+        headers=api.headers["owner"],
+    )
+    assert created.status_code == 200
+
+    detail = api.client.get(
+        f"/api/posts/{created.json()['data']['id']}",
+        headers=api.headers["owner"],
+    )
+
+    assert detail.status_code == 200
+    assert detail.json()["data"].get("activity_participants") == [
+        {"id": unpaid.id, "label": "99기 검증미납", "is_paid_for_board": False},
+        {"id": other_once.id, "label": "99기 검증다른행사", "is_paid_for_board": False},
+        {"id": all_paid.id, "label": "99기 검증전체", "is_paid_for_board": True},
+    ]
+
+
 def test_activity_participant_snapshot_survives_payment_state_change_during_edit(api) -> None:
     board_id = _activity_board(api)
     first_id, second_id = _seed_payers(api)

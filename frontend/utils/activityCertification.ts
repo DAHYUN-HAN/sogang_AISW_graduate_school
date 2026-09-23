@@ -1,4 +1,8 @@
-import type { ApiSuccess, DuesPayerSearchItem, PostListItem } from "../types";
+import type {
+  ActivityCertificationParticipantDetail,
+  ApiSuccess,
+  PostListItem,
+} from "../types";
 import { clubOperationStatus } from "./participationGuide";
 
 export type ActivityParticipant = {
@@ -70,11 +74,11 @@ export const ACTIVITY_PARTICIPANT_PAID_COLOR = "#212429";
 export const ACTIVITY_PARTICIPANT_UNPAID_COLOR = "#8A919C";
 
 export function activityParticipantTextColor(
-  participant: Pick<DuesPayerSearchItem, "is_paid_for_board">,
+  participant: { is_paid_for_board: boolean | null },
 ) {
-  return participant.is_paid_for_board
-    ? ACTIVITY_PARTICIPANT_PAID_COLOR
-    : ACTIVITY_PARTICIPANT_UNPAID_COLOR;
+  return participant.is_paid_for_board === false
+    ? ACTIVITY_PARTICIPANT_UNPAID_COLOR
+    : ACTIVITY_PARTICIPANT_PAID_COLOR;
 }
 
 export function activityParticipantSearchKey(boardId: number, query: string) {
@@ -178,6 +182,18 @@ function participantLabels(metadata?: Record<string, unknown> | null) {
   return typeof metadata?.participants === "string"
     ? metadata.participants.split(",").map((label) => label.trim()).filter(Boolean)
     : [];
+}
+
+export function activityDetailParticipants(
+  participants: ActivityCertificationParticipantDetail[] | null | undefined,
+  metadata?: Record<string, unknown> | null,
+): ActivityCertificationParticipantDetail[] {
+  if (Array.isArray(participants) && participants.length > 0) return participants;
+  return participantLabels(metadata).map((label) => ({
+    id: null,
+    label,
+    is_paid_for_board: null,
+  }));
 }
 
 function isUnchangedPersistedSelection(
