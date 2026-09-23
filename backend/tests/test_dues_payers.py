@@ -3,11 +3,14 @@ from io import BytesIO
 import pytest
 from openpyxl import Workbook
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.config import settings
+from app.errors import AppException
 from app.models.audit import OperationalAuditLog
 from app.models.board import Board
 from app.models.dues_payer import DuesPayer
+from app.routers import dues_payers as dues_payers_router
 
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -40,7 +43,7 @@ def _import_payments(api, rows: list[tuple[object, ...]], *, actor: str = "admin
     )
 
 
-def test_admin_roster_import_upserts_by_student_number_and_members_search_name_or_number(api) -> None:
+def test_admin_roster_import_keeps_existing_students_and_adds_only_new_students(api) -> None:
     board_id = _activity_board(api)
     first = _import_roster(
         api,
@@ -52,7 +55,7 @@ def test_admin_roster_import_upserts_by_student_number_and_members_search_name_o
     second = _import_roster(
         api,
         [
-            ("김민준", "인공지능", "a74003"),
+            ("김민준", "데이터사이언스", "a74003"),
             ("이현화", "정보처리", "A34011"),
             ("홍길동", "보안 및 블록체인", "A74099"),
         ],
@@ -61,7 +64,7 @@ def test_admin_roster_import_upserts_by_student_number_and_members_search_name_o
     assert first.status_code == 200
     assert first.json()["data"] == {"created": 2, "updated": 0, "unchanged": 0, "total_rows": 2}
     assert second.status_code == 200
-    assert second.json()["data"] == {"created": 1, "updated": 1, "unchanged": 1, "total_rows": 3}
+    assert second.json()["data"] == {"created": 1, "updated": 0, "unchanged": 2, "total_rows": 3}
 
     by_name = api.client.get(
         "/api/dues-payers/search",
@@ -79,7 +82,7 @@ def test_admin_roster_import_upserts_by_student_number_and_members_search_name_o
         {
             "id": 1,
             "name": "김민준",
-            "major": "인공지능",
+            "major": "데이터사이언스",
             "student_number": "A74003",
             "is_paid_for_board": False,
         }
@@ -165,7 +168,7 @@ def test_member_search_rejects_missing_inactive_ordinary_and_unknown_boards(api)
         ),
     ]
 
-    assert [(response.status_code, response.json()["code"]) for response in responses] == [
+    assert [(response.status_code, response.json().get("code")) for response in responses] == [
         (422, "INVALID_DUES_BOARD"),
         (422, "INVALID_DUES_BOARD"),
         (422, "INVALID_DUES_BOARD"),
@@ -272,39 +275,140 @@ def test_admin_import_accepts_exact_limit_and_rejects_one_byte_over_without_chan
         assert payers[0].student_number == "A74001"
 
 
-def test_exact_confirmation_permanently_deletes_roster_and_audits_counts_without_pii(api) -> None:
-    _import_roster(api, [("홍길동", "인공지능", "A74001"), ("김서강", "보안", "A74002")])
+def test_payment_reset_keeps_roster_clears_all_and_preserves_once(api) -> None:
+    board_id = _activity_board(api)
+    with api.session() as db:
+        db.add_all(
+            [
+                DuesPayer(name="전체납부", major="인공지능", student_number="A74001", is_full_paid=True),
+                DuesPayer(name="행사납부", major="보안", student_number="A74002", once_board_id=board_id),
+                DuesPayer(name="미납", major="데이터", student_number="A74003"),
+            ]
+        )
+        db.commit()
 
     wrong = api.client.post(
-        "/api/dues-payers/admin/delete-all",
-        json={"confirmation": "진짜삭제"},
+        "/api/dues-payers/admin/payments/reset",
+        json={"confirmation": "초기화"},
         headers=api.headers["admin"],
     )
     with api.session() as db:
-        assert len(db.scalars(select(DuesPayer)).all()) == 2
+        assert db.scalar(select(DuesPayer).where(DuesPayer.student_number == "A74001")).is_full_paid is True
 
-    deleted = api.client.post(
-        "/api/dues-payers/admin/delete-all",
-        json={"confirmation": "진짜 삭제"},
+    reset = api.client.post(
+        "/api/dues-payers/admin/payments/reset",
+        json={"confirmation": "납부자 초기화"},
         headers=api.headers["admin"],
     )
 
     assert wrong.status_code == 400
-    assert wrong.json()["code"] == "DUES_DELETE_CONFIRMATION_REQUIRED"
-    assert deleted.status_code == 200
-    assert deleted.json()["data"] == {"deleted": 2}
+    assert wrong.json()["code"] == "DUES_RESET_CONFIRMATION_REQUIRED"
+    assert reset.status_code == 200
+    assert reset.json()["data"] == {"reset": 1}
     with api.session() as db:
-        assert db.scalar(select(DuesPayer)) is None
+        payers = {
+            payer.student_number: payer
+            for payer in db.scalars(select(DuesPayer).order_by(DuesPayer.student_number)).all()
+        }
+        assert len(payers) == 3
+        assert (payers["A74001"].is_full_paid, payers["A74001"].once_board_id) == (False, None)
+        assert (payers["A74002"].is_full_paid, payers["A74002"].once_board_id) == (False, board_id)
+        assert (payers["A74003"].is_full_paid, payers["A74003"].once_board_id) == (False, None)
         logs = db.scalars(
             select(OperationalAuditLog)
             .where(OperationalAuditLog.target_type == "dues_payer")
             .order_by(OperationalAuditLog.id)
         ).all()
         assert [(log.action, log.details) for log in logs] == [
-            ("dues_payer.roster_import", {"created": 2, "updated": 0, "unchanged": 0, "total_rows": 2}),
-            ("dues_payer.delete_all", {"deleted": 2}),
+            ("dues_payer.payment_reset", {"reset": 1}),
         ]
-        assert "홍길동" not in str([(log.action, log.details) for log in logs])
+        assert "전체납부" not in str([(log.action, log.details) for log in logs])
+
+
+def test_dues_mutations_share_one_serialization_gate(api, monkeypatch) -> None:
+    def reject_mutation(_db) -> None:
+        raise AppException(status_code=503, message="locked", code="TEST_DUES_LOCK")
+
+    monkeypatch.setattr(dues_payers_router, "lock_dues_payer_mutation", reject_mutation, raising=False)
+    workbook = _workbook_bytes([("홍길동", "인공지능", "A74001")])
+    responses = [
+        api.client.post(
+            "/api/dues-payers/admin/payers",
+            headers=api.headers["admin"],
+            json={
+                "name": "홍길동",
+                "major": "인공지능",
+                "student_number": "A74001",
+                "payment_scope": "UNPAID",
+                "once_board_id": None,
+            },
+        ),
+        api.client.put(
+            "/api/dues-payers/admin/payers/999",
+            headers=api.headers["admin"],
+            json={
+                "name": "홍길동",
+                "major": "인공지능",
+                "student_number": "A74001",
+                "payment_scope": "UNPAID",
+                "once_board_id": None,
+            },
+        ),
+        api.client.post(
+            "/api/dues-payers/admin/roster/import",
+            files={"file": ("dues.xlsx", workbook, XLSX_MIME)},
+            headers=api.headers["admin"],
+        ),
+        api.client.post(
+            "/api/dues-payers/admin/import",
+            files={"file": ("dues.xlsx", workbook, XLSX_MIME)},
+            headers=api.headers["admin"],
+        ),
+        api.client.post(
+            "/api/dues-payers/admin/payments/reset",
+            json={"confirmation": "납부자 초기화"},
+            headers=api.headers["admin"],
+        ),
+    ]
+
+    assert [(response.status_code, response.json().get("code")) for response in responses] == [
+        (503, "TEST_DUES_LOCK"),
+        (503, "TEST_DUES_LOCK"),
+        (503, "TEST_DUES_LOCK"),
+        (503, "TEST_DUES_LOCK"),
+        (503, "TEST_DUES_LOCK"),
+    ]
+    with api.session() as db:
+        assert db.scalar(select(DuesPayer)) is None
+
+
+def test_payment_reset_requires_admin_and_removed_delete_route_stays_unavailable(api) -> None:
+    with api.session() as db:
+        db.add(DuesPayer(name="전체납부", major="인공지능", student_number="A74001", is_full_paid=True))
+        db.commit()
+
+    member = api.client.post(
+        "/api/dues-payers/admin/payments/reset",
+        json={"confirmation": "납부자 초기화"},
+        headers=api.headers["owner"],
+    )
+    guest = api.client.post(
+        "/api/dues-payers/admin/payments/reset",
+        json={"confirmation": "납부자 초기화"},
+    )
+    removed = api.client.post(
+        "/api/dues-payers/admin/delete-all",
+        json={"confirmation": "진짜 삭제"},
+        headers=api.headers["admin"],
+    )
+
+    assert member.status_code == 403
+    assert guest.status_code == 401
+    assert removed.status_code == 404
+    with api.session() as db:
+        payer = db.scalar(select(DuesPayer).where(DuesPayer.student_number == "A74001"))
+        assert payer is not None
+        assert payer.is_full_paid is True
 
 
 def test_admin_user_api_does_not_expose_or_change_legacy_dues_status(api) -> None:
@@ -320,7 +424,7 @@ def test_admin_user_api_does_not_expose_or_change_legacy_dues_status(api) -> Non
     assert all("dues_status" not in item for item in listing.json()["data"])
 
 
-def test_roster_import_updates_identity_without_changing_payment_scope(api) -> None:
+def test_roster_import_rejects_conflicting_identity_without_changing_existing_roster(api) -> None:
     with api.session() as db:
         db.add(
             DuesPayer(
@@ -335,14 +439,36 @@ def test_roster_import_updates_identity_without_changing_payment_scope(api) -> N
 
     response = _import_roster(api, [("변경이름", "변경전공", "A74001")])
 
-    assert response.status_code == 200
-    assert response.json()["data"] == {"created": 0, "updated": 1, "unchanged": 0, "total_rows": 1}
+    assert response.status_code == 422
+    assert response.json()["code"] == "DUES_ROSTER_IDENTITY_CONFLICT"
     with api.session() as db:
         payer = db.scalar(select(DuesPayer).where(DuesPayer.student_number == "A74001"))
         assert payer is not None
-        assert (payer.name, payer.major) == ("변경이름", "변경전공")
+        assert (payer.name, payer.major) == ("기존이름", "기존전공")
         assert payer.is_full_paid is False
         assert payer.once_board_id == 1
+
+
+def test_roster_import_translates_commit_race_and_rolls_back(api, monkeypatch) -> None:
+    session_class = api.session_factory.class_
+    original_commit = session_class.commit
+
+    def fail_roster_commit(session) -> None:
+        if any(isinstance(item, DuesPayer) for item in session.new):
+            raise IntegrityError("INSERT INTO dues_payers", {}, RuntimeError("simulated race"))
+        original_commit(session)
+
+    monkeypatch.setattr(session_class, "commit", fail_roster_commit)
+
+    response = _import_roster(api, [("신입원우", "인공지능", "A74001")])
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "DUES_ROSTER_IDENTITY_CONFLICT"
+    with api.session() as db:
+        assert db.scalar(select(DuesPayer)) is None
+        assert db.scalar(
+            select(OperationalAuditLog).where(OperationalAuditLog.action == "dues_payer.roster_import")
+        ) is None
 
 
 def _activity_board(api, *, name: str = "스터디 인증", slug: str = "study-dues", is_active: bool = True) -> int:

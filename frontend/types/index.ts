@@ -396,6 +396,10 @@ export type DuesPaymentImportResult = {
   total_rows: number;
 };
 
+export type DuesPaymentResetResult = {
+  reset: number;
+};
+
 export type AdminReportItem = {
   id: number;
   target_type: "post" | "comment";

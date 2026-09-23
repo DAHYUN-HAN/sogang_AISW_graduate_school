@@ -34,7 +34,7 @@ class DuesPayerWriteRequest(BaseModel):
         return self
 
 
-class DuesPayerDeleteRequest(BaseModel):
+class DuesPaymentResetRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    confirmation: str = Field(min_length=1, max_length=20)
+    confirmation: str = Field(min_length=1, max_length=30)

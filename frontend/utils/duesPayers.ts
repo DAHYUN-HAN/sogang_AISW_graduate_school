@@ -4,7 +4,7 @@ import type {
   DuesRosterImportResult,
 } from "../types";
 
-export const DUES_DELETE_CONFIRMATION = "진짜 삭제";
+export const DUES_RESET_CONFIRMATION = "납부자 초기화";
 
 export function formatDuesPayer(
   item: Pick<AdminDuesPayerItem, "id" | "name" | "major" | "student_number">,
@@ -30,6 +30,6 @@ export function formatPaymentImportSummary(result: DuesPaymentImportResult) {
   return `총 ${result.total_rows}명 · 전체 납부 전환 ${result.activated}명 · 미납 초기화 ${result.reset}명 · 유지 ${result.unchanged}명`;
 }
 
-export function isExactDuesDeleteConfirmation(value: string) {
-  return value === DUES_DELETE_CONFIRMATION;
+export function isExactDuesResetConfirmation(value: string) {
+  return value === DUES_RESET_CONFIRMATION;
 }

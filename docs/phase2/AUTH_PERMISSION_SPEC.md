@@ -71,7 +71,7 @@ Implementation:
 | Create regular post | No | Yes | Yes |
 | Create activity certification | No | Yes | Yes |
 | Search current dues-payer roster | No | Yes | Yes |
-| List/delete dues-payer roster | No | No | Yes |
+| List dues-payer roster/reset ALL payments | No | No | Yes |
 | Import roster or ALL-payment snapshot | No | No | Yes |
 | Create/update ALL, ONCE, or UNPAID scope | No | No | Yes |
 | Create study recruitment | No | Yes | Yes |
@@ -114,7 +114,7 @@ Rules:
 - Frontend may hide buttons based on permission, but hidden UI is not security.
 - The `club-promo` and `networking-programs` boards are seeded and migrated with `write_permission = admin`; the post API also applies an explicit admin guard for defense in depth.
 - `study-recruit` and all activity certification boards remain user-writable. Activity bank-account metadata is sensitive and may be read only by admins.
-- Activity-certification participants are resolved only from the independent current student roster. Member-account enrollment, activation, and legacy dues fields grant no participant eligibility. Only admins may list the full roster, import identity or `ALL`-payment XLSX rows, mutate `ALL`/`ONCE`/`UNPAID`, or permanently clear it. Authenticated members receive bounded name-only results plus a board-specific `is_paid_for_board` boolean; raw scope and board assignment are not exposed. `UNPAID` and different-board `ONCE` rows remain selectable, and the post API validates roster existence rather than payment status.
+- Activity-certification participants are resolved only from the independent current student roster. Member-account enrollment, activation, and legacy dues fields grant no participant eligibility. Only admins may list the full roster, add identity rows through the additive roster import, import the `ALL`-payment snapshot, mutate `ALL`/`ONCE`/`UNPAID`, or reset all `ALL` rows to `UNPAID`. The roster and `ONCE` assignments are never deleted by payment reset. Authenticated members receive bounded name-only results plus a board-specific `is_paid_for_board` boolean; raw scope and board assignment are not exposed. `UNPAID` and different-board `ONCE` rows remain selectable, and the post API validates roster existence rather than payment status.
 - Every `council`/`gsa` board is admin-writable unless its board type is `suggestion` or `mutual_aid`.
 - Cohort-leader registration is stored through the admin-only board management API; members can read the configured cohort introductions but cannot create or edit them.
 - Past-council records use a separate admin-only board metadata area. FAQ remains a separate dedicated table/API; neither mutation path is available to members.

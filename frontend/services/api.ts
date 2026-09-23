@@ -28,6 +28,7 @@ import type {
   DuesPayerSearchItem,
   DuesPayerWritePayload,
   DuesPaymentImportResult,
+  DuesPaymentResetResult,
   DuesRosterImportResult,
   NotificationItem,
   NotificationSettings,
@@ -803,8 +804,8 @@ export const duesPayerApi = {
     );
     return response.data;
   },
-  deleteAll: async (confirmation: string) => {
-    const response = await api.post<ApiSuccess<{ deleted: number }>>("/dues-payers/admin/delete-all", {
+  resetPayments: async (confirmation: string) => {
+    const response = await api.post<ApiSuccess<DuesPaymentResetResult>>("/dues-payers/admin/payments/reset", {
       confirmation,
     });
     return response.data;

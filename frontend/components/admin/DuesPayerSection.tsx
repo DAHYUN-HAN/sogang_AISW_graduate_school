@@ -9,12 +9,12 @@ import { useBoardsQuery } from "../../hooks/useApi";
 import { duesPayerApi } from "../../services/api";
 import type { AdminDuesPayerItem, DuesPayerWritePayload } from "../../types";
 import {
-  DUES_DELETE_CONFIRMATION,
+  DUES_RESET_CONFIRMATION,
   formatDuesScope,
   formatPaymentImportSummary,
   formatDuesPayer,
   formatRosterImportSummary,
-  isExactDuesDeleteConfirmation,
+  isExactDuesResetConfirmation,
 } from "../../utils/duesPayers";
 import DuesPayerEditor from "./DuesPayerEditor";
 
@@ -147,9 +147,9 @@ export default function DuesPayerSection() {
   const [editorVisible, setEditorVisible] = useState(false);
   const [editorItem, setEditorItem] = useState<AdminDuesPayerItem | null>(null);
   const [saving, setSaving] = useState(false);
-  const [deleteStep, setDeleteStep] = useState<0 | 1 | 2>(0);
-  const [deleteConfirmation, setDeleteConfirmation] = useState("");
-  const [deleting, setDeleting] = useState(false);
+  const [resetStep, setResetStep] = useState<0 | 1 | 2>(0);
+  const [resetConfirmation, setResetConfirmation] = useState("");
+  const [resetting, setResetting] = useState(false);
 
   const payersQuery = useQuery({
     queryKey: ["admin-dues-payers", appliedSearch, page],
@@ -161,7 +161,7 @@ export default function DuesPayerSection() {
   const activityBoards = (boardsResponse?.data ?? [])
     .flatMap((group) => group.boards)
     .filter((board) => board.is_active && board.board_type === "activity_certification");
-  const busy = uploadingRoster || uploadingPayments || saving || deleting;
+  const busy = uploadingRoster || uploadingPayments || saving || resetting;
 
   const importRosterWorkbook = async () => {
     const file = await pickWorkbook();
@@ -218,20 +218,23 @@ export default function DuesPayerSection() {
     }
   };
 
-  const deleteAll = async () => {
-    if (!isExactDuesDeleteConfirmation(deleteConfirmation)) return;
-    setDeleting(true);
+  const resetPayments = async () => {
+    if (!isExactDuesResetConfirmation(resetConfirmation)) return;
+    setResetting(true);
     try {
-      const response = await duesPayerApi.deleteAll(deleteConfirmation);
+      const response = await duesPayerApi.resetPayments(resetConfirmation);
       await queryClient.invalidateQueries({ queryKey: ["admin-dues-payers"] });
-      Alert.alert("삭제 완료", `${response.data.deleted}명의 원우회비 명부를 삭제했습니다.`);
-      setDeleteStep(0);
-      setDeleteConfirmation("");
+      Alert.alert(
+        "초기화 완료",
+        `${response.data.reset}명의 전체 납부 상태를 미납으로 초기화했습니다. 원우 명부와 특정 행사 1회 납부는 유지됩니다.`,
+      );
+      setResetStep(0);
+      setResetConfirmation("");
       setPage(1);
     } catch (error) {
-      Alert.alert("삭제 실패", apiErrorMessage(error, "원우회비 명부를 삭제하지 못했습니다."));
+      Alert.alert("초기화 실패", apiErrorMessage(error, "원우회비 납부 상태를 초기화하지 못했습니다."));
     } finally {
-      setDeleting(false);
+      setResetting(false);
     }
   };
 
@@ -245,7 +248,7 @@ export default function DuesPayerSection() {
         <View style={{ borderRadius: 6, backgroundColor: COLORS.primary50, padding: 12, gap: 4 }}>
           <Text style={{ color: COLORS.primary900, fontWeight: "900" }}>업로드 규칙</Text>
           <Text style={{ color: COLORS.primary900, fontSize: 13, lineHeight: 19 }}>
-            두 파일 모두 헤더 없이 이름 전공 학번 3열을 사용합니다. 전체 납부자 업로드는 매번 ALL 상태를 새 목록으로 교체하며, 특정 행사 1회 납부자는 목록에서 빠져도 유지됩니다.
+            두 파일 모두 헤더 없이 이름 전공 학번 3열을 사용합니다. 원우 명부는 기존 명부를 유지하면서 새 학번만 추가하고, 기존 학번의 이름·전공이 다르면 업로드를 중단합니다. 전체 납부자 업로드는 매번 ALL 상태를 새 목록으로 교체하며, 특정 행사 1회 납부자는 목록에서 빠져도 유지됩니다.
           </Text>
         </View>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
@@ -340,41 +343,41 @@ export default function DuesPayerSection() {
       ) : null}
 
       <View style={{ borderRadius: 8, borderWidth: 1, borderColor: "#F7B8B8", backgroundColor: COLORS.error50, padding: 16, gap: 10 }}>
-        <Text style={{ color: COLORS.error, fontSize: 17, fontWeight: "900" }}>명부 전체 삭제</Text>
-        {deleteStep === 0 ? (
-          <Button label="전체 삭제 시작" tone="danger" onPress={() => setDeleteStep(1)} disabled={busy} />
+        <Text style={{ color: COLORS.error, fontSize: 17, fontWeight: "900" }}>원우회비 납부자 초기화</Text>
+        {resetStep === 0 ? (
+          <Button label="납부자 초기화 시작" tone="danger" onPress={() => setResetStep(1)} disabled={busy} />
         ) : null}
-        {deleteStep === 1 ? (
+        {resetStep === 1 ? (
           <>
             <Text style={{ color: COLORS.error, lineHeight: 20 }}>
-              정말 삭제하시겠습니까? 삭제한 명부는 복원할 수 없고, 다시 사용하려면 엑셀로 재등록해야 합니다.
+              전체 납부(ALL) 상태를 모두 미납으로 초기화합니다. 원우 명부와 특정 행사 1회 납부(ONCE)는 그대로 유지됩니다.
             </Text>
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <View style={{ flex: 1 }}><Button label="취소" tone="outline" onPress={() => setDeleteStep(0)} /></View>
-              <View style={{ flex: 1 }}><Button label="삭제 확인 계속" tone="danger" onPress={() => setDeleteStep(2)} /></View>
+              <View style={{ flex: 1 }}><Button label="취소" tone="outline" onPress={() => setResetStep(0)} /></View>
+              <View style={{ flex: 1 }}><Button label="초기화 확인 계속" tone="danger" onPress={() => setResetStep(2)} /></View>
             </View>
           </>
         ) : null}
-        {deleteStep === 2 ? (
+        {resetStep === 2 ? (
           <>
             <Text style={{ color: COLORS.error, lineHeight: 20 }}>
-              마지막 확인입니다. 아래 입력란에 {DUES_DELETE_CONFIRMATION}를 정확히 입력하세요.
+              마지막 확인입니다. 아래 입력란에 {DUES_RESET_CONFIRMATION}를 정확히 입력하세요.
             </Text>
             <TextInput
-              value={deleteConfirmation}
-              onChangeText={setDeleteConfirmation}
-              placeholder={DUES_DELETE_CONFIRMATION}
+              value={resetConfirmation}
+              onChangeText={setResetConfirmation}
+              placeholder={DUES_RESET_CONFIRMATION}
               placeholderTextColor={COLORS.muted}
               style={{ minHeight: 44, borderRadius: 6, borderWidth: 1, borderColor: COLORS.error, backgroundColor: COLORS.surface, paddingHorizontal: 12, color: COLORS.text }}
             />
             <View style={{ flexDirection: "row", gap: 8 }}>
-              <View style={{ flex: 1 }}><Button label="취소" tone="outline" onPress={() => { setDeleteStep(0); setDeleteConfirmation(""); }} /></View>
+              <View style={{ flex: 1 }}><Button label="취소" tone="outline" onPress={() => { setResetStep(0); setResetConfirmation(""); }} /></View>
               <View style={{ flex: 1 }}>
                 <Button
-                  label={deleting ? "삭제 중..." : "진짜 삭제"}
+                  label={resetting ? "초기화 중..." : "납부자 초기화"}
                   tone="danger"
-                  disabled={deleting || !isExactDuesDeleteConfirmation(deleteConfirmation)}
-                  onPress={() => void deleteAll()}
+                  disabled={resetting || !isExactDuesResetConfirmation(resetConfirmation)}
+                  onPress={() => void resetPayments()}
                 />
               </View>
             </View>

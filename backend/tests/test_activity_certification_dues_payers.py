@@ -162,27 +162,33 @@ def test_activity_certification_rejects_missing_empty_or_duplicate_payer_ids(api
         assert db.scalar(select(Post).where(Post.board_id == board_id)) is None
 
 
-def test_roster_deletion_does_not_remove_activity_participant_snapshot(api) -> None:
+def test_payment_reset_keeps_activity_participant_snapshot_and_roster_link(api) -> None:
     board_id = _activity_board(api)
     first_id, _ = _seed_payers(api)
+    with api.session() as db:
+        db.get(DuesPayer, first_id).is_full_paid = True
+        db.commit()
     created = api.client.post(
         f"/api/boards/{board_id}/posts",
         json=_payload([first_id]),
         headers=api.headers["owner"],
     )
 
-    deleted = api.client.post(
-        "/api/dues-payers/admin/delete-all",
-        json={"confirmation": "진짜 삭제"},
+    reset = api.client.post(
+        "/api/dues-payers/admin/payments/reset",
+        json={"confirmation": "납부자 초기화"},
         headers=api.headers["admin"],
     )
 
     assert created.status_code == 200
-    assert deleted.status_code == 200
+    assert reset.status_code == 200
     with api.session() as db:
         post = db.get(Post, created.json()["data"]["id"])
         assert post.metadata_json["participants"] == "74기 홍길동"
         assert post.metadata_json["participant_dues_payer_ids"] == [first_id]
+        payer = db.get(DuesPayer, first_id)
+        assert payer is not None
+        assert payer.is_full_paid is False
 
 
 def test_unchanged_legacy_participants_survive_edit_but_changed_names_require_reselection(api) -> None:

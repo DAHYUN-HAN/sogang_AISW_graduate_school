@@ -597,7 +597,7 @@ Query: optional `q`, `page`, and `size` (max `100`). Returns `{id, name, major, 
 
 Auth: admin. Multipart field: `file`, restricted to `.xlsx`.
 
-The first sheet is read without a header as `name`, `major`, `student_number`. A valid workbook atomically creates or updates identity by normalized student number and returns `{created, updated, unchanged, total_rows}`. Existing `ALL`, `ONCE`, and `UNPAID` state is preserved; newly created rows start as `UNPAID`.
+The first sheet is read without a header as `name`, `major`, `student_number`. A valid workbook is additive: it keeps every existing roster row, skips exact normalized-student-number duplicates, and creates only new students as `UNPAID`. If an existing student number has a different name or major, the entire upload returns `422 DUES_ROSTER_IDENTITY_CONFLICT` without changing the roster. Success returns `{created, updated: 0, unchanged, total_rows}` and preserves every existing payment state.
 
 ### POST `/dues-payers/admin/import`
 
@@ -606,6 +606,8 @@ Auth: admin. Multipart field: `file`, restricted to `.xlsx`.
 This endpoint applies an atomic snapshot of `ALL` payers. Every workbook row must exactly match an existing roster row by normalized student number and name or the entire upload returns `422 DUES_IMPORT_ROSTER_MISMATCH`. Matching rows become `ALL` and clear any `once_board_id`; existing `ALL` rows omitted from the workbook become `UNPAID`; omitted `ONCE` rows remain unchanged. Success returns `{activated, reset, unchanged, total_rows}`.
 
 Both imports share the fixed global 10 MiB (`10485760` bytes) file limit used by media uploads. Any partial blank row, non-`A` plus five-digit student number, populated fourth column, duplicate normalized student number, empty workbook, malformed workbook, or oversized upload rejects the entire operation. Parser validation codes are `DUES_IMPORT_EMPTY_VALUE`, `DUES_IMPORT_INVALID_STUDENT_NUMBER`, `DUES_IMPORT_DUPLICATE_STUDENT_NUMBER`, `INVALID_DUES_WORKBOOK`, and `PAYLOAD_TOO_LARGE`. Audit details contain aggregate counts only.
+
+All administrator dues mutations (individual create/update, both imports, and payment reset) share one transaction-scoped PostgreSQL advisory lock so an `ALL` snapshot or reset cannot interleave with another roster/payment write.
 
 ### POST `/dues-payers/admin/payers`
 
@@ -617,11 +619,11 @@ Request: `{name, major, student_number, payment_scope, once_board_id}`. `payment
 
 Auth: admin. Uses the same full request and response contract as create. Missing rows return `404 DUES_PAYER_NOT_FOUND`. Audit details contain only payer ID and scope fields, never name, major, or student number.
 
-### POST `/dues-payers/admin/delete-all`
+### POST `/dues-payers/admin/payments/reset`
 
 Auth: admin
 
-Request: `{ "confirmation": "진짜 삭제" }`. The phrase must match exactly or the API returns `400 DUES_DELETE_CONFIRMATION_REQUIRED`. Success permanently clears the current roster and returns `{deleted}`; restoration requires a new import. Audit details contain counts only, never roster PII.
+Request: `{ "confirmation": "납부자 초기화" }`. The phrase must match exactly or the API returns `400 DUES_RESET_CONFIRMATION_REQUIRED`. Success changes every current `ALL` row to `UNPAID` and returns `{reset}`. Roster identity and `ONCE` assignments are preserved. Audit details contain counts only, never roster PII.
 
 ### GET `/users/me/blocks`
 

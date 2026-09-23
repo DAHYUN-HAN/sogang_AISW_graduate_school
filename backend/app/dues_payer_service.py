@@ -1,10 +1,16 @@
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.dues_payer_import import DuesPayerRow
 from app.errors import AppException
 from app.models.board import Board
 from app.models.dues_payer import DuesPayer
+
+
+def lock_dues_payer_mutation(db: Session) -> None:
+    bind = db.get_bind()
+    if bind.dialect.name == "postgresql":
+        db.execute(text("SELECT pg_advisory_xact_lock(hashtext('aisw-dues-payer-mutations'))"))
 
 
 def payment_scope(item: DuesPayer) -> str:
@@ -63,8 +69,16 @@ def import_roster(db: Session, rows: list[DuesPayerRow]) -> dict[str, int]:
         ).all()
     }
     created = 0
-    updated = 0
     unchanged = 0
+    for row in rows:
+        item = existing.get(row.student_number)
+        if item is not None and (item.name, item.major) != (row.name, row.major):
+            raise AppException(
+                status_code=422,
+                message=f"Row {row.row_number} conflicts with the registered roster identity.",
+                code="DUES_ROSTER_IDENTITY_CONFLICT",
+            )
+
     for row in rows:
         item = existing.get(row.student_number)
         if item is None:
@@ -78,19 +92,26 @@ def import_roster(db: Session, rows: list[DuesPayerRow]) -> dict[str, int]:
                 )
             )
             created += 1
-        elif (item.name, item.major) != (row.name, row.major):
-            item.name = row.name
-            item.major = row.major
-            updated += 1
         else:
             unchanged += 1
 
     return {
         "created": created,
-        "updated": updated,
+        "updated": 0,
         "unchanged": unchanged,
         "total_rows": len(rows),
     }
+
+
+def reset_full_payments(db: Session) -> dict[str, int]:
+    full_payers = db.scalars(
+        select(DuesPayer)
+        .where(DuesPayer.is_full_paid.is_(True))
+        .with_for_update()
+    ).all()
+    for item in full_payers:
+        item.is_full_paid = False
+    return {"reset": len(full_payers)}
 
 
 def apply_full_payment_snapshot(db: Session, rows: list[DuesPayerRow]) -> dict[str, int]:

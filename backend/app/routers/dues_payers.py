@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,9 @@ from app.dues_payer_service import (
     apply_full_payment_snapshot,
     apply_payment_scope,
     import_roster,
+    lock_dues_payer_mutation,
     payment_scope,
+    reset_full_payments,
     require_activity_dues_board,
 )
 from app.errors import AppException
@@ -21,10 +23,18 @@ from app.models.board import Board
 from app.models.dues_payer import DuesPayer
 from app.models.user import User
 from app.response import success_response
-from app.schemas.dues_payer import DuesPayerDeleteRequest, DuesPayerWriteRequest
+from app.schemas.dues_payer import DuesPayerWriteRequest, DuesPaymentResetRequest
 
 
 router = APIRouter()
+
+
+def require_dues_mutation_admin(
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+) -> User:
+    lock_dues_payer_mutation(db)
+    return admin
 
 
 async def _parse_workbook_upload(file: UploadFile):
@@ -147,7 +157,7 @@ def get_admin_dues_payers(
 def create_admin_dues_payer(
     payload: DuesPayerWriteRequest,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_dues_mutation_admin),
 ):
     item = DuesPayer(
         name=payload.name.strip(),
@@ -188,7 +198,7 @@ def update_admin_dues_payer(
     payer_id: int,
     payload: DuesPayerWriteRequest,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_dues_mutation_admin),
 ):
     item = db.scalar(select(DuesPayer).where(DuesPayer.id == payer_id).with_for_update())
     if item is None:
@@ -222,7 +232,7 @@ def update_admin_dues_payer(
 async def import_dues_payer_roster(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_dues_mutation_admin),
 ):
     rows = await _parse_workbook_upload(file)
     result = import_roster(db, rows)
@@ -233,7 +243,15 @@ async def import_dues_payer_roster(
         target_type="dues_payer",
         details=result,
     )
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise AppException(
+            status_code=422,
+            message="The roster changed while the workbook was being imported. Try again.",
+            code="DUES_ROSTER_IDENTITY_CONFLICT",
+        ) from exc
     return success_response(result)
 
 
@@ -241,7 +259,7 @@ async def import_dues_payer_roster(
 async def import_dues_payer_payments(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_dues_mutation_admin),
 ):
     rows = await _parse_workbook_upload(file)
     result = apply_full_payment_snapshot(db, rows)
@@ -256,26 +274,25 @@ async def import_dues_payer_payments(
     return success_response(result)
 
 
-@router.post("/admin/delete-all")
-def delete_all_dues_payers(
-    payload: DuesPayerDeleteRequest,
+@router.post("/admin/payments/reset")
+def reset_admin_dues_payments(
+    payload: DuesPaymentResetRequest,
     db: Session = Depends(get_db),
-    admin: User = Depends(require_admin),
+    admin: User = Depends(require_dues_mutation_admin),
 ):
-    if payload.confirmation != "진짜 삭제":
+    if payload.confirmation != "납부자 초기화":
         raise AppException(
             status_code=400,
-            message="Type 진짜 삭제 to permanently delete the dues payer roster.",
-            code="DUES_DELETE_CONFIRMATION_REQUIRED",
+            message="Type 납부자 초기화 to reset full-payment statuses.",
+            code="DUES_RESET_CONFIRMATION_REQUIRED",
         )
-    deleted_count = db.scalar(select(func.count(DuesPayer.id))) or 0
-    db.execute(delete(DuesPayer))
+    result = reset_full_payments(db)
     log_admin_action(
         db,
         actor_id=admin.id,
-        action="dues_payer.delete_all",
+        action="dues_payer.payment_reset",
         target_type="dues_payer",
-        details={"deleted": deleted_count},
+        details=result,
     )
     db.commit()
-    return success_response({"deleted": deleted_count})
+    return success_response(result)

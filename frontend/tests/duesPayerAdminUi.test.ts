@@ -10,6 +10,8 @@ test("원우회비 관리 화면은 명부와 전체 납부 업로드를 분리�
   assert.match(sectionSource, /전체 납부자 업로드/);
   assert.match(sectionSource, /개별 등록/);
   assert.match(sectionSource, /formatDuesScope/);
+  assert.match(sectionSource, /원우회비 납부자 초기화/);
+  assert.doesNotMatch(sectionSource, /명부 전체 삭제/);
 });
 
 test("원우회비 개별 편집기는 세 가지 납부 범위를 제공한다", () => {
