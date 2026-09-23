@@ -19,6 +19,10 @@ test("원우 명부는 신원 3열 대량 테이블만 제공한다", () => {
 test("원우회비 화면은 업로드 전체 교체와 개별 납부 수정만 제공한다", () => {
   assert.match(paymentSource, /현재 학기 전체 납부자 업로드/);
   assert.match(paymentSource, /기존 전체 납부와 특정 행사 1회 납부가 모두 초기화/);
+  assert.match(paymentSource, /DuesPaymentImportConfirm/);
+  assert.match(paymentSource, /setImportConfirmVisible\(true\)/);
+  assert.match(paymentSource, /setImportConfirmVisible\(false\)[\s\S]*void importPaymentWorkbook\(\)/);
+  assert.doesNotMatch(paymentSource, /Alert\.alert\(\s*"현재 학기 납부자 교체"/);
   assert.match(paymentSource, /updatePayment/);
   assert.doesNotMatch(paymentSource, /납부자 초기화 시작|resetPayments|개별 등록/);
 });

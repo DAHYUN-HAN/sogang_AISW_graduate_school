@@ -270,7 +270,7 @@ def update_current_payment(
         db,
         actor_id=admin.id,
         action="dues_payment.update",
-        target_type="dues_payment",
+        target_type="student_roster",
         target_id=member.id,
         details={
             "roster_member_id": member.id,

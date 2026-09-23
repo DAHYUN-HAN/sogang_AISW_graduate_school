@@ -13,6 +13,7 @@ import {
   pickDuesWorkbook,
 } from "./DuesAdminPrimitives";
 import DuesPaymentEditor from "./DuesPaymentEditor";
+import DuesPaymentImportConfirm from "./DuesPaymentImportConfirm";
 
 
 export default function DuesPaymentSection() {
@@ -22,6 +23,7 @@ export default function DuesPaymentSection() {
   const [page, setPage] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [importConfirmVisible, setImportConfirmVisible] = useState(false);
   const [editorItem, setEditorItem] = useState<AdminDuesPaymentItem | null>(null);
   const paymentsQuery = useQuery({
     queryKey: ["admin-dues-payments", appliedSearch, page],
@@ -58,17 +60,6 @@ export default function DuesPaymentSection() {
     }
   };
 
-  const confirmPaymentImport = () => {
-    Alert.alert(
-      "현재 학기 납부자 교체",
-      "업로드하면 기존 전체 납부와 특정 행사 1회 납부가 모두 초기화됩니다.",
-      [
-        { text: "취소", style: "cancel" },
-        { text: "엑셀 선택", style: "destructive", onPress: () => void importPaymentWorkbook() },
-      ],
-    );
-  };
-
   const savePayment = async (payload: DuesPaymentWritePayload) => {
     if (!editorItem) return;
     setSaving(true);
@@ -101,7 +92,7 @@ export default function DuesPaymentSection() {
           icon="cloud-upload-outline"
           label={uploading ? "납부자 업로드 중..." : "현재 학기 전체 납부자 업로드"}
           disabled={uploading || saving}
-          onPress={confirmPaymentImport}
+          onPress={() => setImportConfirmVisible(true)}
         />
       </View>
 
@@ -157,6 +148,17 @@ export default function DuesPaymentSection() {
           if (!saving) setEditorItem(null);
         }}
         onSave={(payload) => void savePayment(payload)}
+      />
+      <DuesPaymentImportConfirm
+        visible={importConfirmVisible}
+        disabled={uploading || saving}
+        onCancel={() => {
+          if (!uploading && !saving) setImportConfirmVisible(false);
+        }}
+        onConfirm={() => {
+          setImportConfirmVisible(false);
+          void importPaymentWorkbook();
+        }}
       />
     </View>
   );

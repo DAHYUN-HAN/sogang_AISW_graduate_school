@@ -26,7 +26,7 @@ Alembic head: `0029_roster_dues_separation`
 | QA검증미납 (`A99003`) | `UNPAID` | 회색 | `rgb(138, 145, 156)` |
 | QA검증다른행사 (`A99004`) | `ONCE`, 보드 13 | 회색 | `rgb(138, 145, 156)` |
 
-관리자 명부 검색은 네 원우의 이름·학번·전공과 `총 4명`을 확인했다. 원우회비 화면은 전체 납부, 두 개의 보드별 1회 납부, 미납을 함께 표시했고, 업로드가 기존 전체/1회 납부를 모두 초기화한다는 경고 문구를 확인했다.
+관리자 명부 검색은 네 원우의 이름·학번·전공과 `총 4명`을 확인했다. 원우회비 화면은 전체 납부, 두 개의 보드별 1회 납부, 미납을 함께 표시했다. 교차 플랫폼 확인 모달에서 업로드가 기존 전체/1회 납부를 모두 초기화한다는 경고를 확인했고, `엑셀 선택`을 누르면 Chrome DevTools Protocol의 `Page.fileChooserOpened` 이벤트가 실제 발생하는 것도 검증했다.
 
 ## 증빙 화면
 
@@ -37,6 +37,10 @@ Alembic head: `0029_roster_dues_separation`
 ### 현재 학기 원우회비
 
 ![현재 학기 납부 상태와 전체 교체 경고](evidence/roster-dues-separation/admin-dues-payments.png)
+
+### 납부자 전체 교체 확인
+
+![기존 전체 및 1회 납부 초기화 확인 모달](evidence/roster-dues-separation/admin-dues-import-confirm.png)
 
 ### 활동인증 참가자 색상
 
@@ -53,6 +57,7 @@ Alembic head: `0029_roster_dues_separation`
 | `cd backend && python -m compileall -q app alembic` | 종료 코드 0 |
 | `cd backend && python -c "from app.main import app; ..."` | import 성공, route 22개 |
 | `cd backend && python -m alembic heads` | `0029_roster_dues_separation (head)` |
+| Chrome CDP 관리자 업로드 상호작용 | 확인 모달 렌더링, `엑셀 선택`, `Page.fileChooserOpened: true` |
 
 핵심 회귀 테스트는 명부 신원 overwrite가 납부 상태를 건드리지 않는지, 납부 업로드가 기존 `ALL`/`ONCE` 전부를 교체하는지, 검증 실패 시 기존 납부 스냅샷이 유지되는지, 개별 변경이 신원을 수정하지 않는지, 활동인증이 미납 원우도 허용하는지를 포함한다.
 

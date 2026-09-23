@@ -362,6 +362,16 @@ def test_admin_updates_payment_scope_without_editing_identity(api) -> None:
         assert db.scalar(
             select(DuesPayment).where(DuesPayment.roster_member_id == member_id)
         ) is None
+        audit_logs = db.scalars(
+            select(OperationalAuditLog).where(
+                OperationalAuditLog.action == "dues_payment.update"
+            )
+        ).all()
+        assert len(audit_logs) == 3
+        assert all(
+            log.target_type == "student_roster" and log.target_id == member_id
+            for log in audit_logs
+        )
 
 
 def test_invalid_payment_scope_board_and_missing_member_are_normalized(api) -> None:
