@@ -766,18 +766,16 @@ def _highlight(text: str, keyword: str | None) -> str:
 
 def _post_attachments(
     db: Session,
-    post: Post,
+    post_id: int,
     board: Board,
     current_user: User,
     *,
     include_evidence: bool = False,
 ) -> list[dict]:
-    if board.board_type == "mutual_aid" and current_user.role != "admin" and not include_evidence:
-        return []
     rows = db.execute(
         select(PostAttachment, MediaAsset)
         .join(MediaAsset, MediaAsset.id == PostAttachment.media_id)
-        .where(PostAttachment.post_id == post.id)
+        .where(PostAttachment.post_id == post_id)
         .order_by(PostAttachment.sort_order.asc(), PostAttachment.id.asc())
     ).all()
     return [
@@ -790,7 +788,11 @@ def _post_attachments(
             "is_private": media.is_private,
         }
         for _, media in rows
-        if include_evidence or not media.is_private or media.owner_id == current_user.id or current_user.role == "admin"
+        if include_evidence
+        or not media.is_private
+        or board.board_type == "mutual_aid"
+        or media.owner_id == current_user.id
+        or current_user.role == "admin"
     ]
 
 
@@ -800,6 +802,8 @@ def _replace_attachments(
     attachment_ids: list[int],
     current_user: User,
     evidence_link: str | None = None,
+    *,
+    preserve_existing_when_empty: bool = False,
 ) -> None:
     post = db.get(Post, post_id)
     board = db.get(Board, post.board_id) if post is not None else None
@@ -1466,6 +1470,7 @@ def update_post(
         _upsert_suggestion_extension(db, post, target_board, payload.category)
         _upsert_mutual_aid_extension(db, post, target_board, payload.category, normalized_metadata)
     if payload.attachment_ids is not None:
+        incoming_evidence_link = _evidence_link(normalized_metadata)
         _replace_attachments(
             db,
             post.id,

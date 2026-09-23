@@ -561,7 +561,7 @@ def test_post_media_reuses_post_read_policy_and_any_readable_link_allows(api, me
     assert _signed_file_response(api, access).status_code == 200
 
 
-def test_private_mutual_aid_media_allows_only_processing_owner_and_admin(api, media_storage) -> None:
+def test_private_mutual_aid_media_is_readable_by_members_after_attachment(api, media_storage) -> None:
     _, private_directory = media_storage
     uploaded = _upload(api, filename="evidence.pdf", body=PDF_BYTES, content_type="application/pdf", private=True)
     assert uploaded.status_code == 200
@@ -666,16 +666,16 @@ def _evidence_edit_payload(attachment_ids, proof_url=""):
     }
 
 
-def test_evidence_is_visible_only_in_authorized_edit_detail(api, media_storage) -> None:
+def test_evidence_is_visible_in_read_detail_but_edit_detail_still_requires_authorization(api, media_storage) -> None:
     media_id = _attach_evidence(api, actor="admin")
     for actor in ("owner", "other"):
         detail = api.client.get("/api/posts/1", headers=api.headers[actor]).json()["data"]
-        assert detail["attachments"] == []
-        assert "proof_url" not in detail["metadata"]
+        assert [item["id"] for item in detail["attachments"]] == [media_id]
+        assert detail["metadata"]["proof_url"] == "https://example.com/private-proof"
         listed = api.client.get("/api/boards/1/posts", headers=api.headers[actor]).json()["data"]
         listed_post = next(post for post in listed if post["id"] == 1)
-        assert "proof_url" not in listed_post["metadata"]
-        assert listed_post["attachment_count"] == 0
+        assert listed_post["metadata"]["proof_url"] == "https://example.com/private-proof"
+        assert listed_post["attachment_count"] == 1
     for actor in ("owner", "admin"):
         response = api.client.get("/api/posts/1?for_edit=true", headers=api.headers[actor])
         assert response.status_code == 200
@@ -695,7 +695,7 @@ def test_regular_post_edit_detail_requires_owner_or_admin(api) -> None:
 
 @pytest.mark.parametrize("state", ["completed", "rejected", "deleted", "inactive_board", "restricted_board", "missing_extension"])
 @pytest.mark.parametrize("private", [True, False])
-def test_evidence_access_fails_closed_after_request_becomes_uneditable(api, media_storage, state, private) -> None:
+def test_evidence_access_follows_post_readability_after_request_becomes_uneditable(api, media_storage, state, private) -> None:
     media_id = _attach_evidence(api, private=private)
     initial = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"])
     assert initial.status_code == 200
@@ -717,10 +717,15 @@ def test_evidence_access_fails_closed_after_request_becomes_uneditable(api, medi
         media = db.get(MediaAsset, media_id)
         legacy_path = f"/uploads/{media.stored_filename}"
         db.commit()
+    expected_read_status = 404 if state in {"deleted", "inactive_board", "restricted_board"} else 200
     for actor in ("owner", "other"):
-        assert api.client.get(f"/api/media/{media_id}", headers=api.headers[actor]).status_code == 404
-        assert api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers[actor]).status_code == 404
-        assert api.client.get("/api/media/access-url", params={"path": legacy_path}, headers=api.headers[actor]).status_code == 404
+        assert api.client.get(f"/api/media/{media_id}", headers=api.headers[actor]).status_code == expected_read_status
+        assert api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers[actor]).status_code == expected_read_status
+        assert api.client.get(
+            "/api/media/access-url",
+            params={"path": legacy_path},
+            headers=api.headers[actor],
+        ).status_code == expected_read_status
     edit = api.client.get("/api/posts/1?for_edit=true", headers=api.headers["owner"])
     assert edit.status_code in {400, 404}
     update = api.client.put("/api/posts/1", headers=api.headers["owner"], json=_evidence_edit_payload([media_id]))
@@ -730,7 +735,7 @@ def test_evidence_access_fails_closed_after_request_becomes_uneditable(api, medi
     assert _signed_file_response(api, admin).content == PDF_BYTES
 
 
-def test_legacy_public_evidence_cannot_escape_policy_through_regular_post_or_profile(api, media_storage) -> None:
+def test_legacy_public_evidence_remains_readable_when_referenced_elsewhere(api, media_storage) -> None:
     media_id = _attach_evidence(api, private=False)
     with api.session() as db:
         media = db.get(MediaAsset, media_id)
@@ -739,8 +744,8 @@ def test_legacy_public_evidence_cannot_escape_policy_through_regular_post_or_pro
         legacy_path = f"/uploads/{media.stored_filename}"
         db.commit()
     for path in (f"/api/media/{media_id}", f"/api/media/{media_id}/access-url", f"/api/media/{media_id}/download-link"):
-        assert api.client.get(path, headers=api.headers["other"]).status_code == 404
-    assert api.client.get("/api/media/access-url", params={"path": legacy_path}, headers=api.headers["other"]).status_code == 404
+        assert api.client.get(path, headers=api.headers["other"]).status_code == 200
+    assert api.client.get("/api/media/access-url", params={"path": legacy_path}, headers=api.headers["other"]).status_code == 200
     access = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"])
     assert access.status_code == 200
     assert _signed_file_response(api, access).content == PDF_BYTES
