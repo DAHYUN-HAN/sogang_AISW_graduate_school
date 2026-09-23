@@ -381,25 +381,6 @@ export type DuesPaymentWritePayload = {
   once_board_id: number | null;
 };
 
-export type AdminDuesPayerItem = {
-  id: number;
-  name: string;
-  major: string;
-  student_number: string;
-  payment_scope: DuesPaymentScope;
-  is_full_paid: boolean;
-  once_board_id: number | null;
-  once_board_name: string | null;
-};
-
-export type DuesPayerWritePayload = {
-  name: string;
-  major: string;
-  student_number: string;
-  payment_scope: DuesPaymentScope;
-  once_board_id: number | null;
-};
-
 export type DuesRosterImportResult = {
   created: number;
   updated: number;
@@ -411,10 +392,6 @@ export type DuesPaymentImportResult = {
   cleared: number;
   registered: number;
   total_rows: number;
-};
-
-export type DuesPaymentResetResult = {
-  reset: number;
 };
 
 export type AdminReportItem = {

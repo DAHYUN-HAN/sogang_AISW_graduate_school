@@ -5,8 +5,6 @@ import type {
   DuesRosterImportResult,
 } from "../types";
 
-export const DUES_RESET_CONFIRMATION = "납부자 초기화";
-
 export function formatDuesPayer(
   item: Pick<AdminRosterItem, "id" | "name" | "major" | "student_number">,
 ) {
@@ -29,8 +27,4 @@ export function formatRosterImportSummary(result: DuesRosterImportResult) {
 
 export function formatPaymentImportSummary(result: DuesPaymentImportResult) {
   return `기존 납부 ${result.cleared}명 초기화 · 현재 학기 전체 납부 ${result.registered}명 등록`;
-}
-
-export function isExactDuesResetConfirmation(value: string) {
-  return value === DUES_RESET_CONFIRMATION;
 }

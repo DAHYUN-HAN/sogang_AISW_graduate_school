@@ -10,7 +10,6 @@ import type {
   AccountDeletionResult,
   AccountDeletionVerifyRequest,
   ApiSuccess,
-  AdminDuesPayerItem,
   AdminDuesPaymentItem,
   AdminRosterItem,
   AdminReportItem,
@@ -28,10 +27,8 @@ import type {
   EventPayload,
   FAQItem,
   DuesPayerSearchItem,
-  DuesPayerWritePayload,
   DuesPaymentImportResult,
   DuesPaymentWritePayload,
-  DuesPaymentResetResult,
   DuesRosterImportResult,
   NotificationItem,
   NotificationSettings,
@@ -788,10 +785,6 @@ export const duesPayerApi = {
     });
     return response.data;
   },
-  getAdminPayers: async (params?: { q?: string; page?: number; size?: number }) => {
-    const response = await api.get<ApiSuccess<AdminDuesPayerItem[]>>("/dues-payers/admin/payers", { params });
-    return response.data;
-  },
   getAdminRoster: async (params?: { q?: string; page?: number; size?: number }) => {
     const response = await api.get<ApiSuccess<AdminRosterItem[]>>("/dues-payers/admin/roster", { params });
     return response.data;
@@ -809,23 +802,6 @@ export const duesPayerApi = {
       `/dues-payers/admin/payments/${rosterMemberId}`,
       payload,
     );
-    return response.data;
-  },
-  createPayer: async (payload: DuesPayerWritePayload) => {
-    const response = await api.post<ApiSuccess<AdminDuesPayerItem>>("/dues-payers/admin/payers", payload);
-    return response.data;
-  },
-  updatePayer: async (payerId: number, payload: DuesPayerWritePayload) => {
-    const response = await api.put<ApiSuccess<AdminDuesPayerItem>>(
-      `/dues-payers/admin/payers/${payerId}`,
-      payload,
-    );
-    return response.data;
-  },
-  resetPayments: async (confirmation: string) => {
-    const response = await api.post<ApiSuccess<DuesPaymentResetResult>>("/dues-payers/admin/payments/reset", {
-      confirmation,
-    });
     return response.data;
   },
 };

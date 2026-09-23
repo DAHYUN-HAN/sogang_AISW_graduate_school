@@ -2,13 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  DUES_RESET_CONFIRMATION,
   formatDuesScope,
   formatPaymentImportSummary,
   formatDuesPayer,
   formatRosterImportSummary,
-  isExactDuesResetConfirmation,
 } from "../utils/duesPayers";
+import * as duesUtils from "../utils/duesPayers";
 
 test("원우회비 납부자는 이름 전공 학번을 띄어쓰기로 표시한다", () => {
   assert.equal(
@@ -40,9 +39,7 @@ test("전체 납부 업로드 결과는 기존 삭제와 신규 등록 건수를
   );
 });
 
-test("납부자 초기화는 정확한 확인 문구를 입력해야 확정된다", () => {
-  assert.equal(DUES_RESET_CONFIRMATION, "납부자 초기화");
-  assert.equal(isExactDuesResetConfirmation("납부자 초기화"), true);
-  assert.equal(isExactDuesResetConfirmation(" 납부자 초기화 "), false);
-  assert.equal(isExactDuesResetConfirmation("초기화"), false);
+test("수동 초기화 확인 유틸은 더 이상 노출하지 않는다", () => {
+  assert.equal("DUES_RESET_CONFIRMATION" in duesUtils, false);
+  assert.equal("isExactDuesResetConfirmation" in duesUtils, false);
 });

@@ -178,7 +178,7 @@ test("게시판 관련 사이드 메뉴는 게시판 관리 하나만 남는다"
     ["boardManagement", "게시판 관리"],
     ["accounts", "계정"],
     ["studentRoster", "원우 명부"],
-    ["duesPayers", "원우회비"],
+    ["duesPayments", "원우회비"],
     ["reports", "신고"],
     ["registration", "가입 설정"],
   ]) {
