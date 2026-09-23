@@ -345,39 +345,6 @@ def test_roster_import_updates_identity_without_changing_payment_scope(api) -> N
         assert payer.once_board_id == 1
 
 
-def test_payment_snapshot_resets_omitted_all_preserves_once_and_promotes_matches(api) -> None:
-    with api.session() as db:
-        db.add_all(
-            [
-                DuesPayer(name="전체누락", major="인공지능", student_number="A74001", is_full_paid=True),
-                DuesPayer(
-                    name="행사유지",
-                    major="인공지능",
-                    student_number="A74002",
-                    once_board_id=1,
-                ),
-                DuesPayer(
-                    name="행사승격",
-                    major="인공지능",
-                    student_number="A74003",
-                    once_board_id=2,
-                ),
-                DuesPayer(name="전체유지", major="인공지능", student_number="A74004", is_full_paid=True),
-                DuesPayer(name="미납승격", major="인공지능", student_number="A74005"),
-            ]
-        )
-        db.commit()
-
-    response = _import_payments(
-        api,
-        [
-            ("행사승격", "무시되는전공", "A74003"),
-            ("전체유지", "무시되는전공", "A74004"),
-            ("미납승격", "무시되는전공", "A74005"),
-        ],
-    )
-
-
 def _activity_board(api, *, name: str = "스터디 인증", slug: str = "study-dues", is_active: bool = True) -> int:
     with api.session() as db:
         board = Board(
@@ -413,6 +380,39 @@ def _create_payer(
             "payment_scope": payment_scope,
             "once_board_id": once_board_id,
         },
+    )
+
+
+def test_payment_snapshot_resets_omitted_all_preserves_once_and_promotes_matches(api) -> None:
+    with api.session() as db:
+        db.add_all(
+            [
+                DuesPayer(name="전체누락", major="인공지능", student_number="A74001", is_full_paid=True),
+                DuesPayer(
+                    name="행사유지",
+                    major="인공지능",
+                    student_number="A74002",
+                    once_board_id=1,
+                ),
+                DuesPayer(
+                    name="행사승격",
+                    major="인공지능",
+                    student_number="A74003",
+                    once_board_id=2,
+                ),
+                DuesPayer(name="전체유지", major="인공지능", student_number="A74004", is_full_paid=True),
+                DuesPayer(name="미납승격", major="인공지능", student_number="A74005"),
+            ]
+        )
+        db.commit()
+
+    response = _import_payments(
+        api,
+        [
+            ("행사승격", "무시되는전공", "A74003"),
+            ("전체유지", "무시되는전공", "A74004"),
+            ("미납승격", "무시되는전공", "A74005"),
+        ],
     )
 
     assert response.status_code == 200
