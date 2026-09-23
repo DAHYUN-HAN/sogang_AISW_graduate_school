@@ -585,45 +585,41 @@ Rule:
 
 Auth: user
 
-Query: required `q` (name substring), required `board_id` (active `activity_certification` board), and optional `size` (default `8`, max `20`). Missing, inactive, unknown, or non-activity boards return `422 INVALID_DUES_BOARD`. Every matching row in the independent current student roster is returned as `{id, name, major, student_number, is_paid_for_board}`; the safe boolean is true only for `ALL` or `ONCE` assigned to the requested board. The member response never exposes `payment_scope` or `once_board_id`, and unpaid rows remain searchable and selectable. User enrollment, activation, and legacy `dues_status` fields do not affect results.
+Query: required `q` (name substring), required `board_id` (active `activity_certification` board), and optional `size` (default `8`, max `20`). Missing, inactive, unknown, or non-activity boards return `422 INVALID_DUES_BOARD`. Every name-matching row in the permanent `student_roster` table is returned as `{id, name, major, student_number, is_paid_for_board}`. The safe boolean is true only when the current-term `dues_payments` row is `ALL` or is `ONCE` for the requested board. The member response never exposes `payment_scope` or `once_board_id`; a missing payment row and a different-board `ONCE` row remain searchable and selectable with `is_paid_for_board: false`. User enrollment, activation, and legacy `users.dues_status` do not affect results.
 
-### GET `/dues-payers/admin/payers`
+### GET `/dues-payers/admin/roster`
 
 Auth: admin
 
-Query: optional `q`, `page`, and `size` (max `100`). Returns `{id, name, major, student_number, payment_scope, is_full_paid, once_board_id, once_board_name}` with the shared pagination envelope. `payment_scope` is derived as `ALL`, `ONCE`, or `UNPAID`; the board name is joined at read time so renames are immediate, and deleting the referenced board changes the row to `UNPAID` through `ON DELETE SET NULL`.
+Query: optional `q`, `page`, and `size` (max `100`). Search matches name, student number, or major. Returns `{id, name, major, student_number}` with the shared pagination envelope; payment fields are intentionally absent.
 
 ### POST `/dues-payers/admin/roster/import`
 
 Auth: admin. Multipart field: `file`, restricted to `.xlsx`.
 
-The first sheet is read without a header as `name`, `major`, `student_number`. A valid workbook is additive: it keeps every existing roster row, skips exact normalized-student-number duplicates, and creates only new students as `UNPAID`. If an existing student number has a different name or major, the entire upload returns `422 DUES_ROSTER_IDENTITY_CONFLICT` without changing the roster. Success returns `{created, updated: 0, unchanged, total_rows}` and preserves every existing payment state.
+The first sheet is read without a header as `name`, `major`, `student_number`. A valid workbook is an identity upsert keyed by normalized student number: it creates new roster rows, overwrites name and major on existing rows, keeps every row omitted from the workbook, and never changes `dues_payments`. Success returns `{created, updated, unchanged, total_rows}`. A concurrent conflicting roster write returns `422 ROSTER_IDENTITY_CONFLICT` without a partial commit.
 
-### POST `/dues-payers/admin/import`
+### GET `/dues-payers/admin/payments`
+
+Auth: admin
+
+Query: optional `q`, `page`, and `size` (max `100`). Search matches roster name, student number, or major. The outer-joined roster result is `{id, name, major, student_number, payment_scope, once_board_id, once_board_name}`. `payment_scope` is `ALL`, `ONCE`, or derived `UNPAID` when no payment row exists. Board names are joined at read time, so renames are immediate. Deleting a referenced activity board cascades its `ONCE` payment row and makes that roster member read as `UNPAID`.
+
+### POST `/dues-payers/admin/payments/import`
 
 Auth: admin. Multipart field: `file`, restricted to `.xlsx`.
 
-This endpoint applies an atomic snapshot of `ALL` payers. Every workbook row must exactly match an existing roster row by normalized student number and name or the entire upload returns `422 DUES_IMPORT_ROSTER_MISMATCH`. Matching rows become `ALL` and clear any `once_board_id`; existing `ALL` rows omitted from the workbook become `UNPAID`; omitted `ONCE` rows remain unchanged. Success returns `{activated, reset, unchanged, total_rows}`.
+This endpoint replaces the complete current-term payment snapshot. Before any deletion, every workbook row must match an existing roster row by normalized student number and exact trimmed name; otherwise the entire upload returns `422 DUES_IMPORT_ROSTER_MISMATCH` and the previous payment table remains unchanged. After validation, every existing `ALL` and `ONCE` row is deleted and each uploaded roster member receives one `ALL` row. Success returns `{cleared, registered, total_rows}`. An empty workbook is rejected, so clearing the term is never an accidental upload side effect.
 
 Both imports share the fixed global 10 MiB (`10485760` bytes) file limit used by media uploads. Any partial blank row, non-`A` plus five-digit student number, populated fourth column, duplicate normalized student number, empty workbook, malformed workbook, or oversized upload rejects the entire operation. Parser validation codes are `DUES_IMPORT_EMPTY_VALUE`, `DUES_IMPORT_INVALID_STUDENT_NUMBER`, `DUES_IMPORT_DUPLICATE_STUDENT_NUMBER`, `INVALID_DUES_WORKBOOK`, and `PAYLOAD_TOO_LARGE`. Audit details contain aggregate counts only.
 
-All administrator dues mutations (individual create/update, both imports, and payment reset) share one transaction-scoped PostgreSQL advisory lock so an `ALL` snapshot or reset cannot interleave with another roster/payment write.
+All administrator roster/payment mutations (both imports and individual payment updates) share one transaction-scoped PostgreSQL advisory lock so a full payment replacement cannot interleave with a roster upsert or individual scope edit.
 
-### POST `/dues-payers/admin/payers`
-
-Auth: admin
-
-Request: `{name, major, student_number, payment_scope, once_board_id}`. `payment_scope` is `ALL`, `ONCE`, or `UNPAID`. `ONCE` requires an active activity-certification `once_board_id`; the other scopes require it to be null. Duplicate normalized student numbers return `409 DUES_STUDENT_NUMBER_CONFLICT`, and invalid board selection returns `422 INVALID_DUES_BOARD`. Success returns the enriched administrator item.
-
-### PUT `/dues-payers/admin/payers/{payer_id}`
-
-Auth: admin. Uses the same full request and response contract as create. Missing rows return `404 DUES_PAYER_NOT_FOUND`. Audit details contain only payer ID and scope fields, never name, major, or student number.
-
-### POST `/dues-payers/admin/payments/reset`
+### PUT `/dues-payers/admin/payments/{roster_member_id}`
 
 Auth: admin
 
-Request: `{ "confirmation": "납부자 초기화" }`. The phrase must match exactly or the API returns `400 DUES_RESET_CONFIRMATION_REQUIRED`. Success changes every current `ALL` row to `UNPAID` and returns `{reset}`. Roster identity and `ONCE` assignments are preserved. Audit details contain counts only, never roster PII.
+Request: `{payment_scope, once_board_id}`. Roster identity is read-only. `payment_scope` is `ALL`, `ONCE`, or `UNPAID`; `ONCE` requires one active activity-certification `once_board_id`, while the other scopes require null. `ALL` upserts a payment row and clears its board, `ONCE` upserts one board-specific row, and `UNPAID` deletes the payment row. Missing roster members return `404 ROSTER_MEMBER_NOT_FOUND`; invalid scope/board pairs return `422 INVALID_DUES_SCOPE` or `422 INVALID_DUES_BOARD`. Success returns the joined administrator payment item. Audit details contain only roster ID and scope fields, never name, major, or student number.
 
 ### GET `/users/me/blocks`
 
