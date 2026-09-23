@@ -97,10 +97,14 @@ The current dues-payer roster is intentionally independent from `users`; there i
 - `student_number VARCHAR(20) NOT NULL`, unique, normalized to `^A\d{5}$`
 - `name VARCHAR(50) NOT NULL`, indexed for search
 - `major VARCHAR(100) NOT NULL`
+- `is_full_paid BOOLEAN NOT NULL`
+- `once_board_id INTEGER NULL REFERENCES boards(id) ON DELETE SET NULL`, indexed
 - `created_at DATETIME NOT NULL`
 - `updated_at DATETIME NOT NULL`
 
-The roster is populated only through the admin XLSX upsert. Raw workbooks and row-level PII never belong in migrations, seed data, or operational audit details. Activity-certification metadata stores ordered `participant_dues_payer_ids` plus a server-generated `participants` name snapshot, so clearing the current roster does not erase historical participant names.
+The table has `CHECK NOT (is_full_paid AND once_board_id IS NOT NULL)`. Scope is derived without a stored enum: `ALL` is `is_full_paid = true`, `ONCE` is `is_full_paid = false` with a board ID, and `UNPAID` has false/null. Migration `0028_dues_payment_scope` backfills every pre-existing row to `ALL`; deleting a referenced board makes its `ONCE` rows `UNPAID`.
+
+The master roster is populated through the admin roster XLSX upsert, while the separate payment XLSX replaces only the `ALL` snapshot. Administrators may also create or update one row with `ALL`, one-board `ONCE`, or `UNPAID`. Raw workbooks and row-level PII never belong in migrations, seed data, or operational audit details. Activity-certification metadata stores ordered `participant_dues_payer_ids` plus a server-generated `participants` name snapshot, so clearing the current roster or changing payment state does not erase historical participant names. Payment state controls only the black/gray member presentation for a requested activity board; it is not an activity-post storage gate.
 
 ### `boards`
 

@@ -585,19 +585,37 @@ Rule:
 
 Auth: user
 
-Query: required `q` (name or student-number substring), optional `size` (default `8`, max `20`). Returns only the independent current dues-payer roster as `{id, name, major, student_number}`. User enrollment, activation, and legacy `dues_status` fields do not affect results.
+Query: required `q` (name substring), required `board_id` (active `activity_certification` board), and optional `size` (default `8`, max `20`). Missing, inactive, unknown, or non-activity boards return `422 INVALID_DUES_BOARD`. Every matching row in the independent current student roster is returned as `{id, name, major, student_number, is_paid_for_board}`; the safe boolean is true only for `ALL` or `ONCE` assigned to the requested board. The member response never exposes `payment_scope` or `once_board_id`, and unpaid rows remain searchable and selectable. User enrollment, activation, and legacy `dues_status` fields do not affect results.
 
 ### GET `/dues-payers/admin/payers`
 
 Auth: admin
 
-Query: optional `q`, `page`, and `size` (max `100`). Returns the same items with the shared pagination envelope.
+Query: optional `q`, `page`, and `size` (max `100`). Returns `{id, name, major, student_number, payment_scope, is_full_paid, once_board_id, once_board_name}` with the shared pagination envelope. `payment_scope` is derived as `ALL`, `ONCE`, or `UNPAID`; the board name is joined at read time so renames are immediate, and deleting the referenced board changes the row to `UNPAID` through `ON DELETE SET NULL`.
+
+### POST `/dues-payers/admin/roster/import`
+
+Auth: admin. Multipart field: `file`, restricted to `.xlsx`.
+
+The first sheet is read without a header as `name`, `major`, `student_number`. A valid workbook atomically creates or updates identity by normalized student number and returns `{created, updated, unchanged, total_rows}`. Existing `ALL`, `ONCE`, and `UNPAID` state is preserved; newly created rows start as `UNPAID`.
 
 ### POST `/dues-payers/admin/import`
 
 Auth: admin. Multipart field: `file`, restricted to `.xlsx`.
 
-The first sheet is read without a header as `name`, `major`, `student_number`. A valid workbook is upserted atomically by normalized student number and returns `{created, updated, unchanged, total_rows}`. The import shares the fixed global 10 MiB (`10485760` bytes) file limit used by media uploads. Any partial blank row, non-`A` plus five-digit student number, populated fourth column, duplicate normalized student number, empty workbook, malformed workbook, or oversized upload rejects the entire import. Validation codes are `DUES_IMPORT_EMPTY_VALUE`, `DUES_IMPORT_INVALID_STUDENT_NUMBER`, `DUES_IMPORT_DUPLICATE_STUDENT_NUMBER`, `INVALID_DUES_WORKBOOK`, and `PAYLOAD_TOO_LARGE`.
+This endpoint applies an atomic snapshot of `ALL` payers. Every workbook row must exactly match an existing roster row by normalized student number and name or the entire upload returns `422 DUES_IMPORT_ROSTER_MISMATCH`. Matching rows become `ALL` and clear any `once_board_id`; existing `ALL` rows omitted from the workbook become `UNPAID`; omitted `ONCE` rows remain unchanged. Success returns `{activated, reset, unchanged, total_rows}`.
+
+Both imports share the fixed global 10 MiB (`10485760` bytes) file limit used by media uploads. Any partial blank row, non-`A` plus five-digit student number, populated fourth column, duplicate normalized student number, empty workbook, malformed workbook, or oversized upload rejects the entire operation. Parser validation codes are `DUES_IMPORT_EMPTY_VALUE`, `DUES_IMPORT_INVALID_STUDENT_NUMBER`, `DUES_IMPORT_DUPLICATE_STUDENT_NUMBER`, `INVALID_DUES_WORKBOOK`, and `PAYLOAD_TOO_LARGE`. Audit details contain aggregate counts only.
+
+### POST `/dues-payers/admin/payers`
+
+Auth: admin
+
+Request: `{name, major, student_number, payment_scope, once_board_id}`. `payment_scope` is `ALL`, `ONCE`, or `UNPAID`. `ONCE` requires an active activity-certification `once_board_id`; the other scopes require it to be null. Duplicate normalized student numbers return `409 DUES_STUDENT_NUMBER_CONFLICT`, and invalid board selection returns `422 INVALID_DUES_BOARD`. Success returns the enriched administrator item.
+
+### PUT `/dues-payers/admin/payers/{payer_id}`
+
+Auth: admin. Uses the same full request and response contract as create. Missing rows return `404 DUES_PAYER_NOT_FOUND`. Audit details contain only payer ID and scope fields, never name, major, or student number.
 
 ### POST `/dues-payers/admin/delete-all`
 
