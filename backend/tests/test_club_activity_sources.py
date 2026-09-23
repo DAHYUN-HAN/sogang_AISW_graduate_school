@@ -3,14 +3,14 @@ from datetime import datetime
 import pytest
 
 from app.models.board import Board
-from app.models.dues_payer import DuesPayer
 from app.models.media import PostAttachment
 from app.models.post import Post
+from app.models.student_roster import StudentRosterMember
 
 
 def _setup_club_sources(api) -> dict[str, int]:
     with api.session() as db:
-        payer = DuesPayer(name="Club payer", major="AI", student_number="A74001")
+        payer = StudentRosterMember(name="Club payer", major="AI", student_number="A74001")
         promo_board = Board(
             name="Club Promotion",
             slug="club-promo",

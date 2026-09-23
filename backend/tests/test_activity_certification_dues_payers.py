@@ -1,16 +1,17 @@
 from sqlalchemy import select
 
 from app.models.board import Board
-from app.models.dues_payer import DuesPayer
+from app.models.dues_payment import DuesPayment
 from app.models.media import PostAttachment
 from app.models.post import Post
+from app.models.student_roster import StudentRosterMember
 
 
-def _activity_board(api) -> int:
+def _activity_board(api, *, slug: str = "study-activity-dues-test") -> int:
     with api.session() as db:
         board = Board(
             name="Study Activity Certification",
-            slug="study-activity-dues-test",
+            slug=slug,
             category="participation",
             board_type="activity_certification",
             read_permission="user",
@@ -23,8 +24,8 @@ def _activity_board(api) -> int:
 
 def _seed_payers(api) -> tuple[int, int]:
     with api.session() as db:
-        first = DuesPayer(name="홍길동", major="인공지능", student_number="A74001")
-        second = DuesPayer(name="김서강", major="보안", student_number="A74002")
+        first = StudentRosterMember(name="홍길동", major="인공지능", student_number="A74001")
+        second = StudentRosterMember(name="김서강", major="보안", student_number="A74002")
         db.add_all([first, second])
         db.commit()
         return first.id, second.id
@@ -66,17 +67,37 @@ def test_activity_certification_uses_roster_names_in_selected_order(api) -> None
 
 def test_activity_certification_accepts_unpaid_and_current_board_once_participants(api) -> None:
     board_id = _activity_board(api)
+    other_board_id = _activity_board(api, slug="other-selectable-activity-dues")
     with api.session() as db:
-        unpaid = DuesPayer(name="검증미납", major="인공지능", student_number="A74011")
-        once = DuesPayer(
+        unpaid = StudentRosterMember(name="검증미납", major="인공지능", student_number="A74011")
+        once = StudentRosterMember(
             name="검증현재행사",
             major="인공지능",
             student_number="A74012",
-            once_board_id=board_id,
         )
-        db.add_all([unpaid, once])
+        other_once = StudentRosterMember(
+            name="검증다른행사",
+            major="인공지능",
+            student_number="A74013",
+        )
+        db.add_all([unpaid, once, other_once])
+        db.flush()
+        db.add_all(
+            [
+                DuesPayment(
+                    roster_member_id=once.id,
+                    scope="ONCE",
+                    once_board_id=board_id,
+                ),
+                DuesPayment(
+                    roster_member_id=other_once.id,
+                    scope="ONCE",
+                    once_board_id=other_board_id,
+                ),
+            ]
+        )
         db.commit()
-        payer_ids = [unpaid.id, once.id]
+        payer_ids = [unpaid.id, once.id, other_once.id]
 
     created = api.client.post(
         f"/api/boards/{board_id}/posts",
@@ -88,7 +109,50 @@ def test_activity_certification_accepts_unpaid_and_current_board_once_participan
     with api.session() as db:
         post = db.get(Post, created.json()["data"]["id"])
         assert post.metadata_json["participant_dues_payer_ids"] == payer_ids
-        assert post.metadata_json["participants"] == "74기 검증미납, 74기 검증현재행사"
+        assert post.metadata_json["participants"] == "74기 검증미납, 74기 검증현재행사, 74기 검증다른행사"
+
+
+def test_search_derives_board_payment_from_optional_payment_row(api) -> None:
+    board_id = _activity_board(api)
+    other_board_id = _activity_board(api, slug="other-activity-dues-test")
+    with api.session() as db:
+        all_paid = StudentRosterMember(name="검증전체", major="AI", student_number="A74101")
+        matching_once = StudentRosterMember(name="검증현재행사", major="AI", student_number="A74102")
+        other_once = StudentRosterMember(name="검증다른행사", major="AI", student_number="A74103")
+        unpaid = StudentRosterMember(name="검증미납", major="AI", student_number="A74104")
+        db.add_all([all_paid, matching_once, other_once, unpaid])
+        db.flush()
+        db.add_all(
+            [
+                DuesPayment(roster_member_id=all_paid.id, scope="ALL"),
+                DuesPayment(
+                    roster_member_id=matching_once.id,
+                    scope="ONCE",
+                    once_board_id=board_id,
+                ),
+                DuesPayment(
+                    roster_member_id=other_once.id,
+                    scope="ONCE",
+                    once_board_id=other_board_id,
+                ),
+            ]
+        )
+        db.commit()
+
+    response = api.client.get(
+        "/api/dues-payers/search",
+        headers=api.headers["owner"],
+        params={"q": "검증", "board_id": board_id},
+    )
+
+    assert response.status_code == 200
+    states = {item["name"]: item["is_paid_for_board"] for item in response.json()["data"]}
+    assert states == {
+        "검증전체": True,
+        "검증현재행사": True,
+        "검증다른행사": False,
+        "검증미납": False,
+    }
 
 
 def test_activity_participant_snapshot_survives_payment_state_change_during_edit(api) -> None:
@@ -102,10 +166,16 @@ def test_activity_participant_snapshot_survives_payment_state_change_during_edit
     assert created.status_code == 200
 
     with api.session() as db:
-        first = db.get(DuesPayer, first_id)
-        second = db.get(DuesPayer, second_id)
-        first.is_full_paid = True
-        second.once_board_id = board_id
+        db.add_all(
+            [
+                DuesPayment(roster_member_id=first_id, scope="ALL"),
+                DuesPayment(
+                    roster_member_id=second_id,
+                    scope="ONCE",
+                    once_board_id=board_id,
+                ),
+            ]
+        )
         db.commit()
 
     edited = api.client.put(
@@ -162,11 +232,11 @@ def test_activity_certification_rejects_missing_empty_or_duplicate_payer_ids(api
         assert db.scalar(select(Post).where(Post.board_id == board_id)) is None
 
 
-def test_payment_reset_keeps_activity_participant_snapshot_and_roster_link(api) -> None:
+def test_payment_removal_keeps_activity_participant_snapshot_and_roster_link(api) -> None:
     board_id = _activity_board(api)
     first_id, _ = _seed_payers(api)
     with api.session() as db:
-        db.get(DuesPayer, first_id).is_full_paid = True
+        db.add(DuesPayment(roster_member_id=first_id, scope="ALL"))
         db.commit()
     created = api.client.post(
         f"/api/boards/{board_id}/posts",
@@ -174,9 +244,9 @@ def test_payment_reset_keeps_activity_participant_snapshot_and_roster_link(api) 
         headers=api.headers["owner"],
     )
 
-    reset = api.client.post(
-        "/api/dues-payers/admin/payments/reset",
-        json={"confirmation": "납부자 초기화"},
+    reset = api.client.put(
+        f"/api/dues-payers/admin/payments/{first_id}",
+        json={"payment_scope": "UNPAID", "once_board_id": None},
         headers=api.headers["admin"],
     )
 
@@ -186,9 +256,11 @@ def test_payment_reset_keeps_activity_participant_snapshot_and_roster_link(api) 
         post = db.get(Post, created.json()["data"]["id"])
         assert post.metadata_json["participants"] == "74기 홍길동"
         assert post.metadata_json["participant_dues_payer_ids"] == [first_id]
-        payer = db.get(DuesPayer, first_id)
+        payer = db.get(StudentRosterMember, first_id)
         assert payer is not None
-        assert payer.is_full_paid is False
+        assert db.scalar(
+            select(DuesPayment).where(DuesPayment.roster_member_id == first_id)
+        ) is None
 
 
 def test_unchanged_legacy_participants_survive_edit_but_changed_names_require_reselection(api) -> None:

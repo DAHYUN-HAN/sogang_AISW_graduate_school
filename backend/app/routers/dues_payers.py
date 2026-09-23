@@ -19,7 +19,6 @@ from app.dues_payment_service import (
 from app.errors import AppException
 from app.models.board import Board
 from app.models.dues_payment import DuesPayment
-from app.models.dues_payer import DuesPayer
 from app.models.student_roster import StudentRosterMember
 from app.models.user import User
 from app.response import success_response
@@ -101,7 +100,6 @@ def search_dues_payers(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    """Legacy implementation retained until the activity integration step."""
     if board_id is None:
         raise AppException(
             status_code=422,
@@ -113,19 +111,28 @@ def search_dues_payers(
     if not trimmed:
         return success_response([])
     keyword = f"%{trimmed}%"
-    payers = db.scalars(
-        select(DuesPayer)
-        .where(DuesPayer.name.ilike(keyword))
-        .order_by(DuesPayer.name.asc(), DuesPayer.student_number.asc(), DuesPayer.id.asc())
+    rows = db.execute(
+        select(StudentRosterMember, DuesPayment)
+        .outerjoin(DuesPayment, DuesPayment.roster_member_id == StudentRosterMember.id)
+        # 참가자 검색은 이름으로만 매칭한다. 학번 매칭은 다른 원우의 학번을 유추하는 통로가 된다.
+        .where(StudentRosterMember.name.ilike(keyword))
+        .order_by(
+            StudentRosterMember.name.asc(),
+            StudentRosterMember.student_number.asc(),
+            StudentRosterMember.id.asc(),
+        )
         .limit(size)
     ).all()
     return success_response(
         [
             {
-                **_roster_payload(item),
-                "is_paid_for_board": item.is_full_paid or item.once_board_id == board.id,
+                **_roster_payload(member),
+                "is_paid_for_board": bool(
+                    payment
+                    and (payment.scope == "ALL" or payment.once_board_id == board.id)
+                ),
             }
-            for item in payers
+            for member, payment in rows
         ]
     )
 
