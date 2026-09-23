@@ -378,6 +378,8 @@ Definition of done:
 
 ## Work Package 9: Phase 4 Full Frontend-Backend Integration
 
+- 2026-09-24 WP9 iOS App Store update: the prior IPA (build 8) reached App Store Connect with `expo.version` 0.1.0 while the live App Store version is 1.0 (build 4). Bump the shared app version and Android native version name to 1.0.1 before creating the next production iOS build; EAS remote auto-increment continues to own the iOS build number. Screenshots and App Store review/release remain separate App Store Connect steps.
+
 - 2026-09-24 WP9 iOS submission tooling: EAS CLI 21.3.0 fails Apple Developer login with `iTunes service key is empty`; Expo resolved this in 24.4.1. The CLI range now requires that fix, and the production iOS submit profile uses the existing App Store Connect app ID so EAS can reuse its stored API key without an Apple ID session. Static release configuration checks pass; this does not change the built app binary.
 
 - 2026-09-17 WP5/WP9 non-admin upload audit (`Phase 5 QA`): mapped four resource categories, three activity certification boards, private mutual-aid evidence and profile images; separated album/six legacy route implementations from current menu entry points. Resource and retained generic edit forms omit attachment controls; activity/album/profile controls exist, while mutual-aid existing evidence is intentionally protected. Source inventory and verification limits: `docs/qa/USER_ATTACHMENT_UPLOAD_AUDIT_2026-09-17.md`.
