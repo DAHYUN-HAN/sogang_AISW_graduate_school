@@ -1700,7 +1700,9 @@ const styles = StyleSheet.create({
   },
   activityThumb: {
     position: "relative",
-    aspectRatio: 2.05, // 활동 인증 피드의 기존 가로형 고정 비율
+    // Figma 인증피드카드(117:61)의 인증사진 328x219. 카드 폭은 좌우 16 여백을 뺀
+    // 328이라 그대로 맞는다. 예전 2.05는 같은 폭에서 높이가 160으로 59px 낮았다.
+    aspectRatio: 328 / 219,
     borderRadius: 8,
     overflow: "hidden",
   },

@@ -113,8 +113,10 @@ test("#62·63 공지 목록은 공통 로딩과 중앙 빈 상태 레이아웃�
   assert.match(noticeListSource, /emptyState:[\s\S]*justifyContent: "center"/);
 });
 
-test("활동 인증 목록 이미지는 이전의 가로형 고정 비율을 사용한다", () => {
-  assert.match(boardSource, /activityThumb:[\s\S]*aspectRatio: 2\.05/);
+test("활동 인증 목록 이미지는 Figma 인증피드카드의 328x219 비율을 쓴다", () => {
+  // 카드 폭은 좌우 16 여백을 뺀 328이라 Figma와 같다. 높이만 맞추면 된다.
+  assert.match(boardSource, /activityThumb:[\s\S]*aspectRatio: 328 \/ 219/);
+  assert.match(boardSource, /cardContent:[\s\S]*paddingHorizontal: 16/);
 });
 
 test("활동 인증 상세 이미지는 게시판별 관리자 규칙을 사용하고 사진첩만 240px 프레임을 유지한다", () => {
