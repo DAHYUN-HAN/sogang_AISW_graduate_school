@@ -33,6 +33,7 @@ import {
   activityParticipantSelectionError,
   activityParticipantTextColor,
   activityParticipantsFromMetadata,
+  withParticipantDuesState,
   activitySourcePostIdFromMetadata,
   buildActivityCertificationMetadata,
   formatActivityParticipant,
@@ -505,7 +506,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     if (!postId || !existingPost || !board || hydratedPostId.current === postId) return;
 
     const metadata = existingPost.metadata ?? {};
-    const storedParticipants = activityParticipantsFromMetadata(metadata);
+    // 메타데이터에는 납부 여부가 없다. 글 상세가 준 값으로 채워 수정 화면의 칩도
+    // 검색 목록과 같은 색이 되게 한다.
+    const storedParticipants = withParticipantDuesState(
+      activityParticipantsFromMetadata(metadata),
+      existingPost.activity_participants,
+    );
     reset({
       title: existingPost.title,
       category: mutualAidEventTypeLabel(existingPost.mutual_aid?.event_type ?? existingPost.category),
@@ -1383,7 +1389,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                         <View style={styles.activityChipRow}>
                           {selectedParticipants.map((participant) => (
                             <Pressable key={participant.id} onPress={() => removeParticipant(participant.id)} style={styles.activityMemberChip}>
-                              <Text style={styles.activityMemberChipText}>{formatActivityParticipant(participant)}</Text>
+                              {/* 검색 목록과 같은 기준으로 미납자는 회색으로 보여 준다. */}
+                              <Text style={[styles.activityMemberChipText, { color: activityParticipantTextColor(participant) }]}>
+                                {formatActivityParticipant(participant)}
+                              </Text>
                               <CloseIcon size={12} color={COLORS.muted} />
                             </Pressable>
                           ))}

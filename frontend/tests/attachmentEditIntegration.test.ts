@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import test from "node:test";
 import ts from "typescript";
-import { activityParticipantsFromMetadata, activitySourcePostIdFromMetadata } from "../utils/activityCertification";
+import { activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, withParticipantDuesState } from "../utils/activityCertification";
 import { clubOperationStatus } from "../utils/participationGuide";
 import { mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate } from "../utils/mutualAid";
 
@@ -36,7 +36,7 @@ test("activity edit restores its saved account once and does not overwrite an in
     board: { slug: "networking-activity" },
     existingPost: { id: 42, title: "Activity", content: "Reflection", metadata: { bank_account: "Test Bank 123-456" }, attachments: [] },
     reset: (values: typeof form) => Object.assign(form, values),
-    activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, clubOperationStatus,
+    activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, withParticipantDuesState, clubOperationStatus,
     mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate,
     resourceFields: null, resourcePostFieldValues: () => ({}), unsavedBaseline: { current: null },
     setAttachments: () => {}, setEvidenceLink: () => {}, setEvidenceMode: () => {},
