@@ -14,7 +14,7 @@ export default function SchoolEmailInput({ value, onChangeText, placeholder = "�
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <View style={[styles.container, isFocused && !hasError ? styles.containerFocused : null, hasError ? styles.containerError : null]}>
+    <View style={[styles.container, hasError ? styles.containerError : null]}>
       <TextInput
         autoCapitalize="none"
         autoCorrect={false}
@@ -33,6 +33,20 @@ export default function SchoolEmailInput({ value, onChangeText, placeholder = "�
       <View style={styles.domainBox}>
         <Text style={styles.domain}>{SCHOOL_EMAIL_DOMAIN}</Text>
       </View>
+      {/*
+        테두리는 자식 위에 따로 그린다. 컨테이너에 borderWidth를 주면 iOS가 자식을
+        테두리 '바깥쪽' 반경으로 잘라, 모서리에서 테두리 호와 잘린 자식 배경의 호가
+        따로 보인다(0.5px라 안티앨리어싱까지 겹쳐 선이 두 겹으로 읽힌다). 위에 덮어
+        그리면 그 경계를 테두리가 가려 호가 하나만 남는다.
+      */}
+      <View
+        pointerEvents="none"
+        style={[
+          styles.border,
+          isFocused && !hasError ? styles.borderFocused : null,
+          hasError ? styles.borderError : null,
+        ]}
+      />
     </View>
   );
 }
@@ -43,16 +57,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "stretch",
     overflow: "hidden",
-    borderWidth: 0.5, // Figma: 0.5px border
-    borderColor: "#E1E4E9",
     borderRadius: 8,
     backgroundColor: "#FFFFFF",
   },
   containerError: {
-    borderColor: "#D64545", // error/500 (Figma)
     backgroundColor: "#FFF5F5",
   },
-  containerFocused: {
+  border: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 0.5, // Figma: 0.5px border
+    borderColor: "#E1E4E9",
+    borderRadius: 8,
+  },
+  borderError: {
+    borderColor: "#D64545", // error/500 (Figma)
+  },
+  borderFocused: {
     borderColor: "#2761FF",
   },
   input: {
