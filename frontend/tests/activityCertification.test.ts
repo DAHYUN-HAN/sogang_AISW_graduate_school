@@ -40,7 +40,8 @@ const detailParticipants = (
 test("현재 게시판 납부 효력은 검정과 회색 두 색으로만 표시한다", () => {
   assert.equal(activityParticipantTextColor({ is_paid_for_board: true }), "#212429");
   assert.equal(activityParticipantTextColor({ is_paid_for_board: false }), "#8A919C");
-  assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /검정.*납부.*회색.*미납/);
+  // Figma Screen/Activity/Verify(110:39) 문구. 색이 뜻하는 것은 납부 여부가 아니라 지원금 지급 여부다.
+  assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /검정은 지급 가능, 회색은 지급 불가/);
   assert.match(ACTIVITY_PARTICIPANT_GUIDANCE, /본인도 검색해서 추가해주세요/);
   assert.doesNotMatch(ACTIVITY_PARTICIPANT_GUIDANCE, /주황|5만원|1회 납부/);
 });

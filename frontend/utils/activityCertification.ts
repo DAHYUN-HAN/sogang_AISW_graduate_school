@@ -91,8 +91,9 @@ export function activityParticipantSearchKey(boardId: number, query: string) {
   return ["dues-payer-search", boardId, query] as const;
 }
 
+// Figma Screen/Activity/Verify(60:70)의 참가자안내(110:39) 문구를 그대로 쓴다.
 export const ACTIVITY_PARTICIPANT_GUIDANCE =
-  "참가자 이름 색상 구분: 검정은 현재 활동 기준 납부, 회색은 현재 활동 기준 미납입니다. 지원금은 참가자 목록 기준 지급되니 본인도 검색해서 추가해주세요.";
+  "참가자 이름 색상으로 지원금 지급 여부를 알 수 있어요. 검정은 지급 가능, 회색은 지급 불가. 본인도 검색해서 추가해주세요.";
 
 export function activityBankAccountFieldState(postId: number | null) {
   if (postId) {
