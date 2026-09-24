@@ -29,7 +29,7 @@ test("actual attachment tap opens the selected image in the modal without reques
     isNotice: false, shouldOpenPostAttachment, viewerImages: [{ id: 12 }, { id: 34 }],
     setViewerIndex: (index: number) => selected.push(index),
     element: (type: string, props: object) => ({ type, props }),
-    Pressable: "Pressable", NaturalAspectMediaImage: "Image", styles: {},
+    Pressable: "Pressable", NaturalAspectMediaImage: "Image", NoticeAttachmentImage: "NoticeImage", styles: {},
     resolveMediaAccessUrl: () => { throw new Error("Images must never use external opening"); },
   });
   const rendered = renderer({ id: 34, content_type: "image/jpeg" });
@@ -37,13 +37,30 @@ test("actual attachment tap opens the selected image in the modal without reques
   assert.deepEqual(selected, [1]);
 });
 
-test("the actual viewer image list excludes guide thumbnails and all notice images, including linked notices", () => {
+test("notice image taps open the modal like community images", async () => {
+  const selected: number[] = [];
+  const renderer = runInNewContext(expression(detail, "attachmentRenderer"), {
+    isNotice: true, shouldOpenPostAttachment, viewerImages: [{ id: 12 }, { id: 34 }],
+    setViewerIndex: (index: number) => selected.push(index),
+    element: (type: string, props: object) => ({ type, props }),
+    Pressable: "Pressable", NaturalAspectMediaImage: "Image", NoticeAttachmentImage: "NoticeImage", styles: {},
+    resolveMediaAccessUrl: () => { throw new Error("Images must never use external opening"); },
+  });
+  const rendered = renderer({ id: 12, content_type: "image/png" });
+  await rendered.props.onPress();
+  assert.deepEqual(selected, [0]);
+});
+
+test("the actual viewer image list excludes guide thumbnails but keeps notice images", () => {
   const code = expression(detail, "viewerImages");
   const imageAttachments = [{ id: 1 }, { id: 2 }, { id: 3 }];
   const participationDetailImages = [{ id: 2 }, { id: 3 }];
   const bindings = { imageAttachments, participationDetailImages, isAdminParticipationGuide: true, isNotice: false };
   assert.deepEqual(runInNewContext(code, bindings), participationDetailImages);
-  assert.equal(runInNewContext(code, { ...bindings, isNotice: true, isCouncilActivityEntry: true }).length, 0);
+  assert.deepEqual(
+    runInNewContext(code, { ...bindings, isAdminParticipationGuide: false, isNotice: true, isCouncilActivityEntry: true }),
+    imageAttachments,
+  );
 });
 
 function gestureHarness(name: "pan" | "pinch") {

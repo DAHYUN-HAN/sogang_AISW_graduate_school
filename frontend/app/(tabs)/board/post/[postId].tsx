@@ -737,7 +737,7 @@ export default function PostDetailScreen() {
   const participationDetailImages = isAdminParticipationGuide
     ? participationGuideImageSections(post.attachments).detailImages
     : [];
-  const viewerImages = isNotice ? [] : isAdminParticipationGuide ? participationDetailImages : imageAttachments;
+  const viewerImages = isAdminParticipationGuide ? participationDetailImages : imageAttachments;
   const participationImagesSection =
     participationDetailImages.length > 0 ? (
       <View style={styles.participationImagesBlock}>
@@ -807,8 +807,8 @@ export default function PostDetailScreen() {
             )}
           />
         ) : heroAttachment ? (
-          <Pressable disabled={isNotice} accessibilityRole={isNotice ? undefined : "button"}
-            accessibilityLabel={isNotice ? undefined : `${normalizedGalleryIndex + 1}번째 사진 크게 보기`}
+          <Pressable accessibilityRole="button"
+            accessibilityLabel={`${normalizedGalleryIndex + 1}번째 사진 크게 보기`}
             onPress={() => setViewerIndex(normalizedGalleryIndex)}
             style={hasNaturalHero ? undefined : StyleSheet.absoluteFill}>
           {isAdminParticipationGuide ? (
@@ -1084,6 +1084,10 @@ export default function PostDetailScreen() {
                   accessibilityLabel={`${attachment.original_filename} 열기`}
                   accessibilityRole="button"
                   onPress={async () => {
+                    if (attachment.content_type.startsWith("image/")) {
+                      setViewerIndex(viewerImages.findIndex((image) => image.id === attachment.id));
+                      return;
+                    }
                     try {
                       const accessUrl = await resolveMediaAccessUrl(attachment);
                       if (accessUrl) {
@@ -1118,14 +1122,14 @@ export default function PostDetailScreen() {
                 contentType: attachment.content_type,
               });
               return !canOpenAttachment ? (
-                isNotice ? <NoticeAttachmentImage key={attachment.id} media={attachment} /> : (
-                  <Pressable key={attachment.id} accessibilityRole="button"
-                    accessibilityLabel={`${viewerImages.findIndex((image) => image.id === attachment.id) + 1}번째 사진 크게 보기`}
-                    onPress={() => setViewerIndex(viewerImages.findIndex((image) => image.id === attachment.id))}
-                    style={styles.imageAttachment}>
+                <Pressable key={attachment.id} accessibilityRole="button"
+                  accessibilityLabel={`${viewerImages.findIndex((image) => image.id === attachment.id) + 1}번째 사진 크게 보기`}
+                  onPress={() => setViewerIndex(viewerImages.findIndex((image) => image.id === attachment.id))}
+                  style={isNotice ? undefined : styles.imageAttachment}>
+                  {isNotice ? <NoticeAttachmentImage media={attachment} /> : (
                     <NaturalAspectMediaImage media={attachment} style={styles.attachmentImage} />
-                  </Pressable>
-                )
+                  )}
+                </Pressable>
               ) : (
                 <Pressable
                   key={attachment.id}

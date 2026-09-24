@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import ImageViewerModal from "../../../components/ImageViewerModal";
 import MediaImage, { MediaImageBackground } from "../../../components/MediaImage";
 import { BackIcon, EmptyCalendarIcon, LedgerIcon, SearchBackIcon, SearchIcon } from "../../../components/icons";
 import LoadingState from "../../../components/LoadingState";
@@ -483,6 +484,7 @@ function pastCouncilsFromMetadata(metadata?: Record<string, unknown> | null): Pa
 
 function PhotoSlider({ photos }: { photos: string[] }) {
   const [index, setIndex] = useState(0);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const current = Math.min(index, Math.max(photos.length - 1, 0));
   // 화살표는 양 끝에서 순환하지만, 쓸어 넘기기는 네이티브 스크롤이라 순환하지 않는다.
   // 끝에서 더 밀면 제자리로 돌아온다.
@@ -495,7 +497,15 @@ function PhotoSlider({ photos }: { photos: string[] }) {
           items={photos}
           itemKey={(url, itemIndex) => `${url}:${itemIndex}`}
           onIndexChange={setIndex}
-          renderItem={(url) => <MediaImage media={{ url }} resizeMode="contain" style={styles.pastPhoto} />}
+          renderItem={(url, itemIndex) => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${itemIndex + 1}번째 사진 크게 보기`}
+              onPress={() => setViewerIndex(itemIndex)}
+            >
+              <MediaImage media={{ url }} resizeMode="contain" style={styles.pastPhoto} />
+            </Pressable>
+          )}
         />
       ) : (
         <LinearGradient colors={["#534AB7", "#AFA9EC"]} end={{ x: 1, y: 1 }} start={{ x: 0, y: 0 }} style={styles.pastPhoto} />
@@ -520,6 +530,13 @@ function PhotoSlider({ photos }: { photos: string[] }) {
             <Text style={styles.pastPhotoIndicatorText}>{current + 1} / {photos.length}</Text>
           </View>
         </>
+      ) : null}
+      {viewerIndex !== null ? (
+        <ImageViewerModal
+          images={photos.map((url) => ({ url }))}
+          initialIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
       ) : null}
     </View>
   );

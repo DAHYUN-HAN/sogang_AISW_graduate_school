@@ -7,7 +7,7 @@ WP5/WP9, requested community/participation image interaction update. The user ex
 - Image attachments no longer call the external media opener. Community documents and actual website/application links retain their prior behavior.
 - Shared `ImageViewerModal` opens at the tapped photo. It supports aspect-fit presentation, 1–4x pinch zoom, double-tap zoom/fit, bounded dragging, fitted-scale horizontal paging, previous/next controls and a counter. Changing photos resets the transform. The user's subsequent visual follow-ups remove the bottom zoom/percentage/fit controls and gesture hint; web keyboard shortcuts remain.
 - Native Modal Back and web Esc close only the viewer. Post route and scroll state remain underneath.
-- Club/networking guide galleries exclude the list-only representative image. Notice images, including notices linked to council activity, remain inert.
+- Club/networking guide galleries exclude the list-only representative image. Notice images, including notices linked to council activity, remain inert. (2026-09-24: superseded — notice, mutual-aid evidence and council-introduction images now open the same modal; see `docs/phase2/FRONTEND_ROUTE_SPEC.md`.)
 - Media resolution reuses authorized signed URLs, with loading/error/retry UI. No API/schema/dependency changes.
 - Gesture review caught and fixed cancelled pans advancing photos and Android focal jumps when a finger lifts. Tests execute the production gesture callbacks and attachment click handler.
 - The modal reuses the Android status-bar scrim so dark system icons remain readable. The final native capture and all three gesture tests were repeated after reloading the latest bundle.
