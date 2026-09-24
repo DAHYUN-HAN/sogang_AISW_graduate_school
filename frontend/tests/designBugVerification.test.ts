@@ -169,7 +169,8 @@ test("#187 홈 동문회 주소록은 디자인 기준의 조밀한 세로 간�
 });
 
 test("스터디 모집 카드 메타는 작성자·날짜 뒤에 댓글 수를 붙이고 추천 수는 감춘다", () => {
-  assert.match(postCardSource, /const showCommentCount = !isLectureReview && !isWorkflowRequest;/);
+  // 강의후기도 댓글을 쓸 수 있으므로 댓글 수는 상조회·건의만 감춘다.
+  assert.match(postCardSource, /const showCommentCount = !isWorkflowRequest;/);
   assert.match(postCardSource, /const showLikeCount = !isWorkflowRequest && !isStudyRecruit;/);
   assert.match(postCardSource, /showCommentCount \? `댓글 \$\{post\.comment_count\}` : null/);
 });
