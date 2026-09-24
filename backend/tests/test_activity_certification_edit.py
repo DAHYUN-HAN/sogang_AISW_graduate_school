@@ -108,6 +108,8 @@ def test_activity_certification_owner_updates_date_and_participants_without_losi
             "activity_date": "2026.08.15",
             "participants": "74기 Owner payer, 74기 Other payer",
             "participant_dues_payer_ids": [1, 2],
+            # 참가자를 다시 고른 시점의 납부 여부를 굳혀 둔다. 둘 다 납부 기록이 없다.
+            "participant_dues_paid": [False, False],
             "activity_source_post_id": "3",
             "bank_account": "Sogang Bank 123-456",
         }

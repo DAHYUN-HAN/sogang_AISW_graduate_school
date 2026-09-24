@@ -359,3 +359,134 @@ def test_unchanged_legacy_participants_survive_edit_but_changed_names_require_re
         post = db.get(Post, post_id)
         assert post.metadata_json["participants"] == "기존 참가자"
         assert post.metadata_json["participant_user_ids"] == "1"
+
+
+def test_detail_keeps_payment_state_from_when_the_post_was_written(api) -> None:
+    """지원금은 활동 당시 기준이라, 나중에 납부해도 지난 글의 표시는 그대로여야 한다."""
+    board_id = _activity_board(api, slug="snapshot-activity-dues-test")
+    first_id, _ = _seed_payers(api)
+    created = api.client.post(
+        f"/api/boards/{board_id}/posts",
+        json=_payload([first_id]),
+        headers=api.headers["owner"],
+    )
+    assert created.status_code == 200
+    post_id = created.json()["data"]["id"]
+
+    before = api.client.get(f"/api/posts/{post_id}", headers=api.headers["owner"])
+    assert before.json()["data"]["activity_participants"][0]["is_paid_for_board"] is False
+
+    # 글을 쓴 뒤에 원우회비를 납부한다.
+    with api.session() as db:
+        db.add(DuesPayment(roster_member_id=first_id, scope="ALL"))
+        db.commit()
+
+    after = api.client.get(f"/api/posts/{post_id}", headers=api.headers["owner"])
+    assert after.json()["data"]["activity_participants"][0]["is_paid_for_board"] is False
+
+
+def test_editing_other_fields_keeps_the_written_payment_state(api) -> None:
+    board_id = _activity_board(api, slug="snapshot-edit-activity-dues-test")
+    first_id, _ = _seed_payers(api)
+    created = api.client.post(
+        f"/api/boards/{board_id}/posts",
+        json=_payload([first_id]),
+        headers=api.headers["owner"],
+    )
+    assert created.status_code == 200
+    post_id = created.json()["data"]["id"]
+
+    with api.session() as db:
+        db.add(DuesPayment(roster_member_id=first_id, scope="ALL"))
+        db.commit()
+
+    # 참가자는 그대로 두고 다른 칸만 고친다. 앱은 이때 payer_ids를 보내지 않는다.
+    edited = api.client.put(
+        f"/api/posts/{post_id}",
+        json={
+            "title": "제목만 고침",
+            "content": "소감만 고침",
+            "category": "테스트 활동",
+            "metadata": {
+                "activity_date": "2026.08.12",
+                "participants": "74기 홍길동",
+            },
+            "attachment_ids": [1],
+            "is_anonymous": False,
+        },
+        headers=api.headers["owner"],
+    )
+    assert edited.status_code == 200
+
+    detail = api.client.get(f"/api/posts/{post_id}", headers=api.headers["owner"])
+    assert detail.json()["data"]["activity_participants"][0]["is_paid_for_board"] is False
+
+
+def test_reselecting_participants_refreshes_the_payment_state(api) -> None:
+    board_id = _activity_board(api, slug="snapshot-reselect-activity-dues-test")
+    first_id, second_id = _seed_payers(api)
+    created = api.client.post(
+        f"/api/boards/{board_id}/posts",
+        json=_payload([first_id]),
+        headers=api.headers["owner"],
+    )
+    assert created.status_code == 200
+    post_id = created.json()["data"]["id"]
+
+    with api.session() as db:
+        db.add(DuesPayment(roster_member_id=first_id, scope="ALL"))
+        db.commit()
+
+    # 참가자를 다시 고르면 그 시점 기준으로 다시 굳힌다.
+    edited = api.client.put(
+        f"/api/posts/{post_id}",
+        json={
+            "title": "참가자 변경",
+            "content": "소감",
+            "category": "테스트 활동",
+            "metadata": {
+                "activity_date": "2026.08.12",
+                "participants": "무시되는 이름",
+                "participant_dues_payer_ids": [first_id, second_id],
+            },
+            "attachment_ids": [1],
+            "is_anonymous": False,
+        },
+        headers=api.headers["owner"],
+    )
+    assert edited.status_code == 200
+
+    detail = api.client.get(f"/api/posts/{post_id}", headers=api.headers["owner"])
+    states = [item["is_paid_for_board"] for item in detail.json()["data"]["activity_participants"]]
+    assert states == [True, False]
+
+
+def test_posts_written_before_the_snapshot_report_unknown_and_stay_fixed(api) -> None:
+    """당시 납부 상태를 알 방법이 없으므로 '모름'으로 두고 화면에서 검은색으로 굳힌다."""
+    board_id = _activity_board(api, slug="snapshot-legacy-activity-dues-test")
+    first_id, _ = _seed_payers(api)
+    created = api.client.post(
+        f"/api/boards/{board_id}/posts",
+        json=_payload([first_id]),
+        headers=api.headers["owner"],
+    )
+    assert created.status_code == 200
+    post_id = created.json()["data"]["id"]
+
+    with api.session() as db:
+        post = db.get(Post, post_id)
+        metadata = dict(post.metadata_json)
+        del metadata["participant_dues_paid"]
+        post.metadata_json = metadata
+        db.commit()
+
+    before = api.client.get(f"/api/posts/{post_id}", headers=api.headers["owner"])
+    assert before.json()["data"]["activity_participants"][0]["is_paid_for_board"] is None
+
+    # 납부 상태를 바꿔도 스냅샷 없는 글의 표시는 그대로여야 한다.
+    with api.session() as db:
+        db.add(DuesPayment(roster_member_id=first_id, scope="ALL"))
+        db.commit()
+
+    after = api.client.get(f"/api/posts/{post_id}", headers=api.headers["owner"])
+    assert after.json()["data"]["activity_participants"][0]["is_paid_for_board"] is None

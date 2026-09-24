@@ -74,6 +74,38 @@ def _participant_label(payer: StudentRosterMember) -> str:
     return payer.name
 
 
+def _dues_paid_snapshot(db: Session, board: Board, payer_ids: list[int]) -> list[bool]:
+    """글을 쓰거나 고친 시점의 납부 여부를 그대로 굳혀 둔다.
+
+    지원금은 활동 당시 기준으로 지급하므로, 1학기에 미납이던 참가자가 2학기에
+    납부했다고 해서 1학기 글의 표시가 바뀌면 안 된다.
+    """
+    payments = {
+        payment.roster_member_id: payment
+        for payment in db.scalars(
+            select(DuesPayment).where(DuesPayment.roster_member_id.in_(payer_ids))
+        ).all()
+    }
+    return [
+        bool(
+            (payment := payments.get(payer_id))
+            and (payment.scope == "ALL" or payment.once_board_id == board.id)
+        )
+        for payer_id in payer_ids
+    ]
+
+
+def _stored_dues_snapshot(metadata: dict, expected: int) -> list[bool] | None:
+    snapshot = metadata.get("participant_dues_paid")
+    if (
+        isinstance(snapshot, list)
+        and len(snapshot) == expected
+        and all(isinstance(paid, bool) for paid in snapshot)
+    ):
+        return snapshot
+    return None
+
+
 def _activity_participant_details(db: Session, board: Board, post: Post) -> list[dict] | None:
     if board.board_type != "activity_certification":
         return None
@@ -96,22 +128,21 @@ def _activity_participant_details(db: Session, board: Board, post: Post) -> list
             for label in labels
         ]
 
-    payments_by_roster_id = {
-        payment.roster_member_id: payment
-        for payment in db.scalars(
-            select(DuesPayment).where(DuesPayment.roster_member_id.in_(payer_ids))
-        ).all()
-    }
+    # 작성·수정 시점에 굳혀 둔 값이 있으면 그대로 쓴다. 그 뒤 납부 상태가 바뀌어도
+    # 지난 글의 표시는 그대로여야 한다.
+    #
+    # 스냅샷을 쓰기 전에 올라온 글은 당시 납부 상태를 알 방법이 없다. dues_payments는
+    # 회원당 한 행이고 미납으로 되돌리면 행이 지워지며, 감사 로그도 변경 후 값만
+    # 남긴다. 그래서 지금 상태로 계산하지 않고 '모름'(null)으로 둔다. 화면은 명시적인
+    # false일 때만 회색이므로 이름만 있던 옛 글과 같이 검은색으로 고정된다.
+    snapshot = _stored_dues_snapshot(metadata, len(payer_ids))
     return [
         {
             "id": payer_id,
             "label": label,
-            "is_paid_for_board": bool(
-                (payment := payments_by_roster_id.get(payer_id))
-                and (payment.scope == "ALL" or payment.once_board_id == board.id)
-            ),
+            "is_paid_for_board": snapshot[index] if snapshot is not None else None,
         }
-        for payer_id, label in zip(payer_ids, labels, strict=True)
+        for index, (payer_id, label) in enumerate(zip(payer_ids, labels, strict=True))
     ]
 
 
@@ -257,6 +288,10 @@ def _canonical_activity_metadata(
         metadata["participants"] = existing_participants
         if "participant_dues_payer_ids" in existing:
             metadata["participant_dues_payer_ids"] = existing["participant_dues_payer_ids"]
+            # 참가자를 그대로 둔 수정이면 굳혀 둔 납부 여부도 그대로 이어받는다.
+            # 다른 칸만 고쳤다고 지난 글의 표시가 바뀌면 안 된다.
+            if "participant_dues_paid" in existing:
+                metadata["participant_dues_paid"] = existing["participant_dues_paid"]
         elif "participant_user_ids" in existing:
             metadata["participant_user_ids"] = existing["participant_user_ids"]
         return metadata
@@ -281,6 +316,9 @@ def _canonical_activity_metadata(
 
     metadata["participants"] = ", ".join(_participant_label(payers_by_id[payer_id]) for payer_id in payer_ids)
     metadata["participant_dues_payer_ids"] = payer_ids
+    # 참가자를 새로 정한 시점의 납부 여부를 굳힌다. 클라이언트가 보낸 값은 믿지 않고
+    # 서버가 직접 계산한다.
+    metadata["participant_dues_paid"] = _dues_paid_snapshot(db, board, payer_ids)
     metadata.pop("participant_user_ids", None)
     return metadata
 
