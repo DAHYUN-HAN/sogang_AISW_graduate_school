@@ -116,6 +116,11 @@ export default function PostEditScreen() {
   const updateMutation = useUpdatePost(postId, post?.board_id ?? 0, board);
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
+  // 저장에 성공해 떠나는 이동은 막으면 안 된다. 저장해도 폼은 여전히 기준선과
+  // 달라 hasUnsavedChanges가 참으로 남으므로, 이 표시로 잠금을 먼저 푼다.
+  // 작성 화면과 같은 방식이다.
+  const [submitted, setSubmitted] = useState(false);
+  const pendingSubmitNavigation = useRef<(() => void) | null>(null);
   // 확인창을 띄우는 동안 고른 게시판을 들고 있는다. 확인 전에는 옮기지 않는다.
   const [pendingBoardId, setPendingBoardId] = useState<number | null>(null);
   // 첨부와 게시판 이동은 react-hook-form 밖이라 기준선을 따로 들고 있는다.
@@ -258,14 +263,23 @@ export default function PostEditScreen() {
   // 하단 탭을 눌러 떠나려는 경우. 확인 후에 이 함수를 불러 그 탭으로 옮긴다.
   const pendingTabLeave = useRef<(() => void) | null>(null);
 
-  usePreventRemove(hasUnsavedChanges && !removeConfirmed, ({ data }) => {
+  usePreventRemove(hasUnsavedChanges && !submitted && !removeConfirmed, ({ data }) => {
     pendingRemoveAction.current = data.action;
     setDiscardPromptOpen(true);
   });
 
+  useEffect(() => {
+    if (!submitted) return;
+    // 잠금이 풀린 렌더 뒤에 옮긴다. 같은 틱에 옮기면 usePreventRemove가 아직
+    // 이전 값을 들고 있어 저장에도 수정 취소 확인창이 뜬다.
+    const go = pendingSubmitNavigation.current;
+    pendingSubmitNavigation.current = null;
+    go?.();
+  }, [submitted]);
+
   // 탭바는 이 화면의 부모라 requestClose를 타지 않는다. 가로채기를 걸어
   // 헤더·안드로이드 뒤로가기와 같은 확인창을 거치게 한다.
-  const blocksLeaving = hasUnsavedChanges && !removeConfirmed;
+  const blocksLeaving = hasUnsavedChanges && !submitted && !removeConfirmed;
   useEffect(() => {
     if (!blocksLeaving) return undefined;
     setWriteLeaveGuard((proceed) => {
@@ -409,13 +423,14 @@ export default function PostEditScreen() {
               detailBoardId,
               params.returnTo,
             );
-            navigateAfterPostEdit(decision, {
+            pendingSubmitNavigation.current = () => navigateAfterPostEdit(decision, {
               back: () => router.back(),
               replace: (route) => router.replace(route as never),
             });
-            return;
+          } else {
+            pendingSubmitNavigation.current = leaveScreen;
           }
-          leaveScreen();
+          setSubmitted(true);
         },
         onError: () => Alert.alert("저장 실패", "작성자 또는 관리자만 이 게시글을 수정할 수 있습니다."),
       }

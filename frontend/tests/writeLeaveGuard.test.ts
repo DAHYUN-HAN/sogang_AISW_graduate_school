@@ -85,7 +85,8 @@ test("작성·수정 화면이 확인창을 거쳐 누른 탭으로 옮긴다", 
 
 test("바꿀 내용이 없으면 가로채기를 걸지 않는다", () => {
   assert.match(createSource, /const blocksLeaving = hasUnsavedChanges && !createdPostId && !removeConfirmed;/);
-  assert.match(editSource, /const blocksLeaving = hasUnsavedChanges && !removeConfirmed;/);
+  // 저장에 성공하면 폼은 기준선과 다른 채로 남으므로 submitted로 잠금을 먼저 푼다.
+  assert.match(editSource, /const blocksLeaving = hasUnsavedChanges && !submitted && !removeConfirmed;/);
   for (const source of [createSource, editSource]) {
     assert.match(source, /if \(!blocksLeaving\) return undefined;/);
   }

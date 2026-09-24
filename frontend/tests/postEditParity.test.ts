@@ -70,8 +70,13 @@ test("수정 중 나가면 확인창을 띄우고, 저장 후에는 묻지 않�
   assert.match(editSource, /<DiscardWriteModal/);
   assert.match(editSource, /mode="edit"/);
   assert.match(editSource, /if \(hasUnsavedChanges\) \{\s*setDiscardPromptOpen\(true\);/);
-  // 저장 성공은 확인창을 거치지 않는다.
-  assert.match(editSource, /onSuccess: \(\) => \{[\s\S]*?leaveScreen\(\);/);
+  // 저장 성공은 확인창을 거치지 않는다. 저장해도 폼은 기준선과 달라
+  // hasUnsavedChanges가 참으로 남으므로, submitted로 잠금을 먼저 푼 뒤
+  // 다음 렌더에서 옮긴다. 같은 틱에 옮기면 usePreventRemove가 이전 값을 들고 있다.
+  assert.match(editSource, /usePreventRemove\(hasUnsavedChanges && !submitted && !removeConfirmed/);
+  assert.match(editSource, /onSuccess: \(\) => \{[\s\S]*?setSubmitted\(true\);/);
+  assert.match(editSource, /pendingSubmitNavigation\.current = leaveScreen;/);
+  assert.match(editSource, /if \(!submitted\) return;[\s\S]*?go\?\.\(\);/);
   // 첨부와 게시판 이동도 변경으로 센다.
   assert.match(editSource, /unsavedBaseline\.current\.attachmentIds/);
   assert.match(editSource, /unsavedBaseline\.current\.boardId/);
