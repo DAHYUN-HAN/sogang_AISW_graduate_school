@@ -13,7 +13,7 @@ import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import LoadingState from "../../../../../components/LoadingState";
 import ClubOperationStatusField from "../../../../../components/ClubOperationStatusField";
-import { clubOperationStatus } from "../../../../../utils/participationGuide";
+import { operationStatus } from "../../../../../utils/participationGuide";
 import DiscardWriteModal from "../../../../../components/DiscardWriteModal";
 import NoticeModal, { type NoticeModalContent } from "../../../../../components/NoticeModal";
 import SelectionSheet from "../../../../../components/SelectionSheet";
@@ -67,7 +67,7 @@ const schema = z.object({
   professor: z.string().optional(),
   difficulty: z.string().optional(),
   satisfaction: z.string().optional(),
-  clubOperationStatus: z.enum(["active", "ended"]),
+  operationStatus: z.enum(["active", "ended"]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -84,7 +84,7 @@ const EMPTY_FORM: FormValues = {
   professor: "",
   difficulty: "",
   satisfaction: "",
-  clubOperationStatus: "active",
+  operationStatus: "active",
 };
 
 export default function PostEditScreen() {
@@ -167,7 +167,7 @@ export default function PostEditScreen() {
       contact: typeof post.metadata?.contact === "string" ? post.metadata.contact : "",
       applicationUrl: typeof post.metadata?.application_url === "string" ? post.metadata.application_url : "",
       ...resourcePostFieldValues(resourcePostFields(board?.slug), post.metadata),
-      clubOperationStatus: clubOperationStatus(post.metadata),
+      operationStatus: operationStatus(post.metadata),
     });
     setAttachments(post.attachments);
     unsavedBaseline.current = {
@@ -401,7 +401,7 @@ export default function PostEditScreen() {
             ? {
                 ...(post.metadata ?? {}),
                 application_url: values.applicationUrl?.trim() ?? "",
-                ...(board?.slug === "club-promo" ? { club_operation_status: values.clubOperationStatus } : {}),
+                ...(board?.slug === "club-promo" ? { operation_status: values.operationStatus } : {}),
               }
             : isResourceEdit
               ? withResourcePostMetadata(post.metadata, resourceFields, values)
@@ -640,7 +640,7 @@ export default function PostEditScreen() {
         {board?.slug === "club-promo" ? (
           <Controller
             control={control}
-            name="clubOperationStatus"
+            name="operationStatus"
             render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} />}
           />
         ) : null}

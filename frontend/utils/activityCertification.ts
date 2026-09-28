@@ -3,7 +3,7 @@ import type {
   ApiSuccess,
   PostListItem,
 } from "../types";
-import { clubOperationStatus } from "./participationGuide";
+import { operationStatus } from "./participationGuide";
 
 export type ActivityParticipant = {
   id: number;
@@ -60,18 +60,18 @@ export async function loadAllPublishedActivitySourcePosts<T extends ActivitySour
   }
 }
 
+// 동아리·스터디·네트워킹 모두 운영 중인 대상만 고를 수 있다. 운영이 끝난 대상의
+// 안내 글은 지우지 않고 남겨둔다 — 과거 활동인증이 그 글을 참조하기 때문이다.
+//
+// 거르는 일은 서버가 한다. 여기서 한 번 더 보는 것은 operation_status 필터를 모르는
+// 옛 백엔드에 붙었을 때를 위한 안전장치이고, 서버가 걸러 주면 아무것도 걸리지 않는다.
 export async function loadPublishedActivitySourcePosts<T extends ActivitySourcePost>(
   boardId: number,
-  boardSlug: string | undefined,
   loadPage: ActivitySourcePageLoader<T>,
   pageSize = 50,
 ): Promise<T[]> {
-  if (boardSlug === "club-promo") {
-    const posts = await loadAllPublishedActivitySourcePosts(boardId, loadPage, pageSize);
-    return posts.filter((post) => clubOperationStatus(post.metadata) === "active");
-  }
-  const response = await loadPage(boardId, 1, pageSize, activitySourcePostFilters());
-  return response.data;
+  const posts = await loadAllPublishedActivitySourcePosts(boardId, loadPage, pageSize);
+  return posts.filter((post) => operationStatus(post.metadata) === "active");
 }
 
 export const ACTIVITY_PARTICIPANT_PAID_COLOR = "#212429";
@@ -181,8 +181,14 @@ export function activityCertificationPreview(
   return contentPreview || title;
 }
 
-export function activitySourcePostFilters(): { sort: "latest"; status: "published" } {
-  return { sort: "latest", status: "published" };
+export function activitySourcePostFilters(): {
+  sort: "latest";
+  status: "published";
+  operation_status: "active";
+} {
+  // 운영이 끝난 대상은 서버가 걸러서 준다. 걸러진 글이 페이지를 차지하지 않아
+  // 스터디처럼 글이 쌓이는 게시판에서도 받아오는 페이지 수가 늘지 않는다.
+  return { sort: "latest", status: "published", operation_status: "active" };
 }
 
 function participantLabels(metadata?: Record<string, unknown> | null) {

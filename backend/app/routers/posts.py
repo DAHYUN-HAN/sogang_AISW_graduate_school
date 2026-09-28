@@ -35,7 +35,16 @@ from app.schemas.post import MutualAidUpdate, PostCreate, PostRepresentativeImag
 from app.security import utc_now
 from app.study_activity_cleanup import post_content_preview
 from app.audit import log_admin_action
-from app.participation_guides import ADMIN_PARTICIPATION_BOARD_SLUGS, normalize_participation_guide
+from app.participation_guides import (
+    ACTIVITY_SOURCE_BOARD_SLUGS,
+    ADMIN_PARTICIPATION_BOARD_SLUGS,
+    LEGACY_OPERATION_STATUS_KEY,
+    OPERATION_STATUS_BOARD_SLUGS,
+    OPERATION_STATUS_KEY,
+    OPERATION_STATUS_VALUES,
+    normalize_participation_guide,
+    operation_status as read_operation_status,
+)
 
 router = APIRouter()
 
@@ -157,7 +166,7 @@ def _invalid_dues_payer() -> AppException:
 def _invalid_activity_source() -> AppException:
     return AppException(
         status_code=422,
-        message="Select a current club registered by an administrator.",
+        message="Select a currently running activity registered by an administrator.",
         code="INVALID_ACTIVITY_SOURCE",
     )
 
@@ -177,39 +186,93 @@ def _activity_source_post_id(metadata: dict | None) -> int | None:
     return parsed if parsed > 0 else None
 
 
-def _canonical_club_activity_source(
+def _operation_status_filter(value: str):
+    """운영 상태로 목록을 거른다. operation_status() 와 같은 규칙을 SQL로 옮긴 것이다.
+
+    화면에서 거르면 운영이 끝난 대상이 페이지를 차지해 뒤쪽이 잘리고, 스터디처럼
+    글이 계속 쌓이는 게시판은 전 페이지를 받는 비용도 커진다.
+    """
+
+    stored = func.coalesce(
+        Post.metadata_json[OPERATION_STATUS_KEY].as_string(),
+        Post.metadata_json[LEGACY_OPERATION_STATUS_KEY].as_string(),
+    )
+    if value == "ended":
+        return stored == "ended"
+    # 값이 없으면 운영 중이다. NULL 비교는 참이 되지 않으므로 따로 본다.
+    return or_(stored.is_(None), stored != "ended")
+
+
+def _canonical_activity_source(
     db: Session,
     board: Board | None,
     metadata: dict | None,
     *,
     existing_metadata: dict | None = None,
+    is_new: bool = False,
 ) -> tuple[dict | None, str | None]:
-    if board is None or board.slug != "club-activity":
+    """활동인증이 가리키는 활동 대상이 실제로 고를 수 있는 글인지 서버에서 확인한다.
+
+    화면에서 목록을 걸러도 옛 앱이나 직접 호출로는 운영이 끝난 대상을 그대로
+    보낼 수 있어, 저장 직전에 다시 본다.
+    """
+
+    if board is None:
+        return metadata, None
+    source_slug = ACTIVITY_SOURCE_BOARD_SLUGS.get(board.slug)
+    if source_slug is None:
         return metadata, None
 
     canonical = dict(metadata or {})
     source_id = _activity_source_post_id(canonical)
+    existing_source_id = _activity_source_post_id(existing_metadata)
+
+    # 대상을 그대로 둔 수정은 검사하지 않는다. 검증이 없던 시절에 올라온 글과
+    # 대상이 아예 없는 레거시 글(legacy_import가 None으로 넣는다)까지 수정이
+    # 막히면 안 된다. 새로 고르는 순간부터 아래 규칙이 그대로 적용된다.
+    if not is_new and source_id == existing_source_id:
+        return canonical, _activity_source_title(db, board, source_id)
+
     if source_id is None:
         raise _invalid_activity_source()
 
-    existing_source_id = _activity_source_post_id(existing_metadata)
-    filters = [Post.id == source_id, Board.slug == "club-promo"]
-    if source_id != existing_source_id:
-        filters.extend(
-            [
-                Board.is_active.is_(True),
-                Post.status == "published",
-                Post.deleted_at.is_(None),
-            ]
+    source = db.scalar(
+        select(Post)
+        .join(Board, Board.id == Post.board_id)
+        .where(
+            Post.id == source_id,
+            Board.slug == source_slug,
+            Board.is_active.is_(True),
+            Post.status == "published",
+            Post.deleted_at.is_(None),
         )
-    source = db.scalar(select(Post).join(Board, Board.id == Post.board_id).where(*filters))
-    if source is None:
-        raise _invalid_activity_source()
-    if source_id != existing_source_id and (source.metadata_json or {}).get("club_operation_status") == "ended":
+    )
+    if source is None or read_operation_status(source.metadata_json) == "ended":
         raise _invalid_activity_source()
 
     canonical["activity_source_post_id"] = str(source_id)
-    return canonical, source.title
+    return canonical, _source_title_for_category(board, source.title)
+
+
+def _source_title_for_category(board: Board, title: str) -> str | None:
+    """대상 제목으로 category를 덮어쓰는 것은 아직 동아리만 한다.
+
+    스터디·네트워킹은 화면이 클라이언트가 보낸 분류를 그대로 쓰고 있어, 여기서
+    같이 바꾸면 표시가 달라진다. 표시 규칙을 손볼 때 함께 정리한다.
+    """
+
+    return title if board.slug == "club-activity" else None
+
+
+def _activity_source_title(db: Session, board: Board, source_id: int | None) -> str | None:
+    if source_id is None or board.slug != "club-activity":
+        return None
+    source = db.scalar(
+        select(Post)
+        .join(Board, Board.id == Post.board_id)
+        .where(Post.id == source_id, Board.slug == ACTIVITY_SOURCE_BOARD_SLUGS[board.slug])
+    )
+    return _source_title_for_category(board, source.title) if source is not None else None
 
 
 def _club_activity_source_titles(db: Session, board: Board | None, posts: list[Post]) -> dict[int, str]:
@@ -332,13 +395,20 @@ def _metadata_for_update(
 ) -> dict | None:
     metadata = dict(incoming_metadata or {})
     existing_metadata = dict(post.metadata_json or {})
-    if (
-        board is not None
-        and board.slug == "club-promo"
-        and "club_operation_status" in existing_metadata
-        and "club_operation_status" not in metadata
-    ):
-        metadata["club_operation_status"] = existing_metadata["club_operation_status"]
+    # 운영 상태는 관리자가 DB에서 직접 넣는다. 클라이언트는 이 키를 모르고 보내지
+    # 않으므로, 이어받지 않으면 작성자가 글을 한 번 고치는 것만으로 지워진다.
+    if board is not None and board.slug in OPERATION_STATUS_BOARD_SLUGS:
+        if OPERATION_STATUS_KEY in metadata:
+            metadata.pop(LEGACY_OPERATION_STATUS_KEY, None)
+        elif LEGACY_OPERATION_STATUS_KEY in metadata:
+            # 옛 앱이 보낸 값도 그대로 존중하되 새 키로 옮겨 적는다.
+            metadata[OPERATION_STATUS_KEY] = metadata.pop(LEGACY_OPERATION_STATUS_KEY)
+        else:
+            stored = existing_metadata.get(OPERATION_STATUS_KEY)
+            if stored is None:
+                stored = existing_metadata.get(LEGACY_OPERATION_STATUS_KEY)
+            if stored is not None:
+                metadata[OPERATION_STATUS_KEY] = stored
     if (
         board is not None
         and board.board_type == "activity_certification"
@@ -731,6 +801,7 @@ def get_posts(
     q: str | None = Query(None, min_length=1),
     category: str | None = None,
     status: str | None = None,
+    operation_status: str | None = Query(None, pattern="^(active|ended)$"),
     sort: str = Query("latest", pattern="^(latest|popular|views)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -761,6 +832,8 @@ def get_posts(
         filters.append(Post.category == category)
     if status:
         filters.append(Post.status == status)
+    if operation_status:
+        filters.append(_operation_status_filter(operation_status))
     blocked_author_ids = db.scalars(
         select(UserBlock.blocked_user_id).where(UserBlock.blocker_id == current_user.id)
     ).all()
@@ -964,11 +1037,11 @@ def _validate_admin_participation_post(board: Board, metadata: dict | None, curr
     if current_user.role != "admin":
         raise AppException(status_code=403, message="Only admins can manage participation guide posts.", code="FORBIDDEN")
 
-    if board.slug == "club-promo" and "club_operation_status" in (metadata or {}):
-        if metadata["club_operation_status"] not in ("active", "ended"):
+    for key in (OPERATION_STATUS_KEY, LEGACY_OPERATION_STATUS_KEY):
+        if key in (metadata or {}) and metadata[key] not in OPERATION_STATUS_VALUES:
             raise AppException(
                 status_code=422,
-                message="Club operation status must be active or ended.",
+                message="Operation status must be active or ended.",
                 code="INVALID_CLUB_OPERATION_STATUS",
             )
 
@@ -1438,7 +1511,7 @@ def create_post(
 
     is_anonymous = True if board.board_type == "suggestion" else payload.is_anonymous
     post_metadata = _canonical_activity_metadata(db, board, normalized_metadata)
-    post_metadata, activity_source_title = _canonical_club_activity_source(db, board, post_metadata)
+    post_metadata, activity_source_title = _canonical_activity_source(db, board, post_metadata, is_new=True)
     post = Post(
         board_id=board_id,
         author_id=current_user.id,
@@ -1541,6 +1614,10 @@ def update_post(
     is_anonymous = (
         True if target_board is not None and target_board.board_type == "suggestion" else payload.is_anonymous
     )
+    # 다른 게시판에서 옮겨 들어오는 수정은 이 게시판 기준으로는 새 글이다. 옛 글
+    # 배려(대상 검사 생략)가 여기까지 오면 대상 없는 활동인증이 생긴다. 지금은 위에서
+    # 자료 게시판끼리만 이동을 허용해 닿지 않지만, 그 제약과 무관하게 참이어야 한다.
+    moved_into_board = target_board is not None and post.board_id != target_board.id
     if target_board is not None:
         post.board_id = target_board.id
     post.title = payload.title
@@ -1559,11 +1636,12 @@ def update_post(
         merged_metadata,
         existing_metadata=existing_metadata,
     )
-    canonical_metadata, activity_source_title = _canonical_club_activity_source(
+    canonical_metadata, activity_source_title = _canonical_activity_source(
         db,
         target_board,
         canonical_metadata,
         existing_metadata=existing_metadata,
+        is_new=moved_into_board,
     )
     post.category = activity_source_title or canonical_post_category(target_board, payload.category)
     post.metadata_json = canonical_metadata

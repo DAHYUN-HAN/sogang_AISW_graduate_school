@@ -54,8 +54,7 @@ test("관리자가 동아리를 수정하면 활동인증 선택 목록 캐시�
 test("활동인증 작성·수정 선택창은 새 동아리와 이름이 바뀐 동아리를 원본 ID로 제공한다", async () => {
   const posts = await activityCertification.loadPublishedActivitySourcePosts(
     9,
-    "club-promo",
-    async (_boardId, page, _size, filters) => {
+    async (_boardId: number, page: number, _size: number, filters: { status: string }) => {
       assert.equal(filters.status, "published");
       return {
         status: "success",

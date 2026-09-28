@@ -366,7 +366,7 @@ export const postApi = {
     boardId: number,
     page: number,
     size: number,
-    filters?: { q?: string; category?: string; status?: string; sort?: "latest" | "popular" | "views" }
+    filters?: { q?: string; category?: string; status?: string; operation_status?: "active" | "ended"; sort?: "latest" | "popular" | "views" }
   ) => {
     const response = await api.get<ApiSuccess<PostListItem[]>>(`/boards/${boardId}/posts`, {
       params: { page, size, ...filters },

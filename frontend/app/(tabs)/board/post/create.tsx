@@ -16,7 +16,7 @@ import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/u
 import CompletionState from "../../../../components/CompletionState";
 import DiscardWriteModal from "../../../../components/DiscardWriteModal";
 import ClubOperationStatusField from "../../../../components/ClubOperationStatusField";
-import { clubOperationStatus } from "../../../../utils/participationGuide";
+import { operationStatus } from "../../../../utils/participationGuide";
 import LoadingState from "../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../components/PostAttachmentEditor";
 import SelectionSheet, { type SelectionOption } from "../../../../components/SelectionSheet";
@@ -110,7 +110,7 @@ const schema = z.object({
   professor: z.string().optional(),
   difficulty: z.string().optional(),
   satisfaction: z.string().optional(),
-  clubOperationStatus: z.enum(["active", "ended"]),
+  operationStatus: z.enum(["active", "ended"]),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -458,18 +458,13 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const activitySourceBoard = useMemo(() => {
     if (!isActivity) return undefined;
     if (board?.slug.includes("study")) return boards.find((item) => item.slug === "study-recruit");
-    if (board?.slug.includes("networking")) {
-      return boards.find((item) => item.slug === "networking-programs") ?? boards.find((item) => item.slug === "alumni-directory");
-    }
+    // 동문 주소록(alumni-directory)은 바깥 링크 안내 게시판이라 활동 대상이 아니다.
+    if (board?.slug.includes("networking")) return boards.find((item) => item.slug === "networking-programs");
     return boards.find((item) => item.slug === "club-promo");
   }, [board?.slug, boards, isActivity]);
   const activitySourceQuery = useQuery({
     queryKey: ["posts", activitySourceBoard?.id, "activity-source-options", activitySourceBoard?.slug],
-    queryFn: () => loadPublishedActivitySourcePosts(
-      activitySourceBoard?.id ?? 0,
-      activitySourceBoard?.slug,
-      postApi.getPosts,
-    ),
+    queryFn: () => loadPublishedActivitySourcePosts(activitySourceBoard?.id ?? 0, postApi.getPosts),
     enabled: isActivity && Boolean(activitySourceBoard?.id),
     retry: false,
   });
@@ -490,7 +485,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       professor: "",
       difficulty: "",
       satisfaction: "",
-      clubOperationStatus: "active",
+      operationStatus: "active",
     },
   });
 
@@ -530,7 +525,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       contact: typeof metadata.contact === "string" ? metadata.contact : "",
       applicationUrl: typeof metadata.application_url === "string" ? metadata.application_url : "",
       ...resourcePostFieldValues(resourceFields, metadata),
-      clubOperationStatus: clubOperationStatus(metadata),
+      operationStatus: operationStatus(metadata),
     });
     setAttachments(existingPost.attachments);
     // 링크로 신청했던 글이면 링크 탭으로 열린다.
@@ -690,7 +685,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     }
     if (isAdminParticipationPost && clean(values.applicationUrl)) {
       metadata.application_url = clean(values.applicationUrl) as string;
-      if (board?.slug === "club-promo") metadata.club_operation_status = values.clubOperationStatus;
+      if (board?.slug === "club-promo") metadata.operation_status = values.operationStatus;
     }
     Object.assign(metadata, resourcePostMetadata(resourceFields, values));
     return Object.keys(metadata).length > 0 ? metadata : undefined;
@@ -954,14 +949,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   });
 
   const participantResults = participantSearch.data?.data ?? [];
-  // 동아리 활동인증은 운영 중인 동아리만 고를 수 있다. 운영이 끝난 동아리의
-  // 안내 글은 지우지 않고 남겨둔다 — 과거 활동인증이 그 글을 참조해 배지에
-  // 마지막 공식명을 띄우기 때문이다.
-  const activitySourcePosts = useMemo(() => {
-    const posts = activitySourceQuery.data ?? [];
-    if (activitySourceBoard?.slug !== "club-promo") return posts;
-    return posts.filter((post) => clubOperationStatus(post.metadata) === "active");
-  }, [activitySourceBoard?.slug, activitySourceQuery.data]);
+  // 운영 중인 대상만 남기는 일은 loadPublishedActivitySourcePosts가 한다.
+  const activitySourcePosts = activitySourceQuery.data ?? [];
   const activityOptions: SelectionOption[] = activitySourcePosts.map((post) => ({ key: String(post.id), label: post.title }));
   const mutualAidTypeOptions: SelectionOption[] = [
     { key: "marriage", label: "결혼" },
@@ -1626,7 +1615,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       {board?.slug === "club-promo" ? (
         <Controller
           control={control}
-          name="clubOperationStatus"
+          name="operationStatus"
           render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} />}
         />
       ) : null}

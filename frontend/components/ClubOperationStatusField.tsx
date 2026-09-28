@@ -1,15 +1,15 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import type { ClubOperationStatus } from "../utils/participationGuide";
+import type { OperationStatus } from "../utils/participationGuide";
 
-const OPTIONS: { value: ClubOperationStatus; label: string }[] = [
+const OPTIONS: { value: OperationStatus; label: string }[] = [
   { value: "active", label: "운영 중" },
   { value: "ended", label: "운영 종료" },
 ];
 
 export default function ClubOperationStatusField({ value, onChange }: {
-  value: ClubOperationStatus;
-  onChange: (value: ClubOperationStatus) => void;
+  value: OperationStatus;
+  onChange: (value: OperationStatus) => void;
 }) {
   return (
     <View style={styles.field}>
