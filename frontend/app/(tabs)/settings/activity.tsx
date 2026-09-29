@@ -28,7 +28,7 @@ function categoryTone(label: string) {
   if (label.includes("종합")) return { bg: "#FAEEDA", fg: "#854F0B" };
   if (label.includes("행사") || label.includes("시험") || label.includes("족보")) return { bg: "#FBEAF0", fg: "#993556" };
   if (label.includes("특강")) return { bg: "#E6F9FB", fg: "#14788A" };
-  if (label.includes("기타")) return { bg: "#F0EEF9", fg: "#5A4C8B" };
+  if (label.includes("기타")) return { bg: "#F0EEF9", fg: "#6543A2" };
   if (label.includes("졸업") || label.includes("논문") || label.includes("인증")) return { bg: "#EAF3DE", fg: "#3B6D11" };
   if (label.includes("강의") || label.includes("후기") || label.includes("스터디") || label.includes("모집")) return { bg: "#EEEDFE", fg: "#3C3489" };
   return { bg: "#E6F1FB", fg: "#0C447C" };

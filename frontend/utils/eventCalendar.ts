@@ -95,23 +95,41 @@ export function eventOccursOnCalendarDate(
   return range.start <= target && target <= range.end;
 }
 
-export function eventDaysForMonth(events: EventItem[], month: Date) {
+function startMillis(event: Pick<EventItem, "start_at">) {
+  const parsed = parseApiDate(event.start_at);
+  return parsed ? parsed.getTime() : 0;
+}
+
+/**
+ * 그 달의 날짜별 일정. 여러 날에 걸친 일정은 걸친 날마다 들어간다.
+ *
+ * 날짜 아래 점과 선택한 날의 일정 목록이 같은 결과를 봐야 해서 한 번만 훑는다.
+ * 목록에 그대로 쓰도록 시작 시각 순으로 정렬해 담는다.
+ */
+export function eventsByDayForMonth(events: EventItem[], month: Date) {
   const monthStart = ordinal({ year: month.getFullYear(), month: month.getMonth() + 1, day: 1 });
   const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
   const monthEnd = monthStart + lastDay - 1;
-  const days = new Set<number>();
+  const byDay = new Map<number, EventItem[]>();
 
-  for (const event of events) {
+  for (const event of [...events].sort((left, right) => startMillis(left) - startMillis(right))) {
     const range = eventOrdinals(event);
     if (!range) continue;
     const visibleStart = Math.max(range.start, monthStart);
     const visibleEnd = Math.min(range.end, monthEnd);
     for (let current = visibleStart; current <= visibleEnd; current += 1) {
-      days.add(current - monthStart + 1);
+      const day = current - monthStart + 1;
+      const bucket = byDay.get(day);
+      if (bucket) bucket.push(event);
+      else byDay.set(day, [event]);
     }
   }
 
-  return days;
+  return byDay;
+}
+
+export function eventDaysForMonth(events: EventItem[], month: Date) {
+  return new Set(eventsByDayForMonth(events, month).keys());
 }
 
 export function eventIsCurrentOrUpcoming(event: EventItem, now = new Date()) {

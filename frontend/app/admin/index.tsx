@@ -132,7 +132,6 @@ const COLORS = {
   primary700: "#0B3AC4",
   primary900: "#0B1F56",
   cyan: "#1FA9BD",
-  purple: "#6C4FCB",
   success: "#2FA365",
   warning: "#E5A500",
   error: "#D94343",

@@ -77,9 +77,34 @@ test("조금만 움직이면 달이 바뀌지 않는다", () => {
 
 test("제스처는 날짜 격자에 붙고 화살표 버튼은 그대로 남는다", () => {
   assert.ok(
-    homeSource.includes("<View {...monthSwipe.panHandlers} style={styles.calendarGrid}>"),
+    homeSource.includes("<View {...monthSwipe.panHandlers} style={cal.grid}>"),
     "격자에 panHandlers가 붙어야 한다",
   );
   assert.ok(homeSource.includes('accessibilityLabel="이전 달"'), "이전 달 버튼");
   assert.ok(homeSource.includes('accessibilityLabel="다음 달"'), "다음 달 버튼");
+});
+
+test("달력은 카드 폭에 맞춰 시안 비율 그대로 커진다", () => {
+  // Figma 캘린더 카드는 360dp 화면·카드 폭 320 기준이다. 화면이 넓어지면 카드도
+  // 넓어지는데 글자만 고정이면 시안보다 작아 보인다.
+  assert.match(homeSource, /const DESIGN_CALENDAR_CARD_WIDTH = 320;/);
+  assert.match(
+    homeSource,
+    /Math\.min\(getHomeContentWidth\(windowWidth\) \/ DESIGN_CALENDAR_CARD_WIDTH, MAX_CALENDAR_SCALE\)/,
+  );
+  // 크기 값은 전부 r()을 거쳐야 한 군데만 고정폭으로 남는 일이 없다.
+  assert.match(homeSource, /const r = \(value: number\) => value \* scale;/);
+  assert.match(homeSource, /fontSize: r\(13\)/);
+  assert.match(homeSource, /width: r\(4\), height: r\(4\)/);
+  // 테두리는 얇은 선이라 키우지 않는다.
+  assert.match(homeSource, /borderWidth: 0\.5,\s*\n\s*borderColor: COLORS\.border,/);
+
+  // 배율은 아주 좁은 화면에서도, 태블릿처럼 넓은 화면에서도 극단으로 가지 않는다.
+  const scaleFor = (cardWidth: number) => Math.min(cardWidth / 320, 1.25);
+  assert.ok(Math.abs(scaleFor(320) - 1) < 0.001, "디자인 기준 화면(360dp)에서는 1배");
+  assert.ok(scaleFor(280) > 0.85, "가장 좁은 화면에서도 0.87배 수준");
+  // 흔한 대화면 폰까지는 비율을 그대로 살린다.
+  assert.ok(scaleFor(371) < 1.25, "411dp 폰은 상한에 걸리지 않는다");
+  assert.ok(scaleFor(390) < 1.25, "430dp 폰도 상한에 걸리지 않는다");
+  assert.equal(scaleFor(1000), 1.25, "태블릿 폭은 상한에서 멈춘다");
 });

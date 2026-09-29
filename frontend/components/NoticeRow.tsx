@@ -23,7 +23,7 @@ export function noticeRowTone(category: string) {
     return { backgroundColor: "#E6F9FB", color: "#14788A" };
   }
   if (category.includes("기타")) {
-    return { backgroundColor: "#F0EEF9", color: "#5A4C8B" };
+    return { backgroundColor: "#F0EEF9", color: "#6543A2" };
   }
   return { backgroundColor: "#E6F1FB", color: "#0C447C" };
 }
