@@ -701,11 +701,18 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
       ) : (
         selectedEvents.map((event) => {
           const accent = eventCategoryAccent(event.category);
+          // 짝이 되는 공지가 있을 때만 누를 수 있다. 없으면 화살표도 두지 않아
+          // 눌러도 아무 일이 없다는 것이 보이게 한다.
+          const noticePostId = event.notice_post_id ?? null;
           return (
             <Pressable
               key={event.id}
-              accessibilityLabel={`${event.title} 일정 보기`}
-              onPress={() => router.push(`/events/${event.id}` as never)}
+              accessibilityLabel={noticePostId ? `${event.title} 공지 보기` : event.title}
+              disabled={!noticePostId}
+              onPress={() => {
+                if (!noticePostId) return;
+                router.push(postDetailRoute(noticePostId, undefined, HOME_TAB_ROUTE) as never);
+              }}
               style={cal.scheduleCard}
             >
               <View style={[cal.scheduleBar, { backgroundColor: accent }]} />
@@ -714,7 +721,7 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
                 <Text style={cal.scheduleName} numberOfLines={2}>{event.title}</Text>
                 <Text style={cal.scheduleTime}>{formatKoreanTime(event.start_at)}</Text>
               </View>
-              <Text style={cal.chevron}>›</Text>
+              {noticePostId ? <Text style={cal.chevron}>›</Text> : null}
             </Pressable>
           );
         })

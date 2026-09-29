@@ -6,9 +6,11 @@ from sqlalchemy.orm import Session
 
 from app.deps import get_current_user, get_db, require_admin
 from app.errors import AppException
+from app.models.event import Event
 from app.models.notification import Notification, NotificationSetting, PushToken
 from app.models.user import User
 from app.response import success_response
+from app.routers.events import openable_notice_post_ids
 from app.schemas.notification import NotificationSettingUpdate, PushTokenRegister
 from app.push import sync_push_receipts
 
@@ -25,13 +27,34 @@ def _setting_payload(setting: NotificationSetting) -> dict:
     }
 
 
-def _notification_payload(notification: Notification) -> dict:
+def _event_notice_post_ids(db: Session, notifications: list[Notification]) -> dict[int, int]:
+    """일정 알림이 가리킬 공지를 누를 때 기준으로 찾는다.
+
+    알림에 박아두지 않고 매번 조회하므로, 알림을 보낸 뒤에 관리자가 공지를 연결하거나
+    바꿔도 그 알림이 최신 공지로 간다. 지워지거나 비공개가 된 공지는 빼고 준다.
+    """
+
+    event_ids = {item.event_id for item in notifications if item.event_id is not None}
+    if not event_ids:
+        return {}
+    events = db.scalars(select(Event).where(Event.id.in_(event_ids))).all()
+    openable = openable_notice_post_ids(db, events)
+    return {
+        event.id: event.notice_post_id
+        for event in events
+        if event.notice_post_id is not None and event.notice_post_id in openable
+    }
+
+
+def _notification_payload(notification: Notification, event_notices: dict[int, int] | None = None) -> dict:
     return {
         "id": notification.id,
         "notification_type": notification.notification_type,
         "message": notification.message,
         "post_id": notification.post_id,
         "event_id": notification.event_id,
+        # 일정 알림을 눌렀을 때 열 공지. 없으면 눌러도 이동하지 않고 읽음 처리만 한다.
+        "event_notice_post_id": (event_notices or {}).get(notification.event_id) if notification.event_id else None,
         "is_read": notification.is_read,
         "created_at": notification.created_at,
     }
@@ -62,8 +85,9 @@ def get_notifications(
         .offset((page - 1) * size)
         .limit(size)
     ).all()
+    event_notices = _event_notice_post_ids(db, list(notifications))
     return success_response(
-        [_notification_payload(notification) for notification in notifications],
+        [_notification_payload(notification, event_notices) for notification in notifications],
         pagination={"page": page, "size": size, "total": total, "total_pages": math.ceil(total / size) if total else 0},
     )
 

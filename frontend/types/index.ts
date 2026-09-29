@@ -270,6 +270,8 @@ export type EventItem = {
   color?: string;
   start_at: string;
   end_at?: string | null;
+  // 짝이 되는 공지. 관리자가 DB에서 직접 넣고, 열 수 있는 글일 때만 내려온다.
+  notice_post_id?: number | null;
   created_by?: number;
   created_at: string;
   updated_at: string;
@@ -319,6 +321,8 @@ export type NotificationItem = {
   message: string;
   post_id?: number;
   event_id?: number;
+  // 일정 알림이 열 공지. 서버가 누를 때 기준으로 채워 준다.
+  event_notice_post_id?: number | null;
   is_read: boolean;
   created_at: string;
 };

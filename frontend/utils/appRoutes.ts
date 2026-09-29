@@ -33,16 +33,6 @@ export type PostCreateBackDecision =
   | { action: "navigate"; route: PostDetailReturnRoute }
   | { action: "replace"; route: ReturnType<typeof boardRoute> };
 
-export type EventDayBackDecision =
-  | { action: "back" }
-  | { action: "navigate"; route: typeof HOME_TAB_ROUTE }
-  | { action: "replace"; route: typeof HOME_TAB_ROUTE };
-
-export type EventDetailBackDecision =
-  | { action: "back" }
-  | { action: "navigate"; route: "/(tabs)/notifications" }
-  | { action: "replace"; route: typeof HOME_TAB_ROUTE };
-
 export type PostEditCompletionDecision =
   | { action: "back" }
   | { action: "replace"; route: ReturnType<typeof postDetailRoute> };
@@ -80,56 +70,23 @@ export function boardRoute(boardId: number) {
   return `/board/${boardId}` as const;
 }
 
-function eventDayReturnRoute(value: unknown): typeof HOME_TAB_ROUTE | null {
-  const candidate = Array.isArray(value) ? value[0] : value;
-  return candidate === HOME_TAB_ROUTE ? HOME_TAB_ROUTE : null;
-}
-
-export function eventDayRoute(dateKey: string, returnTo?: unknown) {
-  const path = `/events/day/${dateKey}`;
-  const safeReturnTo = eventDayReturnRoute(returnTo);
-  return safeReturnTo ? `${path}?returnTo=${encodeURIComponent(safeReturnTo)}` : path;
-}
-
-export function eventDayBackDecision(returnTo: unknown, canGoBack: boolean): EventDayBackDecision {
-  if (eventDayReturnRoute(returnTo)) return { action: "navigate", route: HOME_TAB_ROUTE };
-  if (canGoBack) return { action: "back" };
-  return { action: "replace", route: HOME_TAB_ROUTE };
-}
-
-export function eventRootRoute() {
-  return HOME_TAB_ROUTE;
-}
-
-function eventDetailReturnRoute(value: unknown): "/(tabs)/notifications" | null {
-  const candidate = Array.isArray(value) ? value[0] : value;
-  return candidate === "/(tabs)/notifications" ? candidate : null;
-}
-
-export function eventDetailRoute(eventId: number, returnTo?: unknown) {
-  const path = `/events/${eventId}`;
-  const safeReturnTo = eventDetailReturnRoute(returnTo);
-  return safeReturnTo ? `${path}?returnTo=${encodeURIComponent(safeReturnTo)}` : path;
-}
-
-export function eventDetailBackDecision(returnTo: unknown, canGoBack: boolean): EventDetailBackDecision {
-  const safeReturnTo = eventDetailReturnRoute(returnTo);
-  if (safeReturnTo) return { action: "navigate", route: safeReturnTo };
-  if (canGoBack) return { action: "back" };
-  return { action: "replace", route: HOME_TAB_ROUTE };
-}
-
+/**
+ * 알림을 눌렀을 때 열 화면. 열 것이 없으면 null이라 부르는 쪽이 머물러 있는다.
+ *
+ * 일정 알림에는 더 이상 전용 화면이 없다. 서버가 그 일정에 연결된 공지를 누를 때
+ * 기준으로 채워 주며, 연결이 없으면 읽음 처리만 하고 이동하지 않는다.
+ */
 export function notificationContentRoute(notification: {
   post_id?: number | null;
-  event_id?: number | null;
+  event_notice_post_id?: number | null;
 }) {
   if (notification.post_id) {
     return postDetailRoute(notification.post_id, undefined, "/(tabs)/notifications");
   }
-  if (notification.event_id) {
-    return eventDetailRoute(notification.event_id, "/(tabs)/notifications");
+  if (notification.event_notice_post_id) {
+    return postDetailRoute(notification.event_notice_post_id, undefined, "/(tabs)/notifications");
   }
-  return "/(tabs)/notifications" as const;
+  return null;
 }
 
 export function postDetailReturnRoute(value: unknown): PostDetailReturnRoute | null {

@@ -91,8 +91,6 @@ function harness(path: string, options: Record<string, unknown> = {}) {
 for (const [path, options, expected] of [
   ["faq", {}, "navigate:/(tabs)/council"],
   ["search", { isNoticeSearch: true }, "navigate:/(tabs)/notices"],
-  ["events/day/[date]", {}, "navigate:/(tabs)/home"],
-  ["events/[eventId]", { params: { returnTo: "/(tabs)/notifications" } }, "navigate:/(tabs)/notifications"],
   ["board/post/[postId]", { params: { returnTo: "/(tabs)/community" } }, "navigate:/(tabs)/community"],
   ["board/post/edit/[postId]", { params: {} }, "back"],
 ] as const) {
@@ -146,12 +144,6 @@ test("nested board: search closes before the nested profile/board navigation", (
   assert.equal(childBacks, 1);
 });
 
-test("normal event details retain day history", () => {
-  const h = harness("events/[eventId]", { params: {} });
-  h.focus(); h.back(); h.header();
-  assert.deepEqual(h.navigation, ["back", "back"]);
-});
-
 test("edit board menu closes before navigating to the post", () => {
   const h = harness("board/post/edit/[postId]", { params: {}, isBoardMenuOpen: true });
   const blur = h.focus();
@@ -164,7 +156,7 @@ test("edit board menu closes before navigating to the post", () => {
 
 // Render real early-return JSX with lightweight host elements. These states
 // previously returned only a spinner/error, hiding every header control.
-for (const path of ["board/post/[postId]", "board/post/edit/[postId]", "events/[eventId]"]) {
+for (const path of ["board/post/[postId]", "board/post/edit/[postId]"]) {
   for (const isLoading of [true, false]) {
     test(`${path}: ${isLoading ? "loading" : "error"} keeps an actionable header`, () => {
       const source = screenSource(path);

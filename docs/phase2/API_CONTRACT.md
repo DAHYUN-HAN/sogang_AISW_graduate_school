@@ -1360,6 +1360,10 @@ Query:
 
 Date bounds use `Asia/Seoul` calendar boundaries with overlap semantics: an event is returned when it starts before the exclusive end of the requested range and its `end_at` (or `start_at` when no end exists) is on or after the range start. Date-only `to_date` values include that full Korean calendar day, so month and single-day queries include multi-day events that began earlier and are still in progress. Event writes normalize timezone-aware inputs to UTC before storing them, and D-day dispatch uses the same Korean calendar-day boundaries.
 
+Every event response carries a nullable `notice_post_id`, the notice that explains the event. Administrators set it directly in the database; `POST /events` and `PUT /events/{event_id}` do not accept the field, so editing an event through the app never clears it and a client-supplied value is ignored. The field is returned only when the referenced post is currently openable — published, not soft-deleted, on an active board — so a link to a removed or hidden notice reads back as `null` instead of leaving a dead affordance on screen. Lists resolve every link in one query.
+
+Event notifications carry a nullable `event_notice_post_id` alongside `event_id`. It is resolved when the notification list is read rather than stored on the notification, so a link added or changed after a D-day notification was dispatched still opens the current notice. Clients open `post_id` first, then `event_notice_post_id`, and otherwise only mark the notification read without navigating: events no longer have a detail screen.
+
 Response item:
 
 ```json

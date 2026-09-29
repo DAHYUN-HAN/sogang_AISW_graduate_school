@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.deps import get_current_user, get_db, require_admin
 from app.errors import AppException
 from app.models.event import Event
+from app.models.board import Board
 from app.models.post import Post
 from app.models.user import User
 from app.notifications import create_notification, event_message
@@ -68,7 +69,34 @@ def _dispatch_for_date(db: Session, target_date: date) -> dict:
     return {"target_date": target_date.isoformat(), "created": created}
 
 
-def _event_payload(event: Event) -> dict:
+def openable_notice_post_ids(db: Session, events) -> set[int]:
+    """연계 공지 중 지금 실제로 열리는 글만 남긴다.
+
+    공지가 지워지거나 비공개로 바뀌면 화면에 화살표만 남고 눌러도 아무것도 안 열린다.
+    목록에서도 한 번에 조회해 일정 수만큼 질의가 늘지 않게 한다.
+    """
+
+    candidates = {event.notice_post_id for event in events if event.notice_post_id is not None}
+    if not candidates:
+        return set()
+    return set(
+        db.scalars(
+            select(Post.id)
+            .join(Board, Board.id == Post.board_id)
+            .where(
+                Post.id.in_(candidates),
+                Post.status == "published",
+                Post.deleted_at.is_(None),
+                Board.is_active.is_(True),
+            )
+        ).all()
+    )
+
+
+def _event_payload(event: Event, openable_notice_ids: set[int] | None = None) -> dict:
+    notice_post_id = event.notice_post_id
+    if notice_post_id is not None and openable_notice_ids is not None and notice_post_id not in openable_notice_ids:
+        notice_post_id = None
     return {
         "id": event.id,
         "title": event.title,
@@ -78,6 +106,7 @@ def _event_payload(event: Event) -> dict:
         "color": event.color,
         "start_at": event.start_at,
         "end_at": event.end_at,
+        "notice_post_id": notice_post_id,
         "created_by": event.created_by,
         "created_at": event.created_at,
         "updated_at": event.updated_at,
@@ -103,7 +132,8 @@ def get_events(
         filters.append(Event.category == category)
 
     events = db.scalars(select(Event).where(*filters).order_by(Event.start_at.asc(), Event.id.asc())).all()
-    return success_response([_event_payload(event) for event in events])
+    openable = openable_notice_post_ids(db, events)
+    return success_response([_event_payload(event, openable) for event in events])
 
 
 @router.post("/admin/dispatch-reminders")
@@ -129,7 +159,7 @@ def get_event(event_id: int, db: Session = Depends(get_db), _: User = Depends(ge
     event = db.get(Event, event_id)
     if event is None:
         raise AppException(status_code=404, message="Event not found.", code="NOT_FOUND")
-    return success_response(_event_payload(event))
+    return success_response(_event_payload(event, openable_notice_post_ids(db, [event])))
 
 
 @router.post("")
@@ -140,7 +170,7 @@ def create_event(payload: EventCreate, db: Session = Depends(get_db), admin: Use
     log_admin_action(db, actor_id=admin.id, action="event.create", target_type="event", target_id=event.id)
     db.commit()
     db.refresh(event)
-    return success_response(_event_payload(event))
+    return success_response(_event_payload(event, openable_notice_post_ids(db, [event])))
 
 
 @router.put("/{event_id}")
@@ -159,7 +189,7 @@ def update_event(
     log_admin_action(db, actor_id=admin.id, action="event.update", target_type="event", target_id=event.id)
     db.commit()
     db.refresh(event)
-    return success_response(_event_payload(event))
+    return success_response(_event_payload(event, openable_notice_post_ids(db, [event])))
 
 
 @router.delete("/{event_id}")

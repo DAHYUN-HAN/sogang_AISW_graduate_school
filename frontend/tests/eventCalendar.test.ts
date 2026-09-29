@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
 
+import * as appRoutes from "../utils/appRoutes";
 import type { EventItem } from "../types";
 import { MAX_DAY_DOTS, dayDotCategories } from "../utils/eventCategoryPresentation";
 import {
@@ -89,8 +90,11 @@ test("홈 달력은 날짜를 눌러도 화면을 옮기지 않고 카드 안에
   // 날짜 탭은 선택만 바꾼다. 예전처럼 그날 일정 화면으로 보내면 안 된다.
   assert.match(homeSource, /setPicked\(\{ monthKey, day: cell\.day \}\)/);
   assert.doesNotMatch(homeSource, /eventDayRoute/);
-  // 일정카드를 눌러야 상세로 간다.
-  assert.match(homeSource, /router\.push\(`\/events\/\$\{event\.id\}`/);
+  // 일정 전용 화면은 없앴다. 짝이 되는 공지가 있을 때만 그 공지로 간다.
+  assert.match(homeSource, /const noticePostId = event\.notice_post_id \?\? null;/);
+  assert.match(homeSource, /disabled=\{!noticePostId\}/);
+  assert.match(homeSource, /\{noticePostId \? <Text style=\{cal\.chevron\}>›<\/Text> : null\}/);
+  assert.doesNotMatch(homeSource, /\/events\//);
 });
 
 test("날짜 점은 일정 하나당 하나이고 같은 분류끼리 붙는다", () => {
@@ -116,4 +120,27 @@ test("점은 가장 좁은 화면에서도 칸을 넘지 않게 잘린다", () =
   const dotsWidth = (count: number) => 4 * count + 3 * (count - 1);
   assert.ok(dotsWidth(MAX_DAY_DOTS) <= cellWidth, `${dotsWidth(MAX_DAY_DOTS)} > ${cellWidth}`);
   assert.ok(dotsWidth(MAX_DAY_DOTS + 1) > cellWidth, "한 개 더 들어가면 상한을 올릴 수 있다");
+});
+
+test("일정 알림은 연계 공지가 있을 때만 이동한다", () => {
+  const route = Reflect.get(appRoutes, "notificationContentRoute") as
+    | ((n: { post_id?: number | null; event_notice_post_id?: number | null }) => string | null)
+    | undefined;
+  assert.equal(typeof route, "function");
+  // 글 알림은 그대로 그 글로 간다.
+  assert.equal(route?.({ post_id: 7 }), "/board/post/7?returnTo=%2F(tabs)%2Fnotifications");
+  // 일정 알림은 짝지은 공지로 간다.
+  assert.equal(route?.({ event_notice_post_id: 9 }), "/board/post/9?returnTo=%2F(tabs)%2Fnotifications");
+  // 연계가 없으면 열 것이 없다. 부르는 쪽이 읽음 처리만 하고 머문다.
+  assert.equal(route?.({}), null);
+});
+
+test("일정 전용 화면은 코드에 남아 있지 않다", () => {
+  // 홈 달력이 유일한 일정 화면이다. 라우트 헬퍼가 되살아나면 갈 곳 없는 링크가 생긴다.
+  assert.equal(existsSync("app/(tabs)/events"), false);
+  const routes = readFileSync("utils/appRoutes.ts", "utf8");
+  for (const name of ["eventDayRoute", "eventDetailRoute", "eventRootRoute"]) {
+    assert.doesNotMatch(routes, new RegExp(name));
+  }
+  assert.doesNotMatch(readFileSync("app/admin/index.tsx", "utf8"), /\/events\/\$\{event\.id\}/);
 });

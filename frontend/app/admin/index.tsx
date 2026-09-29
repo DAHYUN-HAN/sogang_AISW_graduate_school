@@ -1581,14 +1581,8 @@ function EventCard({ event, onEdit }: { event: EventItem; onEdit: (event: EventI
       </View>
       <Text style={{ color: COLORS.text, fontSize: 17, fontWeight: "900" }}>{event.title}</Text>
       <Text style={{ color: COLORS.muted }}>{formatBoardDateTime(event.start_at)}</Text>
-      <View style={{ flexDirection: "row", gap: 8 }}>
-        <View style={{ flex: 1 }}>
-          <ActionButton label="수정" onPress={() => onEdit(event)} tone="outline" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <ActionButton label="보기" onPress={() => router.push(`/events/${event.id}` as never)} tone="outline" />
-        </View>
-      </View>
+      {/* 일정 전용 화면이 없어져 "보기"는 갈 곳이 없다. 내용은 "수정"에서 다 보인다. */}
+      <ActionButton label="수정" onPress={() => onEdit(event)} tone="outline" />
     </View>
   );
 }

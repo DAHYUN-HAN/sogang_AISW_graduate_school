@@ -18,7 +18,7 @@ import LoadingState from "../../components/LoadingState";
 import { notificationApi } from "../../services/api";
 import type { NotificationItem } from "../../types";
 import { formatKoreanTime, formatShortDate } from "../../utils/dateFormat";
-import { eventDetailRoute, postDetailRoute } from "../../utils/appRoutes";
+import { notificationContentRoute } from "../../utils/appRoutes";
 
 const COLORS = {
   primary: "#2761FF",
@@ -122,11 +122,9 @@ export default function NotificationsScreen() {
         .then(() => queryClient.invalidateQueries({ queryKey: ["notifications", "home-badge"] }))
         .catch(() => undefined);
     }
-    if (notification.post_id) {
-      router.push(postDetailRoute(notification.post_id, undefined, "/(tabs)/notifications") as never);
-    } else if (notification.event_id) {
-      router.push(eventDetailRoute(notification.event_id, "/(tabs)/notifications") as never);
-    }
+    // 일정 알림은 짝이 되는 공지가 있을 때만 이동한다. 없으면 읽음 처리만 하고 머문다.
+    const target = notificationContentRoute(notification);
+    if (target) router.push(target as never);
   };
 
   return (
