@@ -8,7 +8,6 @@ import mimetypes
 import os
 import re
 import secrets
-import shutil
 import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict

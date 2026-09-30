@@ -8,7 +8,6 @@ from uuid import UUID
 import pytest
 from sqlalchemy import func, inspect, select
 
-from app import account_deletion
 from app.account_deletion import (
     DELETED_USER_NICKNAME,
     delete_user_account,

@@ -2,15 +2,14 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused, useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
-import { isAxiosError } from "axios";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { BackHandler, Keyboard, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
+import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
-import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon, ImagePlaceholderIcon, NoticeAlertIcon, ParticipantAddIcon } from "../../../../components/icons";
+import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon, NoticeAlertIcon, ParticipantAddIcon } from "../../../../components/icons";
 import { useBoardsQuery } from "../../../../hooks/useApi";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/usePosts";
 import CompletionState from "../../../../components/CompletionState";
