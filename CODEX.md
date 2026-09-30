@@ -441,3 +441,4 @@ Definition of done:
 - Phase 5 QA can begin with a known test matrix and no undocumented blockers.
 
 - 2026-09-17 WP5/WP9 P0 follow-up: club create/edit now exposes a separate operation state (`운영 중 / 운영 종료`) in existing metadata. Certification source filtering and API validation exclude operation-ended clubs; recruitment closure remains independent. Historical certification edits, state resumption and older-client metadata preservation are covered. Validation and local UI evidence: `docs/qa/CLUB_OPERATION_STATUS_2026-09-17.md`.
+- 2026-09-30 WP5/WP9 P0 follow-up: migrate stored `club_operation_status` values into `operation_status` once, remove the old key, and use only the new key in source-guide API filtering, validation, updates, and mobile selection. Migration and production verification are recorded in `docs/qa/OPERATION_STATUS_ONLY_2026-09-30.md`.

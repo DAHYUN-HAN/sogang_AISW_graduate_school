@@ -204,18 +204,17 @@ def test_list_filters_by_operation_status_on_the_server(api, activity_slug, sour
 
     ids = _setup(api, activity_slug, source_slug, source_write)
     with api.session() as db:
-        # 옛 키만 있는 글도 같은 규칙으로 걸러져야 한다.
-        legacy = Post(
+        extra_ended = Post(
             board_id=ids["source_board"],
             author_id=3,
-            title="옛 키로 종료",
+            title="운영 종료 추가",
             content="c",
             status="published",
-            metadata_json={"club_operation_status": "ended"},
+            metadata_json={"operation_status": "ended"},
         )
-        db.add(legacy)
+        db.add(extra_ended)
         db.commit()
-        legacy_id = legacy.id
+        extra_ended_id = extra_ended.id
 
     def _ids(**params):
         response = api.client.get(
@@ -228,15 +227,32 @@ def test_list_filters_by_operation_status_on_the_server(api, activity_slug, sour
 
     # 필터가 없으면 지금까지처럼 전부 보인다. 안내 목록은 종료된 대상도 읽을 수 있어야 한다.
     everything = _ids()
-    assert {ids["live"], ids["ended"], legacy_id} <= everything
+    assert {ids["live"], ids["ended"], extra_ended_id} <= everything
 
     active = _ids(operation_status="active")
     assert ids["live"] in active
     assert ids["ended"] not in active
-    assert legacy_id not in active
+    assert extra_ended_id not in active
 
     ended = _ids(operation_status="ended")
-    assert ended == {ids["ended"], legacy_id}
+    assert ended == {ids["ended"], extra_ended_id}
+
+
+def test_old_status_key_does_not_control_source_selection_or_filter(api) -> None:
+    ids = _setup(api, "study-activity", "study-recruit", "user")
+    with api.session() as db:
+        source = db.get(Post, ids["live"])
+        source.metadata_json = {"club_operation_status": "ended"}
+        db.commit()
+
+    assert _create(api, ids, "live").status_code == 200
+    response = api.client.get(
+        f"/api/boards/{ids['source_board']}/posts",
+        headers=api.headers["owner"],
+        params={"operation_status": "active"},
+    )
+    assert response.status_code == 200
+    assert ids["live"] in {post["id"] for post in response.json()["data"]}
 
 
 def test_list_rejects_an_unknown_operation_status(api) -> None:
