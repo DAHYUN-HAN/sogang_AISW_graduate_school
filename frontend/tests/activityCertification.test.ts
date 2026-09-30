@@ -325,7 +325,7 @@ test("서버가 걸러 주지 않아도 운영 종료는 목록에 남지 않는
       status: "success",
       data: [
         { id: 1, title: "끝난 대상", created_at: "2026-09-17", metadata: { operation_status: "ended" } },
-        { id: 2, title: "옛 키로 끝난 대상", created_at: "2026-09-16", metadata: { club_operation_status: "ended" } },
+        { id: 2, title: "종료된 대상 2", created_at: "2026-09-16", metadata: { operation_status: "ended" } },
         { id: 3, title: "운영 중", created_at: "2026-09-15", metadata: {} },
       ],
       pagination: { page: 1, size: 50, total: 3, total_pages: 1 },
@@ -437,9 +437,9 @@ test("운영 종료만 제외하고 모집 마감·기존 동아리는 모든 �
   const posts = await loadPublishedActivitySourcePosts<Pick<PostListItem, "id" | "title" | "created_at" | "category" | "metadata">>(9, async (_id, page) => ({
     status: "success",
     data: page === 1
-      ? [{ id: 1, title: "운영이 종료된 동아리", created_at: "2026-09-17", category: "모집중", metadata: { club_operation_status: "ended" } }]
+      ? [{ id: 1, title: "운영이 종료된 동아리", created_at: "2026-09-17", category: "모집중", metadata: { operation_status: "ended" } }]
       : [
-          { id: 2, title: "모집 마감 후 활동 중", created_at: "2026-09-16", category: "마감", metadata: { club_operation_status: "active", recruitment_status: "closed" } },
+          { id: 2, title: "모집 마감 후 활동 중", created_at: "2026-09-16", category: "마감", metadata: { operation_status: "active", recruitment_status: "closed" } },
           { id: 3, title: "설정 전부터 운영 중인 동아리", created_at: "2026-09-15", category: "상시", metadata: {} },
         ],
     pagination: { page, size: 2, total: 3, total_pages: 2 },

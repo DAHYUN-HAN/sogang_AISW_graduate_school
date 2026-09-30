@@ -19,7 +19,6 @@ OPERATION_STATUS_BOARD_SLUGS = frozenset(ACTIVITY_SOURCE_BOARD_SLUGS.values())
 
 # 운영이 끝난 대상은 새 활동인증의 선택 목록에서 빠진다. 값이 없으면 운영 중으로 본다.
 OPERATION_STATUS_KEY = "operation_status"
-LEGACY_OPERATION_STATUS_KEY = "club_operation_status"
 OPERATION_STATUS_VALUES = ("active", "ended")
 
 
@@ -27,8 +26,6 @@ def operation_status(metadata: dict | None) -> str:
     """운영 상태를 읽는다. 정확히 "ended"일 때만 종료로 본다."""
 
     stored = (metadata or {}).get(OPERATION_STATUS_KEY)
-    if stored is None:
-        stored = (metadata or {}).get(LEGACY_OPERATION_STATUS_KEY)
     return "ended" if stored == "ended" else "active"
 
 

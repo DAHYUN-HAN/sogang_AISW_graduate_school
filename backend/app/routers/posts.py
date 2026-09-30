@@ -38,7 +38,6 @@ from app.audit import log_admin_action
 from app.participation_guides import (
     ACTIVITY_SOURCE_BOARD_SLUGS,
     ADMIN_PARTICIPATION_BOARD_SLUGS,
-    LEGACY_OPERATION_STATUS_KEY,
     OPERATION_STATUS_BOARD_SLUGS,
     OPERATION_STATUS_KEY,
     OPERATION_STATUS_VALUES,
@@ -193,10 +192,7 @@ def _operation_status_filter(value: str):
     글이 계속 쌓이는 게시판은 전 페이지를 받는 비용도 커진다.
     """
 
-    stored = func.coalesce(
-        Post.metadata_json[OPERATION_STATUS_KEY].as_string(),
-        Post.metadata_json[LEGACY_OPERATION_STATUS_KEY].as_string(),
-    )
+    stored = Post.metadata_json[OPERATION_STATUS_KEY].as_string()
     if value == "ended":
         return stored == "ended"
     # 값이 없으면 운영 중이다. NULL 비교는 참이 되지 않으므로 따로 본다.
@@ -395,18 +391,11 @@ def _metadata_for_update(
 ) -> dict | None:
     metadata = dict(incoming_metadata or {})
     existing_metadata = dict(post.metadata_json or {})
-    # 운영 상태는 관리자가 DB에서 직접 넣는다. 클라이언트는 이 키를 모르고 보내지
-    # 않으므로, 이어받지 않으면 작성자가 글을 한 번 고치는 것만으로 지워진다.
+    # 스터디·네트워킹 운영 상태는 관리자가 DB에서 직접 넣는다. 클라이언트가
+    # 보내지 않아도 일반 게시글 수정으로 지워지지 않도록 유지한다.
     if board is not None and board.slug in OPERATION_STATUS_BOARD_SLUGS:
-        if OPERATION_STATUS_KEY in metadata:
-            metadata.pop(LEGACY_OPERATION_STATUS_KEY, None)
-        elif LEGACY_OPERATION_STATUS_KEY in metadata:
-            # 옛 앱이 보낸 값도 그대로 존중하되 새 키로 옮겨 적는다.
-            metadata[OPERATION_STATUS_KEY] = metadata.pop(LEGACY_OPERATION_STATUS_KEY)
-        else:
+        if OPERATION_STATUS_KEY not in metadata:
             stored = existing_metadata.get(OPERATION_STATUS_KEY)
-            if stored is None:
-                stored = existing_metadata.get(LEGACY_OPERATION_STATUS_KEY)
             if stored is not None:
                 metadata[OPERATION_STATUS_KEY] = stored
     if (
@@ -1031,19 +1020,28 @@ def _reject_closed_study_recruit(board: Board, category: str | None, metadata: d
         )
 
 
+def _validate_operation_status_metadata(board: Board, metadata: dict | None) -> None:
+    if board.slug not in OPERATION_STATUS_BOARD_SLUGS:
+        return
+    if "club_operation_status" in (metadata or {}):
+        raise AppException(
+            status_code=422,
+            message="Use operation_status instead of club_operation_status.",
+            code="INVALID_CLUB_OPERATION_STATUS",
+        )
+    if OPERATION_STATUS_KEY in (metadata or {}) and metadata[OPERATION_STATUS_KEY] not in OPERATION_STATUS_VALUES:
+        raise AppException(
+            status_code=422,
+            message="Operation status must be active or ended.",
+            code="INVALID_CLUB_OPERATION_STATUS",
+        )
+
+
 def _validate_admin_participation_post(board: Board, metadata: dict | None, current_user: User) -> None:
     if board.slug not in ADMIN_PARTICIPATION_BOARD_SLUGS:
         return
     if current_user.role != "admin":
         raise AppException(status_code=403, message="Only admins can manage participation guide posts.", code="FORBIDDEN")
-
-    for key in (OPERATION_STATUS_KEY, LEGACY_OPERATION_STATUS_KEY):
-        if key in (metadata or {}) and metadata[key] not in OPERATION_STATUS_VALUES:
-            raise AppException(
-                status_code=422,
-                message="Operation status must be active or ended.",
-                code="INVALID_CLUB_OPERATION_STATUS",
-            )
 
     application_url = str((metadata or {}).get("application_url") or "").strip()
     parsed = urlparse(application_url)
@@ -1504,6 +1502,7 @@ def create_post(
         payload.metadata,
     )
     _validate_post_content(board, normalized_content)
+    _validate_operation_status_metadata(board, normalized_metadata)
     _validate_admin_participation_post(board, normalized_metadata, current_user)
     _reject_closed_study_recruit(board, payload.category, normalized_metadata)
     if payload.is_anonymous and not board.allow_anonymous and board.board_type != "suggestion":
@@ -1569,6 +1568,7 @@ def update_post(
     )
     if board is not None:
         _enforce_council_management_policy(board, current_user)
+        _validate_operation_status_metadata(board, normalized_metadata)
         _validate_admin_participation_post(board, normalized_metadata, current_user)
     _require_post_edit(db, post, board, current_user)
     if payload.replace_evidence and board.board_type == "mutual_aid":

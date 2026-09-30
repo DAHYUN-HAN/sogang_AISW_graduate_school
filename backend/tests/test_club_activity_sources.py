@@ -264,7 +264,7 @@ def test_club_operation_end_blocks_new_certifications_but_preserves_existing_edi
     guide_payload = {
         "title": "파인튜닝 (커피)", "content": "운영 상태 검증",
         "category": "마감", "attachment_ids": [1],
-        "metadata": {"application_url": "https://example.com/join", "club_operation_status": "active"},
+        "metadata": {"application_url": "https://example.com/join", "operation_status": "active"},
     }
     guide = api.client.post(f"/api/boards/{source['promo_board']}/posts", headers=api.headers["admin"], json=guide_payload)
     assert guide.status_code == 200
@@ -275,7 +275,7 @@ def test_club_operation_end_blocks_new_certifications_but_preserves_existing_edi
     activity_id = created.json()["data"]["id"]
 
     ended = api.client.put(f"/api/posts/{guide_id}", headers=api.headers["admin"], json={
-        **guide_payload, "metadata": {**guide_payload["metadata"], "club_operation_status": "ended"},
+        **guide_payload, "metadata": {**guide_payload["metadata"], "operation_status": "ended"},
     })
     assert ended.status_code == 200
     rejected = api.client.post(f"/api/boards/{source['activity_board']}/posts", headers=api.headers["owner"], json=activity_payload)
@@ -290,7 +290,6 @@ def test_club_operation_end_blocks_new_certifications_but_preserves_existing_edi
     assert legacy_edit.status_code == 200
     detail = api.client.get(f"/api/posts/{guide_id}", headers=api.headers["owner"])
     metadata = detail.json()["data"]["metadata"]
-    # 옛 앱이 보낸 club_operation_status도 그대로 반영하되 새 키로 옮겨 적는다.
     assert metadata["operation_status"] == "ended"
     assert "club_operation_status" not in metadata
 
@@ -305,7 +304,30 @@ def test_club_operation_status_rejects_invalid_values(api, invalid_status) -> No
     source = _setup_club_sources(api)
     response = api.client.post(f"/api/boards/{source['promo_board']}/posts", headers=api.headers["admin"], json={
         "title": "Club", "content": "Invalid operation status", "attachment_ids": [1],
-        "metadata": {"application_url": "https://example.com/join", "club_operation_status": invalid_status},
+        "metadata": {"application_url": "https://example.com/join", "operation_status": invalid_status},
     })
     assert response.status_code == 422
     assert response.json()["code"] == "INVALID_CLUB_OPERATION_STATUS"
+
+
+def test_old_status_key_is_rejected_on_club_guide_create_and_edit(api) -> None:
+    source = _setup_club_sources(api)
+    payload = {
+        "title": "Club", "content": "Operation status", "attachment_ids": [1],
+        "metadata": {"application_url": "https://example.com/join", "operation_status": "active"},
+    }
+    created = api.client.post(
+        f"/api/boards/{source['promo_board']}/posts", headers=api.headers["admin"], json=payload,
+    )
+    assert created.status_code == 200
+    post_id = created.json()["data"]["id"]
+
+    with_old_key = {**payload, "metadata": {**payload["metadata"], "club_operation_status": "ended"}}
+    rejected_create = api.client.post(
+        f"/api/boards/{source['promo_board']}/posts", headers=api.headers["admin"], json=with_old_key,
+    )
+    rejected_edit = api.client.put(f"/api/posts/{post_id}", headers=api.headers["admin"], json=with_old_key)
+    assert rejected_create.status_code == 422
+    assert rejected_edit.status_code == 422
+    assert rejected_create.json()["code"] == "INVALID_CLUB_OPERATION_STATUS"
+    assert rejected_edit.json()["code"] == "INVALID_CLUB_OPERATION_STATUS"

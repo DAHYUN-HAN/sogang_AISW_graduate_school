@@ -23,10 +23,8 @@ test("운영상태가 없는 예전 안내 글은 운영중으로 본다", () =>
   assert.equal(operationStatus({ operation_status: "Ended" }), "active");
 });
 
-test("동아리만 쓰던 옛 키도 계속 읽는다", () => {
-  // DB에 club_operation_status가 남아 있는 글이 있다.
-  assert.equal(operationStatus({ club_operation_status: "ended" }), "ended");
-  // 새 키가 있으면 새 키가 이긴다.
+test("운영 상태는 operation_status만 읽는다", () => {
+  assert.equal(operationStatus({ club_operation_status: "ended" }), "active");
   assert.equal(operationStatus({ operation_status: "active", club_operation_status: "ended" }), "active");
 });
 
