@@ -145,7 +145,7 @@ function categoryTone(label: string) {
   if (label.includes("대기")) return { bg: COLORS.yellow50, fg: COLORS.yellow700 };
   if (label.includes("건의") || label.includes("답변")) return { bg: COLORS.cyan50, fg: COLORS.cyan700 };
   if (label.includes("후기")) return { bg: "#EEEDFE", fg: "#3C3489" };
-  if (label.includes("기타")) return { bg: "#F0EEF9", fg: "#5A4C8B" };
+  if (label.includes("기타")) return { bg: "#F0EEF9", fg: "#6543A2" };
   return { bg: "#E6F1FB", fg: "#0C447C" };
 }
 

@@ -1,7 +1,14 @@
-export type ClubOperationStatus = "active" | "ended";
+export type OperationStatus = "active" | "ended";
 
-export function clubOperationStatus(metadata?: Record<string, unknown> | null): ClubOperationStatus {
-  return metadata?.club_operation_status === "ended" ? "ended" : "active";
+const OPERATION_STATUS_KEY = "operation_status";
+// 동아리만 쓰던 시절의 키. DB에 남아 있는 글이 있어 계속 읽어 준다.
+const LEGACY_OPERATION_STATUS_KEY = "club_operation_status";
+
+// 운영이 끝난 대상은 새 활동인증의 선택 목록에서 빠진다. 정확히 "ended"일 때만
+// 종료로 보므로, 키가 없는 옛 글은 운영 중이 된다.
+export function operationStatus(metadata?: Record<string, unknown> | null): OperationStatus {
+  const stored = metadata?.[OPERATION_STATUS_KEY] ?? metadata?.[LEGACY_OPERATION_STATUS_KEY];
+  return stored === "ended" ? "ended" : "active";
 }
 
 export function participationApplicationUrl(metadata?: Record<string, unknown> | null) {

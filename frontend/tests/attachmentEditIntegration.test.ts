@@ -4,7 +4,7 @@ import { runInNewContext } from "node:vm";
 import test from "node:test";
 import ts from "typescript";
 import { activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, withParticipantDuesState } from "../utils/activityCertification";
-import { clubOperationStatus } from "../utils/participationGuide";
+import { operationStatus } from "../utils/participationGuide";
 import { mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate } from "../utils/mutualAid";
 
 import { resourcePostMetadata } from "../utils/resourcePostFields";
@@ -36,7 +36,7 @@ test("activity edit restores its saved account once and does not overwrite an in
     board: { slug: "networking-activity" },
     existingPost: { id: 42, title: "Activity", content: "Reflection", metadata: { bank_account: "Test Bank 123-456" }, attachments: [] },
     reset: (values: typeof form) => Object.assign(form, values),
-    activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, withParticipantDuesState, clubOperationStatus,
+    activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, withParticipantDuesState, operationStatus,
     mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate,
     resourceFields: null, resourcePostFieldValues: () => ({}), unsavedBaseline: { current: null },
     setAttachments: () => {}, setEvidenceLink: () => {}, setEvidenceMode: () => {},

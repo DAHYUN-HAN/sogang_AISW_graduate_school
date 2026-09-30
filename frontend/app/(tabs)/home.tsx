@@ -33,20 +33,26 @@ import { API_ORIGIN, bannerApi, eventApi, notificationApi, postApi } from "../..
 import { requestTabRootReset } from "../../stores/tabRootResetStore";
 import { useUserStore } from "../../stores/userStore";
 import type { BannerItem, Board, EventItem, PostListItem } from "../../types";
-import { COMMUNITY_TAB_ROUTE, HOME_TAB_ROUTE, NOTICES_TAB_ROUTE, eventDayRoute, postDetailRoute } from "../../utils/appRoutes";
-import { formatBoardDate, formatHomeScheduleDate } from "../../utils/dateFormat";
+import { COMMUNITY_TAB_ROUTE, HOME_TAB_ROUTE, NOTICES_TAB_ROUTE, postDetailRoute } from "../../utils/appRoutes";
+import { formatBoardDate, formatKoreanTime } from "../../utils/dateFormat";
 import {
-  calendarDateKey,
   calendarMonthWindowRange,
   currentKoreaMonth,
-  eventDaysForMonth,
-  eventIsCurrentOrUpcoming,
+  eventsByDayForMonth,
   koreaCalendarDate,
   shiftCalendarMonth,
 } from "../../utils/eventCalendar";
 import { toAbsoluteMediaUrl } from "../../utils/mediaAccess";
 import { homeAlumniDirectoryErrorMessage, homeAlumniDirectoryLink } from "../../utils/homeAlumniDirectory";
-import { homeNoticeDeadlineSuffix, homeScheduleDdayLabel } from "../../utils/homeNoticeDeadline";
+import { homeNoticeDeadlineSuffix } from "../../utils/homeNoticeDeadline";
+import {
+  EVENT_CATEGORY_ORDER,
+  type EventDisplayCategory,
+  dayDotCategories,
+  eventCategoryAccent,
+  eventCategoryShortLabel,
+  eventDisplayCategory,
+} from "../../utils/eventCategoryPresentation";
 import { homeNoticeCategory, isNoticeContentBoard, loadHomeNoticePreview } from "../../utils/noticeFeed";
 import { enabledRefetch, refreshQueries } from "../../utils/pullToRefresh";
 
@@ -56,7 +62,6 @@ const COLORS = {
   primary100: "#D5E0FE",
   primary900: "#0B1F56",
   cyan: "#1FA9BD",
-  purple: "#6C4FCB",
   bg: "#FFFFFF",
   surface: "#FFFFFF",
   border: "#E1E4E9",
@@ -117,7 +122,8 @@ function pickBannerImage(banner: BannerItem | undefined, width: number) {
 }
 
 function monthLabel(date: Date) {
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
+  // Figma 캘린더 카드(1615:105)의 "2026.06" 표기.
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
 }
 
 function noticeDotColor(value?: string | null) {
@@ -163,16 +169,16 @@ function thumbnailUrl(post: PostListItem) {
   return null;
 }
 
-function buildMonthCells(month: Date, activeDay: number, markedDays: Set<number>) {
+function buildMonthCells(month: Date) {
   const firstDay = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
   const lastDate = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const cells: { key: string; day?: number; active?: boolean; marked?: boolean }[] = [];
+  const cells: { key: string; day?: number }[] = [];
 
   for (let index = 0; index < firstDay; index += 1) {
     cells.push({ key: `blank-${index}` });
   }
   for (let day = 1; day <= lastDate; day += 1) {
-    cells.push({ key: `day-${day}`, day, active: day === activeDay, marked: markedDays.has(day) });
+    cells.push({ key: `day-${day}`, day });
   }
   while (cells.length % 7 !== 0) {
     cells.push({ key: `blank-${cells.length}` });
@@ -183,6 +189,110 @@ function buildMonthCells(month: Date, activeDay: number, markedDays: Set<number>
 function getHomeContentWidth(windowWidth: number) {
   const shellWidth = Platform.OS === "web" ? Math.min(windowWidth, MOBILE_WEB_WIDTH) : windowWidth;
   return Math.max(280, shellWidth - HORIZONTAL_PADDING * 2);
+}
+
+// Figma 캘린더 카드(1615:105)는 360dp 화면, 카드 폭 320 기준으로 그려졌다.
+const DESIGN_CALENDAR_CARD_WIDTH = 320;
+// 화면이 넓어지면 카드도 넓어지는데 글자만 고정이면 디자인보다 작아 보인다.
+// 카드 폭에 맞춰 같이 키워 어느 화면에서든 시안과 같은 비율로 보이게 한다.
+//
+// 가장 넓은 휴대폰(약 430dp, 카드 390)이 1.22배라 거기까지는 비율을 그대로 살리고,
+// 태블릿처럼 그보다 넓은 화면에서는 글자가 과하게 커지지 않도록 멈춘다.
+const MAX_CALENDAR_SCALE = 1.25;
+
+function calendarScaleForWidth(windowWidth: number) {
+  return Math.min(getHomeContentWidth(windowWidth) / DESIGN_CALENDAR_CARD_WIDTH, MAX_CALENDAR_SCALE);
+}
+
+// 테두리는 배율을 적용하지 않는다. 얇은 선은 키워도 또렷해지지 않고 흐려지기만 한다.
+function calendarStyles(scale: number) {
+  const r = (value: number) => value * scale;
+  return StyleSheet.create({
+    card: {
+      borderRadius: r(12),
+      backgroundColor: COLORS.surface,
+      borderWidth: 0.5,
+      borderColor: COLORS.border,
+      padding: r(14),
+    },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: r(10) },
+    arrow: { width: r(24), height: r(24), alignItems: "center", justifyContent: "center" },
+    month: { color: COLORS.text, fontSize: r(16), fontWeight: "600", lineHeight: r(19) },
+    chips: { flexDirection: "row", gap: r(6), marginBottom: r(10) },
+    chip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: r(5),
+      height: r(26),
+      borderRadius: r(13),
+      paddingHorizontal: r(10),
+      borderWidth: 1,
+      borderColor: "#E7E9EE",
+      backgroundColor: COLORS.surface,
+    },
+    chipActive: { backgroundColor: COLORS.text, borderColor: COLORS.text },
+    chipDot: { width: r(7), height: r(7), borderRadius: r(3.5) },
+    chipText: { color: "#6B7280", fontSize: r(12), fontWeight: "600" },
+    chipTextActive: { color: "#FFFFFF" },
+    grid: { flexDirection: "row", flexWrap: "wrap", rowGap: r(2) },
+    weekday: {
+      width: "14.285%",
+      color: COLORS.subtle,
+      fontSize: r(11),
+      fontWeight: "400",
+      lineHeight: r(13),
+      textAlign: "center",
+      marginBottom: r(8),
+    },
+    weekdaySunday: { color: "#993556" },
+    dayCell: { width: "14.285%", height: r(44), alignItems: "center", paddingTop: r(5) },
+    // Android(Fabric)는 배경색이 나중에 붙는 뷰에서 borderRadius를 간헐적으로 놓친다.
+    // 배경색과 radius를 항상 같은 스타일 객체에 두고 radius는 크기의 절반으로 고정한다.
+    dayBadge: {
+      width: r(24),
+      height: r(24),
+      borderRadius: r(12),
+      overflow: "hidden",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    dayBadgeSelected: { backgroundColor: COLORS.primary, borderRadius: r(12) },
+    dayBadgeToday: { backgroundColor: "#E6F1FB", borderRadius: r(12) },
+    dayText: {
+      color: COLORS.text,
+      fontSize: r(13),
+      fontWeight: "400",
+      lineHeight: r(16),
+      textAlign: "center",
+      includeFontPadding: false,
+    },
+    dayTextSelected: { color: "#FFFFFF", fontWeight: "500" },
+    dayTextToday: { color: "#0C447C", fontWeight: "500" },
+    dayDots: { flexDirection: "row", gap: r(3), height: r(4), marginTop: r(3) },
+    dayDot: { width: r(4), height: r(4), borderRadius: r(2) },
+    scheduleHeader: { flexDirection: "row", alignItems: "center", gap: r(6), marginTop: r(10), marginBottom: r(8) },
+    scheduleTitle: { color: COLORS.text, fontSize: r(14), fontWeight: "600", lineHeight: r(17) },
+    scheduleCount: { color: "#6B7280", fontSize: r(12), fontWeight: "400", lineHeight: r(14) },
+    scheduleEmpty: { color: "#6B7280", fontSize: r(13), fontWeight: "400", lineHeight: r(16), paddingVertical: r(8) },
+    scheduleCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: r(10),
+      borderWidth: 1,
+      borderColor: "#E7E9EE",
+      borderRadius: r(12),
+      paddingHorizontal: r(12),
+      paddingVertical: r(11),
+      marginBottom: r(8),
+    },
+    scheduleBar: { width: r(3), alignSelf: "stretch", borderRadius: r(3) },
+    scheduleBody: { flex: 1, gap: r(3) },
+    scheduleCategory: { fontSize: r(11), fontWeight: "700", lineHeight: r(13) },
+    scheduleName: { color: COLORS.text, fontSize: r(13.5), fontWeight: "600", lineHeight: r(17) },
+    scheduleTime: { color: "#6B7280", fontSize: r(11.5), fontWeight: "400", lineHeight: r(14) },
+    // Figma는 아이콘이 아니라 홑화살괄호 글자를 쓴다. 같은 글꼴·크기로 그려야 시안과 맞는다.
+    chevron: { color: "#C4C8D0", fontSize: r(17), fontWeight: "400", lineHeight: r(20) },
+  });
 }
 
 function IconButton({ label, onPress, children }: { label: string; onPress: () => void; children: ReactNode }) {
@@ -470,69 +580,151 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
       }),
     []
   );
+  // null이면 전체다. 칩은 점과 목록을 함께 걸러서 고른 분류만 남긴다.
+  const [category, setCategory] = useState<EventDisplayCategory | null>(null);
+  // 고른 날짜는 달과 함께 기억한다. 달을 넘기면 그 달의 기본 날짜로 돌아가야 하는데,
+  // 달만 비교하면 되므로 effect 없이 렌더에서 바로 판단한다.
+  const [picked, setPicked] = useState<{ monthKey: string; day: number } | null>(null);
+  const { width: windowWidth } = useWindowDimensions();
+  const scale = calendarScaleForWidth(windowWidth);
+  const cal = useMemo(() => calendarStyles(scale), [scale]);
+  const arrowSize = Math.round(16 * scale);
+
+  const monthKey = `${month.getFullYear()}-${month.getMonth()}`;
+  const visibleEvents = useMemo(
+    () => (category ? events.filter((event) => eventDisplayCategory(event.category) === category) : events),
+    [category, events]
+  );
+  const eventsByDay = useMemo(() => eventsByDayForMonth(visibleEvents, month), [visibleEvents, month]);
+
   const today = koreaCalendarDate();
-  const visibleEvents = events;
-  const activeDay = today.year === month.getFullYear() && today.month === month.getMonth() + 1 ? today.day : 1;
-  const markedDays = eventDaysForMonth(visibleEvents, month);
-  const cells = buildMonthCells(month, activeDay, markedDays);
-  const nextEvent = [...visibleEvents]
-    .filter((event) => eventIsCurrentOrUpcoming(event))
-    .sort((left, right) => +new Date(left.start_at) - +new Date(right.start_at))[0];
+  const todayDay = today.year === month.getFullYear() && today.month === month.getMonth() + 1 ? today.day : null;
+  // 다른 달로 넘어가면 일정이 있는 첫 날을 보여준다. 빈 목록으로 시작하지 않게 한다.
+  const firstDayWithEvents = eventsByDay.size > 0 ? Math.min(...eventsByDay.keys()) : null;
+  const selectedDay = picked?.monthKey === monthKey ? picked.day : todayDay ?? firstDayWithEvents ?? 1;
+
+  const cells = buildMonthCells(month);
+  const selectedEvents = eventsByDay.get(selectedDay) ?? [];
+  const selectedDate = new Date(month.getFullYear(), month.getMonth(), selectedDay);
 
   return (
-    <View style={styles.calendarCard}>
-      <View style={styles.calendarHeader}>
-        <Pressable accessibilityLabel="이전 달" onPress={() => onChangeMonth(-1)} style={styles.calendarArrow}>
-          <BackIcon size={16} color={COLORS.subtle} />
+    <View style={cal.card}>
+      <View style={cal.header}>
+        <Pressable accessibilityLabel="이전 달" onPress={() => onChangeMonth(-1)} style={cal.arrow}>
+          <BackIcon size={arrowSize} color={COLORS.subtle} />
         </Pressable>
-        <Text style={styles.calendarMonth}>{monthLabel(month)}</Text>
-        <Pressable accessibilityLabel="다음 달" onPress={() => onChangeMonth(1)} style={styles.calendarArrow}>
-          <ForwardIcon size={16} color={COLORS.subtle} />
+        <Text style={cal.month}>{monthLabel(month)}</Text>
+        <Pressable accessibilityLabel="다음 달" onPress={() => onChangeMonth(1)} style={cal.arrow}>
+          <ForwardIcon size={arrowSize} color={COLORS.subtle} />
         </Pressable>
       </View>
-      <View {...monthSwipe.panHandlers} style={styles.calendarGrid}>
-        {WEEKDAYS.map((day, index) => (
-          <Text key={day} style={[styles.weekday, index === 0 ? styles.weekdaySunday : null]}>
-            {day}
-          </Text>
-        ))}
-        {cells.map((cell) => (
+
+      <View style={cal.chips}>
+        <Pressable
+          accessibilityLabel="전체 일정 보기"
+          accessibilityState={{ selected: category === null }}
+          onPress={() => setCategory(null)}
+          style={[cal.chip, category === null ? cal.chipActive : null]}
+        >
+          <Text style={[cal.chipText, category === null ? cal.chipTextActive : null]}>전체</Text>
+        </Pressable>
+        {EVENT_CATEGORY_ORDER.map((value) => (
           <Pressable
-            key={cell.key}
-            accessibilityLabel={cell.day ? `${month.getMonth() + 1}월 ${cell.day}일 일정 보기` : undefined}
-            disabled={!cell.day}
-            onPress={() => {
-              if (!cell.day) return;
-              const selectedDate = new Date(month.getFullYear(), month.getMonth(), cell.day);
-              router.push(eventDayRoute(calendarDateKey(selectedDate), HOME_TAB_ROUTE) as never);
-            }}
-            style={styles.dayCell}
+            key={value}
+            accessibilityLabel={`${eventCategoryShortLabel(value)} 일정만 보기`}
+            accessibilityState={{ selected: category === value }}
+            // 한 번 더 누르면 전체로 돌아간다. 해제 버튼을 따로 두지 않는다.
+            onPress={() => setCategory((current) => (current === value ? null : value))}
+            style={[cal.chip, category === value ? cal.chipActive : null]}
           >
-            {cell.day ? (
-              <View style={[styles.dayBadge, cell.active ? styles.dayBadgeActive : cell.marked ? styles.dayBadgeMarked : null]}>
-                <Text style={[styles.dayText, cell.active ? styles.dayTextActive : cell.marked ? styles.dayTextMarked : null]}>{cell.day}</Text>
-              </View>
-            ) : null}
+            <View style={[cal.chipDot, { backgroundColor: eventCategoryAccent(value) }]} />
+            <Text style={[cal.chipText, category === value ? cal.chipTextActive : null]}>
+              {eventCategoryShortLabel(value)}
+            </Text>
           </Pressable>
         ))}
       </View>
-      {nextEvent ? (
-        <Pressable onPress={() => router.push(`/events/${nextEvent.id}` as never)} style={styles.nextEvent}>
-          <View style={styles.eventDot} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.nextEventTitle} numberOfLines={1}>
-              {`${formatHomeScheduleDate(nextEvent.start_at)} · ${nextEvent.title}`}
-            </Text>
-          </View>
-          <Text style={styles.nextEventDday}>{homeScheduleDdayLabel(nextEvent.end_at ?? nextEvent.start_at)}</Text>
-        </Pressable>
+
+      <View {...monthSwipe.panHandlers} style={cal.grid}>
+        {WEEKDAYS.map((day, index) => (
+          <Text key={day} style={[cal.weekday, index === 0 ? cal.weekdaySunday : null]}>
+            {day}
+          </Text>
+        ))}
+        {cells.map((cell) => {
+          const dayEvents = cell.day ? eventsByDay.get(cell.day) ?? [] : [];
+          const dots = dayDotCategories(dayEvents);
+          const isSelected = cell.day === selectedDay;
+          const isToday = cell.day === todayDay;
+          return (
+            <Pressable
+              key={cell.key}
+              accessibilityLabel={cell.day ? `${month.getMonth() + 1}월 ${cell.day}일 일정 ${dayEvents.length}개` : undefined}
+              accessibilityState={{ selected: isSelected }}
+              disabled={!cell.day}
+              onPress={() => {
+                if (!cell.day) return;
+                setPicked({ monthKey, day: cell.day });
+              }}
+              style={cal.dayCell}
+            >
+              {cell.day ? (
+                <>
+                  <View style={[cal.dayBadge, isSelected ? cal.dayBadgeSelected : isToday ? cal.dayBadgeToday : null]}>
+                    <Text style={[cal.dayText, isSelected ? cal.dayTextSelected : isToday ? cal.dayTextToday : null]}>
+                      {cell.day}
+                    </Text>
+                  </View>
+                  <View style={cal.dayDots}>
+                    {dots.map((value, dotIndex) => (
+                      <View
+                        key={`${value}-${dotIndex}`}
+                        style={[cal.dayDot, { backgroundColor: eventCategoryAccent(value) }]}
+                      />
+                    ))}
+                  </View>
+                </>
+              ) : null}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      <View style={cal.scheduleHeader}>
+        <Text style={cal.scheduleTitle}>
+          {`${month.getMonth() + 1}월 ${selectedDay}일 (${WEEKDAYS[selectedDate.getDay()]})`}
+        </Text>
+        <Text style={cal.scheduleCount}>{`일정 ${selectedEvents.length}개`}</Text>
+      </View>
+      {selectedEvents.length === 0 ? (
+        <Text style={cal.scheduleEmpty}>이 날은 일정이 없어요</Text>
       ) : (
-        <View accessibilityLabel="예정된 일정이 없습니다" style={styles.nextEvent}>
-          <View style={styles.eventDot} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.nextEventTitle} numberOfLines={1}>예정된 일정이 없습니다</Text>
-          </View>
-        </View>
+        selectedEvents.map((event) => {
+          const accent = eventCategoryAccent(event.category);
+          // 짝이 되는 공지가 있을 때만 누를 수 있다. 없으면 화살표도 두지 않아
+          // 눌러도 아무 일이 없다는 것이 보이게 한다.
+          const noticePostId = event.notice_post_id ?? null;
+          return (
+            <Pressable
+              key={event.id}
+              accessibilityLabel={noticePostId ? `${event.title} 공지 보기` : event.title}
+              disabled={!noticePostId}
+              onPress={() => {
+                if (!noticePostId) return;
+                router.push(postDetailRoute(noticePostId, undefined, HOME_TAB_ROUTE) as never);
+              }}
+              style={cal.scheduleCard}
+            >
+              <View style={[cal.scheduleBar, { backgroundColor: accent }]} />
+              <View style={cal.scheduleBody}>
+                <Text style={[cal.scheduleCategory, { color: accent }]}>{eventCategoryShortLabel(event.category)}</Text>
+                <Text style={cal.scheduleName} numberOfLines={2}>{event.title}</Text>
+                <Text style={cal.scheduleTime}>{formatKoreanTime(event.start_at)}</Text>
+              </View>
+              {noticePostId ? <Text style={cal.chevron}>›</Text> : null}
+            </Pressable>
+          );
+        })
       )}
     </View>
   );
@@ -1074,31 +1266,6 @@ const styles = StyleSheet.create({
     lineHeight: 15,
     marginTop: 4,
   },
-  calendarCard: {
-    borderRadius: 12,
-    backgroundColor: COLORS.surface,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
-    padding: 14,
-  },
-  calendarHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 10,
-  },
-  calendarArrow: {
-    width: 24,
-    height: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  calendarMonth: {
-    color: COLORS.text,
-    fontSize: 14,
-    fontWeight: "500",
-    lineHeight: 17,
-  },
   calendarLink: {
     flexDirection: "row",
     alignItems: "center",
@@ -1112,90 +1279,6 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
     fontSize: 12,
     fontWeight: "900",
-  },
-  calendarGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    rowGap: 2,
-  },
-  weekday: {
-    width: "14.285%",
-    color: COLORS.subtle,
-    fontSize: 11,
-    fontWeight: "400",
-    lineHeight: 13,
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  weekdaySunday: {
-    color: "#993556",
-  },
-  dayCell: {
-    width: "14.285%",
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  // Android(Fabric)는 배경색이 나중에 추가되는 뷰에서 borderRadius를 간헐적으로 놓친다.
-  // 배경색과 radius를 항상 같은 스타일 객체에 두고, radius는 크기의 절반(14)으로 고정한다.
-  dayBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dayBadgeActive: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 14,
-  },
-  dayBadgeMarked: {
-    backgroundColor: "#E6F1FB",
-    borderRadius: 14,
-  },
-  dayText: {
-    color: COLORS.text,
-    fontSize: 13,
-    fontWeight: "400",
-    lineHeight: 16,
-    textAlign: "center",
-    includeFontPadding: false,
-  },
-  dayTextActive: {
-    color: "#FFFFFF",
-    fontWeight: "500",
-  },
-  dayTextMarked: {
-    color: "#0C447C",
-    fontWeight: "500",
-  },
-  nextEvent: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 0.5,
-    borderTopColor: COLORS.border,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  eventDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.primary,
-  },
-  nextEventTitle: {
-    color: COLORS.text,
-    fontSize: 13,
-    fontWeight: "400",
-    lineHeight: 16,
-  },
-  nextEventDday: {
-    color: COLORS.primary,
-    fontSize: 13,
-    fontWeight: "500",
-    lineHeight: 16,
   },
   nextEventMeta: {
     color: COLORS.muted,

@@ -289,7 +289,10 @@ def test_club_operation_end_blocks_new_certifications_but_preserves_existing_edi
     })
     assert legacy_edit.status_code == 200
     detail = api.client.get(f"/api/posts/{guide_id}", headers=api.headers["owner"])
-    assert detail.json()["data"]["metadata"]["club_operation_status"] == "ended"
+    metadata = detail.json()["data"]["metadata"]
+    # 옛 앱이 보낸 club_operation_status도 그대로 반영하되 새 키로 옮겨 적는다.
+    assert metadata["operation_status"] == "ended"
+    assert "club_operation_status" not in metadata
 
     resumed = api.client.put(f"/api/posts/{guide_id}", headers=api.headers["admin"], json=guide_payload)
     assert resumed.status_code == 200

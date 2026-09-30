@@ -308,8 +308,30 @@ test("스터디와 네트워킹 활동 인증 태그의 기존 분류는 유지�
   );
 });
 
-test("활동 인증의 원본 선택 목록은 공개된 운영진 게시글만 요청한다", () => {
-  assert.deepEqual(activitySourcePostFilters(), { sort: "latest", status: "published" });
+test("활동 인증의 원본 선택 목록은 공개·운영중인 글만 서버에 요청한다", () => {
+  // 운영 종료를 서버가 걸러야 걸러진 글이 페이지를 차지하지 않는다.
+  assert.deepEqual(activitySourcePostFilters(), {
+    sort: "latest",
+    status: "published",
+    operation_status: "active",
+  });
+});
+
+test("서버가 걸러 주지 않아도 운영 종료는 목록에 남지 않는다", async () => {
+  // operation_status를 모르는 옛 백엔드에 붙었을 때의 안전장치.
+  const posts = await loadPublishedActivitySourcePosts<Pick<PostListItem, "id" | "title" | "created_at" | "metadata">>(
+    7,
+    async () => ({
+      status: "success",
+      data: [
+        { id: 1, title: "끝난 대상", created_at: "2026-09-17", metadata: { operation_status: "ended" } },
+        { id: 2, title: "옛 키로 끝난 대상", created_at: "2026-09-16", metadata: { club_operation_status: "ended" } },
+        { id: 3, title: "운영 중", created_at: "2026-09-15", metadata: {} },
+      ],
+      pagination: { page: 1, size: 50, total: 3, total_pages: 1 },
+    }),
+  );
+  assert.deepEqual(posts.map((post) => post.id), [3]);
 });
 
 test("동아리 원본 글은 실제 pagination 계약을 따라 공개 글의 모든 페이지를 읽는다", async () => {
@@ -345,9 +367,9 @@ test("동아리 원본 글은 실제 pagination 계약을 따라 공개 글의 �
 
   assert.deepEqual(posts.map((post) => post.id), [51, 52, 53]);
   assert.deepEqual(calls, [
-    { boardId: 9, page: 1, size: 2, filters: { sort: "latest", status: "published" } },
-    { boardId: 9, page: 2, size: 2, filters: { sort: "latest", status: "published" } },
-    { boardId: 9, page: 3, size: 2, filters: { sort: "latest", status: "published" } },
+    { boardId: 9, page: 1, size: 2, filters: activitySourcePostFilters() },
+    { boardId: 9, page: 2, size: 2, filters: activitySourcePostFilters() },
+    { boardId: 9, page: 3, size: 2, filters: activitySourcePostFilters() },
   ]);
 });
 
@@ -389,27 +411,30 @@ test("비어 있는 페이지를 받으면 잘못된 다음 페이지 수와 무
   assert.deepEqual(posts, []);
 });
 
-test("스터디·네트워킹 원본 선택은 기존처럼 첫 페이지만 조회한다", async () => {
+test("스터디·네트워킹도 전 페이지를 받아 운영 종료를 제외한다", async () => {
+  // 한 페이지만 받으면 걸러낸 만큼 뒤쪽 대상이 잘린다.
   const calls: number[] = [];
-  const posts = await loadPublishedActivitySourcePosts(
+  const posts = await loadPublishedActivitySourcePosts<Pick<PostListItem, "id" | "title" | "created_at" | "metadata">>(
     11,
-    "study-recruit",
     async (_boardId, page) => {
       calls.push(page);
       return {
         status: "success" as const,
-        data: [{ id: 91, title: "스터디 모집", created_at: "2026-08-01T00:00:00Z" }],
-        pagination: { page: 1, size: 50, total: 70, total_pages: 2 },
+        data: page === 1
+          ? [{ id: 90, title: "끝난 스터디", created_at: "2026-08-02T00:00:00Z", metadata: { operation_status: "ended" } }]
+          : [{ id: 91, title: "스터디 모집", created_at: "2026-08-01T00:00:00Z", metadata: {} }],
+        pagination: { page, size: 1, total: 2, total_pages: 2 },
       };
     },
+    1,
   );
 
-  assert.deepEqual(calls, [1]);
+  assert.deepEqual(calls, [1, 2]);
   assert.deepEqual(posts.map((post) => post.id), [91]);
 });
 
 test("운영 종료만 제외하고 모집 마감·기존 동아리는 모든 페이지에서 선택할 수 있다", async () => {
-  const posts = await loadPublishedActivitySourcePosts<Pick<PostListItem, "id" | "title" | "created_at" | "category" | "metadata">>(9, "club-promo", async (_id, page) => ({
+  const posts = await loadPublishedActivitySourcePosts<Pick<PostListItem, "id" | "title" | "created_at" | "category" | "metadata">>(9, async (_id, page) => ({
     status: "success",
     data: page === 1
       ? [{ id: 1, title: "운영이 종료된 동아리", created_at: "2026-09-17", category: "모집중", metadata: { club_operation_status: "ended" } }]

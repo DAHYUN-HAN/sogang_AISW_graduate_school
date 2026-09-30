@@ -213,7 +213,6 @@ test("iOS 기본 스와이프 뒤로가기는 꺼두지 않는다", () => {
   for (const layout of [
     "app/_layout.tsx",
     "app/(tabs)/board/_layout.tsx",
-    "app/(tabs)/events/_layout.tsx",
     "app/(tabs)/settings/_layout.tsx",
   ]) {
     assert.doesNotMatch(readFileSync(layout, "utf8"), /gestureEnabled: false/, `${layout}에서 기본 제스처를 껐다`);

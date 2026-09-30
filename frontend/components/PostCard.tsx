@@ -29,8 +29,6 @@ const COLORS = {
   yellow700: "#9A6B00",
   green50: "#EAF8EF",
   green700: "#1F7A46",
-  purple50: "#F1EEFB",
-  purple700: "#5B49C8",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -92,7 +90,7 @@ function categoryTone(label: string) {
   if (label.includes("행사") || label.includes("시험")) return { bg: "#FBEAF0", fg: "#993556" };
   if (label.includes("졸업") || label.includes("인증")) return { bg: "#EAF3DE", fg: "#3B6D11" };
   if (label.includes("강의") || label.includes("후기") || label.includes("스터디") || label.includes("모집")) return { bg: "#EEEDFE", fg: "#3C3489" };
-  if (label.includes("기타")) return { bg: "#F0EEF9", fg: "#5A4C8B" };
+  if (label.includes("기타")) return { bg: "#F0EEF9", fg: "#6543A2" };
   return { bg: "#E6F1FB", fg: "#0C447C" };
 }
 
