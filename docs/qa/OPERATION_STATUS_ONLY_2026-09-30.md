@@ -31,5 +31,22 @@ key preserves its stored status. Existing certification links remain editable.
   transaction. Verified old `ended` and `active`, both-key precedence, an
   unknown old value, unaffected new-only/missing rows, preserved unrelated
   metadata, and absence of the old key afterward.
-- Production backup, migration, HTTP smoke, and mobile build verification:
-  pending deployment.
+- Coordinated production backup completed immediately before deployment at
+  `/srv/aisw-backups/20260930T021759Z` on the GCP VM. The PostgreSQL dump,
+  public-media tar, and private-media tar passed format/list checks and all
+  three SHA-256 checks. The backend and worker restarted healthy afterward.
+- Deployment: PR #28 passed Backend, Frontend, and Docker build CI and merged
+  as `41cb4ee6db73c154f468f670f5fe7eb6a07496a6`. The GCP VM runs that
+  commit. Docker reports backend, frontend-web, database, nginx, worker, and
+  certificate renewer healthy. `/health`, `/health/ready`, `/healthz`,
+  `/legal/privacy`, and `/(tabs)/home` returned HTTPS 200.
+- Production migration: `0031_operation_status_only (head)`; `alembic check`
+  reported no new upgrade operations. Across all posts, the old key occurs
+  zero times. All 20 `club-promo` posts now have `operation_status`, and the
+  13 previously ended posts remain ended. Study and networking ended counts
+  remain 11 and 1 respectively.
+- Mobile release: Android AAB and APK version `1.0.2` code `11`, iOS IPA
+  version `1.0.2` build `13`. AAB and APK package/manifest, signatures,
+  archive integrity, and APK 16 KB alignment passed. IPA bundle identifier,
+  version, and archive integrity passed. Apple reports iOS build 13 as
+  `VALID` and `READY_FOR_BETA_TESTING` in TestFlight.
