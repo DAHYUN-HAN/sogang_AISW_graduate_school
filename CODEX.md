@@ -348,6 +348,7 @@ Scope:
 - Completed QA 201: duplicate standalone event-list and full-calendar UIs are removed; `/events` redirects to Home, event notifications open their specific detail, and the unlinked all-boards and guide-placeholder routes are removed without changing Home schedule, day/detail, or admin management.
 - Completed: admin event create/update/delete UI.
 - Completed: event categories `academic`, `event`, `exam`, `council`, `external`, and `other`.
+- 2026-09-30 WP7 migration alignment: `events.notice_post_id` declares the index created by `0030_event_notice_link` in SQLAlchemy metadata, so Alembic's schema check does not propose dropping the production index.
 - Decided: recurring events are deferred to v1.1.
 - Completed: idempotent D-day/D-1 notifications are connected to the notification system.
 
