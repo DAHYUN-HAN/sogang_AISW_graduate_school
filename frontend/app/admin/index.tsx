@@ -5,7 +5,8 @@ import { router, useLocalSearchParams } from "expo-router";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, Keyboard, Platform, Pressable, ScrollView, View } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../../components/AppTypography";
 import { z } from "zod";
 
 import BackButton from "../../components/BackButton";

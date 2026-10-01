@@ -1,4 +1,5 @@
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, View } from "react-native";
+import { AppText as Text } from "../AppTypography";
 
 export default function AdminPostDeleteConfirm({
   visible,

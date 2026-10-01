@@ -40,6 +40,7 @@ function loadNavigatorModule() {
     council: ["council", "gsa"],
   };
   const mockRequire = (id: string) => {
+    if (id.endsWith("/AppTypography")) return { AppText: "Text", AppTextInput: "TextInput" };
     if (id === "react-native") return { Pressable: "Pressable", ScrollView: "ScrollView", Text: "Text", View: "View" };
     if (id === "../../utils/adminContentManagement") {
       return {
@@ -69,6 +70,7 @@ function loadContentPanelModule() {
   }).outputText;
   const module = { exports: {} as Record<string, unknown> };
   const mockRequire = (id: string) => {
+    if (id.endsWith("/AppTypography")) return { AppText: "Text", AppTextInput: "TextInput" };
     if (id === "react-native") {
       return { ActivityIndicator: "ActivityIndicator", Pressable: "Pressable", Text: "Text", View: "View" };
     }
@@ -89,6 +91,7 @@ function loadSettingsPanelModule() {
   }).outputText;
   const module = { exports: {} as Record<string, unknown> };
   const mockRequire = (id: string) => {
+    if (id.endsWith("/AppTypography")) return { AppText: "Text", AppTextInput: "TextInput" };
     if (id === "react-native") return { Pressable: "Pressable", Text: "Text", TextInput: "TextInput", View: "View" };
     return nodeRequire(id);
   };

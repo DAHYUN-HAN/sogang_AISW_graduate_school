@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 // Figma: Screen/Common/MigrationNoticeModal-TextOnly (1329:45)
 // 카드 300x196, 안쪽 여백 24/20/20, 블록 사이 10. ×는 카드 위 오른쪽,

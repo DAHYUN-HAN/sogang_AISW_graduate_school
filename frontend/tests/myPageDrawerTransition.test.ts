@@ -83,6 +83,7 @@ function harness(origin = "/home") {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   runInNewContext(code, { exports, require: (name: string) => {
+    if (name.endsWith("/AppTypography")) return { AppText: "Text", AppTextInput: "TextInput" };
     assert.ok(name in modules, name); return modules[name];
   }, setTimeout: (callback: () => void) => timers.push(callback) });
   let tree: Element;

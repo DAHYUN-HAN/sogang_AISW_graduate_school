@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/AppTypography";
 
 import BackButton from "../../components/BackButton";
 import { adminApi } from "../../services/api";

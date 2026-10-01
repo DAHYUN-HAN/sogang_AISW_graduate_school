@@ -24,14 +24,7 @@ const councilSource = source("app/(tabs)/council.tsx");
 const schoolEmailSource = source("components/SchoolEmailInput.tsx");
 const legalDocumentSource = source("components/LegalDocumentScreen.tsx");
 const postCardSource = source("components/PostCard.tsx");
-const fontSource = source("utils/fonts.ts");
 const qaComposeSource = source("../docker-compose.qa.yml");
-
-test("global font patch flattens styles before they reach React DOM", () => {
-  assert.match(fontSource, /style: \{ \.\.\.hostStyle, fontFamily, fontWeight: "normal" \}/);
-  assert.doesNotMatch(fontSource, /style: StyleSheet\.flatten\(\[\{ fontFamily \}, style\]\)/);
-  assert.doesNotMatch(fontSource, /style: \[\{ fontFamily \}, style\]/);
-});
 
 test("QA frontend restart clears Metro before serving updated web styles", () => {
   assert.match(qaComposeSource, /npm run web -- --host lan --clear/);

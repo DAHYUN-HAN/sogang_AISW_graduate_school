@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/AppTypography";
 
 import BoardPostsScreen from "./board/[boardId]";
 import LoadingState from "../../components/LoadingState";

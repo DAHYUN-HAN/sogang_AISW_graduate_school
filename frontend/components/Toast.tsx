@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { Animated, StyleSheet, Text, View } from "react-native";
+import { Animated, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ToastAlertIcon } from "./icons";

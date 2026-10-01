@@ -1,4 +1,5 @@
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
+import { AppText as Text } from "../AppTypography";
 
 import {
   adminBoardsForScope,

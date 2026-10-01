@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "./AppTypography";
 
 import type { CommentNode } from "../types";
 import { commentEditSubmissionValue, getCommentActionState } from "../utils/commentPresentation";

@@ -94,7 +94,7 @@ export default function TabsLayout() {
           tabBarInactiveTintColor: "#8A919C",
           tabBarIconStyle: { marginTop: 0 },
           // Figma: 라벨 11/13 Regular (react-navigation 기본 fontWeight 500 오버라이드)
-          tabBarLabelStyle: { fontSize: 11, fontFamily: "Pretendard_400Regular", fontWeight: "400", lineHeight: 13, marginTop: 3, marginBottom: 0 },
+          tabBarLabelStyle: { fontSize: 11, fontFamily: "Pretendard_400Regular", fontWeight: "normal", lineHeight: 13, marginTop: 3, marginBottom: 0 },
           tabBarItemStyle: { paddingVertical: 0 },
           tabBarStyle,
           tabBarHideOnKeyboard: true,

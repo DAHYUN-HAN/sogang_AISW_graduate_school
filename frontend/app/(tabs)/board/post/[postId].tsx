@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, BackHandler, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
+import { Alert, BackHandler, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CommentItem from "../../../../components/CommentItem";

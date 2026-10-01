@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/AppTypography";
 
 import LegalDocumentScreen from "../../components/LegalDocumentScreen";
 import { useMeQuery } from "../../hooks/useApi";

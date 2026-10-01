@@ -297,6 +297,8 @@ My Page drawer return and avatar:
 
 ## 9. Design Gate
 
+2026-10-01 typography compatibility (WP9 P0): app-owned text and inputs use `AppText` / `AppTextInput` from `components/AppTypography.tsx`. Each logical weight selects a static Pretendard face (400, 500, 600, 700, 800, 900) with native/web `fontWeight: normal`; 100-300 fall back to Regular. Nested text inherits the logical weight and can override it, explicit custom font families remain usable, and input refs expose the native instance. The root loads six assets with `useFonts` before showing navigation. Header/tab labels set the same family explicitly, and web smoothing remains enabled. Do not patch React Native component internals: RN 0.81 Text/TextInput have no `.render` property. Runtime and verification evidence: `docs/qa/TYPOGRAPHY_WEB_ANDROID_2026-10-01.md`.
+
 Before frontend expansion, Figma should provide:
 
 - Colors.

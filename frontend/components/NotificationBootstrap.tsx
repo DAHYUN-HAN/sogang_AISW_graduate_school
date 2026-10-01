@@ -1,7 +1,8 @@
 import { router } from "expo-router";
 import Constants from "expo-constants";
 import { useEffect, useRef, useState } from "react";
-import { Platform, Pressable, Text, View } from "react-native";
+import { Platform, Pressable, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 import { notificationApi } from "../services/api";
 import { useUserStore } from "../stores/userStore";

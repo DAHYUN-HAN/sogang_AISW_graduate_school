@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useMeQuery } from "../../../hooks/useApi";

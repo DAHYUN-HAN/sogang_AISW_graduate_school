@@ -1,4 +1,5 @@
-import { ActivityIndicator, type StyleProp, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { ActivityIndicator, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 type Props = {
   message?: string;

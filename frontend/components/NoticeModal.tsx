@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 // Figma: Screen/Common/UploadFailModal (1136:57), Screen/Common/RateLimitModal (1142:45)
 // 두 화면이 제목·본문만 다르고 구조가 같아 하나로 만들었다.

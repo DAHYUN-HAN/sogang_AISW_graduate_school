@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 // 아래에서 올라오는 선택 시트. 글쓰기의 게시판·동아리·경조사 선택과 글 수정의
 // 게시판 이동이 같은 모양을 쓰도록 한곳에 둔다.

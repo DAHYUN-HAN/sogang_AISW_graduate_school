@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../components/LoadingState";

@@ -1,5 +1,6 @@
 import { router } from "expo-router";
-import { Pressable, Text } from "react-native";
+import { Pressable } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 import { BackIcon } from "./icons";
 type Props = {

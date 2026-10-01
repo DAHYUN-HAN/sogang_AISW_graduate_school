@@ -1,4 +1,5 @@
-import { Modal, Pressable, Text } from "react-native";
+import { Modal, Pressable } from "react-native";
+import { AppText as Text } from "../AppTypography";
 
 export default function AdminSaveSuccessModal({
   visible,

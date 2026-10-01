@@ -54,6 +54,7 @@ for (const type of ["posts", "bookmarks", "comments"]) {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     }).outputText;
     runInNewContext(code, { exports, require: (name: string) => {
+      if (name.endsWith("/AppTypography")) return { AppText: "Text", AppTextInput: "TextInput" };
       assert.ok(name in modules, name); return modules[name];
     } });
     const tree = exports.default();

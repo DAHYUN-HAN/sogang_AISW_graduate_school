@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
+import { AppText as Text } from "../AppTypography";
 
 import type { Board, MediaAsset } from "../../types";
 import type { AdminBoardCapability, AdminBoardContentKind } from "../../utils/adminContentManagement";

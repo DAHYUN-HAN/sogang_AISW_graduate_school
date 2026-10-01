@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {

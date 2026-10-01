@@ -31,6 +31,7 @@ function editorHarness(isPrivate = false) {
     exports: module.exports, module,
     window: { location: { assign: (...args: unknown[]) => opened.push(args) } },
     require: (id: string) => {
+      if (id.endsWith("/AppTypography")) return { AppText: "Text", AppTextInput: "TextInput" };
       if (id === "react/jsx-runtime") return { jsx, jsxs: jsx };
       if (id === "react") return {
         useState: (initial: unknown) => { const i = cursor++; if (!(i in state)) state[i] = initial; return [state[i], (value: unknown) => { state[i] = value; }]; },

@@ -1,15 +1,7 @@
 import { router, usePathname } from "expo-router";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Animated,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { Animated, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useMeQuery } from "../hooks/useApi";

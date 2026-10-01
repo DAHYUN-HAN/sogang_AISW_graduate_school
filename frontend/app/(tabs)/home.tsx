@@ -4,25 +4,8 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  type ImageSourcePropType,
-  Linking,
-  type LayoutChangeEvent,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  PanResponder,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { ActivityIndicator, Alert, Image, type ImageSourcePropType, Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { AppText as Text } from "../../components/AppTypography";
 
 import { MediaImageBackground } from "../../components/MediaImage";
 import HomeSectionGate from "../../components/HomeSectionGate";

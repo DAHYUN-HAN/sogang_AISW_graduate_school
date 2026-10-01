@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { ActivityIndicator, Alert, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Alert, View } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../AppTypography";
 
 import { useBoardsQuery } from "../../hooks/useApi";
 import { duesPayerApi } from "../../services/api";

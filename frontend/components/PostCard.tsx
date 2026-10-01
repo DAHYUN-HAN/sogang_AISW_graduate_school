@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 import { BookmarkIcon } from "./icons";
 import type { PostListItem } from "../types";

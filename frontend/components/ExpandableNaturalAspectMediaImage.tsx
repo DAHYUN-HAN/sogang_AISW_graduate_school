@@ -1,18 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState, type ComponentProps } from "react";
-import {
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type GestureResponderEvent,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { Image, Modal, Pressable, ScrollView, StyleSheet, View, type GestureResponderEvent, type StyleProp, type ViewStyle } from "react-native";
+import { AppText as Text } from "./AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { imageDimensionsFromLoadEvent, type ImageDimensions } from "../utils/imageDimensions";

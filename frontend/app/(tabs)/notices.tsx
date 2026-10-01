@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { EmptyCalendarIcon } from "../../components/icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useBoardsQuery } from "../../hooks/useApi";

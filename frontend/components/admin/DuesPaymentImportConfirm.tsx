@@ -1,4 +1,5 @@
-import { Modal, Pressable, Text, View } from "react-native";
+import { Modal, Pressable, View } from "react-native";
+import { AppText as Text } from "../AppTypography";
 
 import { DUES_ADMIN_COLORS as COLORS } from "./DuesAdminPrimitives";
 

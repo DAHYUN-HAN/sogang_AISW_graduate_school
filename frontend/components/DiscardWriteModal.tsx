@@ -1,4 +1,5 @@
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 // Figma: Screen/Common/DiscardWriteModal (node 1344:45)
 //        Screen/Common/BoardChangeConfirmModal (node 1527:54)

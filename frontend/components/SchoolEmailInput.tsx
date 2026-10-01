@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Platform, StyleSheet, Text, TextInput, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "./AppTypography";
 
 type Props = {
   value: string;

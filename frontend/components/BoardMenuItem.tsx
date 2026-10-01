@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 import type { Board } from "../types";
 

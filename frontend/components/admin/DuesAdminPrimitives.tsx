@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { isAxiosError } from "axios";
 import * as DocumentPicker from "expo-document-picker";
-import { Platform, Pressable, Text } from "react-native";
+import { Platform, Pressable } from "react-native";
+import { AppText as Text } from "../AppTypography";
 
 
 export const DUES_ADMIN_COLORS = {

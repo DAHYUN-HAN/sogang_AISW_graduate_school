@@ -21,6 +21,7 @@ function loadComponent() {
   }).outputText;
   const module = { exports: {} as Record<string, unknown> };
   const mockRequire = (id: string) => {
+    if (id.endsWith("/AppTypography")) return { AppText: "Text", AppTextInput: "TextInput" };
     if (id === "react-native") {
       return {
         Modal: "Modal",

@@ -10,7 +10,8 @@ import NotificationBootstrap from "../components/NotificationBootstrap";
 import StatusBarScrim from "../components/StatusBarScrim";
 import KeyboardViewport from "../components/KeyboardViewport";
 import { useUserStore } from "../stores/userStore";
-import { APP_FONTS, patchDefaultFontFamily } from "../utils/fonts";
+import { APP_FONTS } from "../utils/fontAssets";
+import { appFontStyle, applyWebFontSmoothing } from "../utils/fonts";
 import { isAdminUser } from "../utils/permissions";
 import { MINIMUM_SPLASH_DURATION_MS, shouldShowSplash } from "../utils/splash";
 
@@ -19,8 +20,7 @@ if (Platform.OS !== "web") {
   void SplashScreen.preventAutoHideAsync();
 }
 
-// Route every <Text>/<TextInput> through the matching Pretendard face (design uses Inter + Korean fallback).
-patchDefaultFontFamily();
+applyWebFontSmoothing();
 
 // iOS 기본 가장자리 스와이프 뒤로가기는 켜둔다. 예전에 이 제스처가 오작동한 건
 // 마이페이지 서랍이 같은 구역에 자체 PanResponder를 걸어 다퉜기 때문이고,
@@ -84,7 +84,7 @@ export default function RootLayout() {
           <Stack
             screenOptions={{
               headerStyle: { backgroundColor: "#ffffff" },
-              headerTitleStyle: { color: "#111827", fontWeight: "900" },
+              headerTitleStyle: { color: "#111827", ...appFontStyle("900") },
               contentStyle: { backgroundColor: "#FFFFFF" },
               statusBarStyle: "dark",
             }}

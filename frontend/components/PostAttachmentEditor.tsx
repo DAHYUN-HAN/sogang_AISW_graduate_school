@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { Keyboard, Linking, Platform, Pressable, StyleSheet, Text, View, type ViewProps } from "react-native";
+import { Keyboard, Linking, Platform, Pressable, StyleSheet, View, type ViewProps } from "react-native";
+import { AppText as Text } from "./AppTypography";
 
 import { resolveMediaAccessUrl } from "../hooks/useMediaAccessUrl";
 import type { MediaAsset } from "../types";

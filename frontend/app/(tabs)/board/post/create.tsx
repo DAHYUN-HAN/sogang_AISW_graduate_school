@@ -5,7 +5,8 @@ import { useIsFocused, useNavigation, usePreventRemove, type NavigationAction } 
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextStyle } from "react-native";
+import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, type TextStyle } from "react-native";
+import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
