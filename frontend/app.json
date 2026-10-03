@@ -4,7 +4,7 @@
     "slug": "sogang-community",
     "owner": "kimjinsan11",
     "scheme": "sogang-community",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "icon": "./assets/app-icon.png",
     "splash": {
       "image": "./assets/splash-logo.png",
