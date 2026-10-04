@@ -151,6 +151,10 @@ done
 
 public_ip="$(require_value PUBLIC_IP)"
 is_global_ipv4 "$public_ip" || fail "PUBLIC_IP must be an explicit globally routable IPv4 address."
+domain_enabled="${PUBLIC_DOMAIN_ENABLED:-false}"
+tls_cert_name="$public_ip"
+public_host="$public_ip"
+public_host_aliases=""
 tls_contact_email="$(require_value TLS_CONTACT_EMAIL)"
 [[ "$tls_contact_email" =~ ^[^[:space:]@]+@[^[:space:]@]+\.[^[:space:]@]+$ ]] || \
   fail "TLS_CONTACT_EMAIL must be a valid monitored email address."
@@ -165,6 +169,15 @@ proxy_ip="$(require_value IP_INGRESS_PROXY_IP)"
 trusted_proxy_ips="$(require_value RATE_LIMIT_TRUSTED_PROXY_IPS)"
 [[ "$trusted_proxy_ips" == "$proxy_ip/32" ]] || \
   fail "RATE_LIMIT_TRUSTED_PROXY_IPS must be exactly IP_INGRESS_PROXY_IP/32."
+if [[ "$domain_enabled" == true ]]; then
+  python3 "$script_dir/configure_public_domain.py" --check "$resolved_env_file" "$repo_root/deploy/public-domain.env"
+  for key in PUBLIC_HOST PUBLIC_HOST_ALIASES TLS_CERT_NAME ALLOWED_HOSTS CORS_ORIGIN_REGEX PUBLIC_API_URL SUPPORT_URL PRIVACY_POLICY_URL ACCOUNT_DELETION_URL; do
+    export "$key=$(dotenv_value "$key")"
+  done
+  public_host="$PUBLIC_HOST"
+  public_host_aliases="$PUBLIC_HOST_ALIASES"
+  tls_cert_name="$TLS_CERT_NAME"
+else
 [[ "$(require_value ALLOWED_HOSTS)" == "$public_ip" ]] || fail "ALLOWED_HOSTS must be exactly PUBLIC_IP."
 [[ "$(require_value PUBLIC_API_URL)" == "https://$public_ip/api" ]] || \
   fail "PUBLIC_API_URL must be https://PUBLIC_IP/api."
@@ -177,6 +190,7 @@ trusted_proxy_ips="$(require_value RATE_LIMIT_TRUSTED_PROXY_IPS)"
 escaped_ip="${public_ip//./\\.}"
 [[ "$(require_value CORS_ORIGIN_REGEX)" == "^https://$escaped_ip$" ]] || \
   fail "CORS_ORIGIN_REGEX must match only https://PUBLIC_IP."
+fi
 
 export PRODUCTION_ENV_FILE="$resolved_env_file"
 export PRODUCTION_WORKER_ENV_FILE="$resolved_worker_env_file"
@@ -192,6 +206,9 @@ compose_args=(
   -f "$compose_production_file"
   -f "$compose_ip_file"
 )
+if [[ "$domain_enabled" == true ]]; then
+  compose_args+=(-f "$repo_root/docker-compose.domain.yml")
+fi
 
 validate_config() {
   compose config --quiet
@@ -218,6 +235,19 @@ ensure_challenge_server() {
   fi
   for _ in $(seq 1 30); do
     if [[ "$(curl --fail --silent --show-error --max-time 3 "http://$public_ip/.well-known/acme-challenge/aisw-preflight" 2>/dev/null || true)" == ready ]]; then
+      if [[ "$domain_enabled" == true ]]; then
+        # Check real DNS routing before attempting certificate issuance.
+        local vm_ip dns_ips
+        vm_ip="$(curl --fail --silent --connect-timeout 2 --max-time 3 -H 'Metadata-Flavor: Google' \
+          http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip 2>/dev/null || true)"
+        [[ -z "$vm_ip" || "$vm_ip" == "$public_ip" ]] || fail "VM external IP is $vm_ip but PUBLIC_IP is $public_ip; update DNS and PUBLIC_IP before issuing."
+        for host in $public_host $public_host_aliases; do
+          dns_ips="$(getent ahostsv4 "$host" | awk '{print $1}' | sort -u)"
+          [[ "$dns_ips" == "$public_ip" ]] || fail "DNS for $host must point only to PUBLIC_IP ($public_ip)."
+          [[ "$(curl --fail --silent --show-error --max-time 10 "http://$host/.well-known/acme-challenge/aisw-preflight")" == ready ]] || \
+            fail "Domain HTTP-01 preflight failed for $host; check DNS and VM external IP."
+        done
+      fi
       return 0
     fi
     sleep 1
@@ -230,15 +260,22 @@ issue_certificate() {
   local cert_name="$2"
   shift 2
   ensure_challenge_server
+  local identity_args=()
+  if [[ "$domain_enabled" == true ]]; then
+    identity_args=(-d "$public_host")
+    for host in $public_host_aliases; do identity_args+=(-d "$host"); done
+    identity_args+=(--expand)
+  else
+    identity_args=(--preferred-profile shortlived --ip-address "$public_ip")
+  fi
   compose --profile certificate run --rm --no-deps "$service" certonly \
     --non-interactive \
     --agree-tos \
     --no-eff-email \
     --email "$tls_contact_email" \
-    --preferred-profile shortlived \
     --webroot \
     --webroot-path /var/www/certbot \
-    --ip-address "$public_ip" \
+    "${identity_args[@]}" \
     --cert-name "$cert_name" \
     "$@"
 }
@@ -247,6 +284,27 @@ require_live_certificate() {
   compose --profile certificate run --rm --no-deps --entrypoint /bin/sh certbot \
     -ceu 'test -s "/etc/letsencrypt/live/$PUBLIC_IP/fullchain.pem" && test -s "/etc/letsencrypt/live/$PUBLIC_IP/privkey.pem"' || \
     fail "A live certificate for PUBLIC_IP is required. Run Issue first."
+  if [[ "$domain_enabled" == true ]]; then
+    compose --profile certificate run --rm --no-deps --entrypoint /bin/sh certbot \
+      -ceu 'test -s "/etc/letsencrypt/live/$1/fullchain.pem" && test -s "/etc/letsencrypt/live/$1/privkey.pem"' -- "$tls_cert_name" || \
+      fail "A live domain certificate is required. Run production-domain.sh Issue first."
+  fi
+}
+
+domain_smoke() {
+  local host path result
+  for path in /health /health/ready /healthz /legal/privacy; do
+    curl --fail --proto '=https' --tlsv1.2 --silent --show-error --max-time 15 "https://$public_host$path" >/dev/null
+  done
+  for host in $public_host $public_host_aliases; do
+    result="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code} %{redirect_url}' "http://$host/legal/privacy?domain_check=1")"
+    [[ "$result" == "308 https://$public_host/legal/privacy?domain_check=1" ]] || fail "HTTP canonical redirect failed for $host."
+  done
+  for host in $public_host_aliases; do
+    result="$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code} %{redirect_url}' "https://$host/legal/privacy?domain_check=1")"
+    [[ "$result" == "308 https://$public_host/legal/privacy?domain_check=1" ]] || fail "HTTPS alias redirect or certificate verification failed for $host."
+  done
+  printf 'Canonical domain HTTPS and alias redirects passed.\n'
 }
 
 smoke() {
@@ -271,6 +329,7 @@ smoke() {
   rm -f -- "$temporary" "$certificate_text"
   trap - RETURN
   printf 'Public HTTPS, certificate SAN, API readiness, and web deep-link smoke checks passed.\n'
+  if [[ "$domain_enabled" == true ]]; then domain_smoke; fi
 }
 
 case "$action" in
@@ -281,13 +340,13 @@ case "$action" in
     ;;
   IssueStaging)
     validate_config
-    issue_certificate certbot-staging "staging-$public_ip" --staging
-    printf 'Staging IP certificate issuance passed; the browser must not use this test certificate.\n'
+    issue_certificate certbot-staging "staging-$tls_cert_name" --staging
+    printf 'Staging certificate issuance passed; the browser must not use this test certificate.\n'
     ;;
   Issue)
     validate_config
-    issue_certificate certbot "$public_ip"
-    printf 'Live short-lived IP certificate issued for %s.\n' "$public_ip"
+    issue_certificate certbot "$tls_cert_name"
+    printf 'Live certificate issued for %s.\n' "$public_host"
     ;;
   Up)
     validate_config
@@ -306,10 +365,16 @@ case "$action" in
     validate_config
     require_live_certificate
     compose --profile certificate run --rm --no-deps certbot renew --quiet \
-      --preferred-profile shortlived --webroot --webroot-path /var/www/certbot
+      --webroot --webroot-path /var/www/certbot
     compose exec nginx nginx -t
     compose exec nginx nginx -s reload
     smoke
+    ;;
+  RenewDryRun)
+    validate_config
+    require_live_certificate
+    compose --profile certificate run --rm --no-deps certbot renew --dry-run \
+      --webroot --webroot-path /var/www/certbot
     ;;
   Ps)
     compose --profile certificate ps -a
@@ -321,6 +386,6 @@ case "$action" in
     smoke
     ;;
   *)
-    fail "Action must be one of: Config, IssueStaging, Issue, Up, Renew, Ps, Logs, Smoke."
+    fail "Action must be one of: Config, IssueStaging, Issue, Up, Renew, RenewDryRun, Ps, Logs, Smoke."
     ;;
 esac

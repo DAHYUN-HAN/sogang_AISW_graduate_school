@@ -438,6 +438,8 @@ Scope:
   Live certificate issuance, VM container smoke, SMTP/alert delivery, and
   physical Android/iOS evidence remain deployment-time checks.
 
+- 2026-10-04 WP1/WP9 domain deployment: committed canonical `www.aisw-campus.com` public profile, domain ingress overlay, secret-preserving/idempotent configuration helper and deploy commands. Apex redirects preserve paths/queries; the legacy IP HTTPS endpoint remains available for installed clients. Renewal retains each certificate's saved profile and the watcher retries temporary certificate/read/reload failures. Targeted deployment tests pass 15/15; actual pinned-Nginx Docker checks pass for TLS, HTTP/HTTPS redirects, both ACME hosts, API/web and legacy IP. Compose runtime CORS/URL/volume checks and automatic reload/retry behavior pass. Live GCP issuance/deployment remains an operator step; no live-domain success is claimed. Runbook: `docs/GCP_DOMAIN_PRODUCTION_DEPLOYMENT.md`.
+
 Definition of done:
 
 - Critical bug count is zero.

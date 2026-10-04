@@ -41,6 +41,9 @@ backend/venv/
 .env
 .env.production
 .env.production.worker
+.env.production.before-domain
+.env*.before-domain
+.domain-env-*
 .env.qa
 .secrets/
 *.env.local

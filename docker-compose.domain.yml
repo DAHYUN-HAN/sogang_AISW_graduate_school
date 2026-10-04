@@ -1,0 +1,19 @@
+# Add after the production and IP overlays. Preserve the existing IP TLS endpoint.
+services:
+  nginx:
+    environment:
+      PUBLIC_HOST: ${PUBLIC_HOST:?Run production-domain.sh Configure first}
+      PUBLIC_HOST_ALIASES: ${PUBLIC_HOST_ALIASES:-}
+      TLS_CERT_NAME: ${TLS_CERT_NAME:?Run production-domain.sh Configure first}
+    volumes:
+      - ./deploy/nginx/domain.conf.template:/etc/nginx/templates/domain.conf.template:ro
+      - ./deploy/nginx/watch-domain-certificates.sh:/usr/local/bin/watch-certificates.sh:ro
+
+  certificate-renewer:
+    command:
+      - >-
+        trap 'exit 0' TERM INT;
+        while :; do
+          certbot renew --quiet --webroot --webroot-path /var/www/certbot;
+          sleep 43200 & wait $$!;
+        done
