@@ -281,10 +281,6 @@ export const PRIVACY_POLICY_ONLY_SECTIONS: PrivacyPolicySection[] = [
     ),
   },
   {
-    title: "제4조의3 (공개 영역의 민감정보 및 제3자 정보 보호)",
-    body: "원우회는 상조회 증빙자료를 서비스의 공개 영역에 게시하지 않습니다.",
-  },
-  {
     title: "제5조 (정보주체의 권리·의무 및 행사방법)",
     body: lines(
       "① 정보주체는 원우회에 대해 언제든지 개인정보 열람·정정·삭제·처리정지·동의철회를 요구할 수 있습니다.",
