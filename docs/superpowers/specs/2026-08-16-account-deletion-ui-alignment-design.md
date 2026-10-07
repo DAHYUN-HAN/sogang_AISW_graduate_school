@@ -16,6 +16,7 @@ The reference instead shows a minimal completion state containing only an outlin
 
 - Preserve the current signed-in screen because its unchecked and checked states already match the reference.
 - Hide the bottom tab bar only on `/settings/account-deletion`; keep it on the account screen, My Page, and all primary tabs.
+  - 2026-10-07 superseded: the shipped app never hid it (the category-highlight tab bar rendered the last visible tab's options), and the user chose to keep that shipped behavior. The tab bar now stays visible on `/settings/account-deletion`; the helper and its test were removed. See `PLAN.md` navigation decision.
 - Keep the exact blue and amber retention notices, acknowledgement checkbox, disabled gray button, and enabled destructive-red `탈퇴하기` button.
 - Keep the current-password modal after selecting `탈퇴하기`. It is a required security step, not an optional visual detail.
 - Preserve existing validation, retry feedback, rate-limit handling, administrator restriction, push-token cleanup, and session cleanup.
@@ -47,7 +48,7 @@ Deletion errors remain on the signed-in screen or password modal. A successful a
 ## Testing
 
 - A pure behavior test verifies that only `completed=1` selects the compact member presentation.
-- A route behavior test verifies that only `/settings/account-deletion` hides the tab bar.
+- A route behavior test verifies that only `/settings/account-deletion` hides the tab bar. (Removed 2026-10-07 with the tab-bar hiding.)
 - The test verifies the approved title, button label, and login destination using hand-derived literals.
 - Existing account-deletion security and retention tests remain unchanged.
 - Full frontend tests, typecheck, lint, and a 360px browser capture verify the integrated result.

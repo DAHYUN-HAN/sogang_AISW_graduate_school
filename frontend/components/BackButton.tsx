@@ -3,6 +3,7 @@ import { Pressable } from "react-native";
 import { AppText as Text } from "./AppTypography";
 
 import { BackIcon } from "./icons";
+import { replaceWithRoute } from "../utils/tabNavigation";
 type Props = {
   fallback?: string;
   label?: string;
@@ -17,7 +18,7 @@ export default function BackButton({ fallback = "/(tabs)/home", label = "뒤로"
           router.back();
           return;
         }
-        router.replace(fallback as never);
+        replaceWithRoute(fallback);
       }}
       style={{
         alignSelf: "flex-start",

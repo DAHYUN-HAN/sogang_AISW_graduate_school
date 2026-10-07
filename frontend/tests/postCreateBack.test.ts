@@ -8,7 +8,7 @@ import { COMMUNITY_TAB_ROUTE, PARTICIPATION_TAB_ROUTE, postCreateCompletionRoute
 
 // Run the actual screen's header callback and focus subscription. Route-helper
 // tests alone cannot catch Android Back falling through to the parent Home tab.
-const source = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const source = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const form = source.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === "PostCreateForm")!;
 let headerBack: ts.Expression | undefined;
 function findHeader(node: ts.Node) {
@@ -63,7 +63,10 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
       back: () => routes.push("back"),
       navigate: (route: string) => routes.push(`navigate:${route}`),
       replace: (route: string) => routes.push(`replace:${route}`),
+      dismissTo: (route: string) => routes.push(`dismissTo:${route}`),
     },
+    navigateToRoute: (route: string) => routes.push(`navigate:${route}`),
+    replaceWithRoute: (route: string) => routes.push(`replace:${route}`),
     postCreateFormBackDecision,
     postCreateCompletionRoute,
     postId: options.postId ? Number(options.postId) : null,
@@ -128,13 +131,16 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
 }
 
 for (const returnTo of [COMMUNITY_TAB_ROUTE, PARTICIPATION_TAB_ROUTE]) {
-  test(`${returnTo} 글쓰기의 헤더와 Android Back은 이력 없이도 원래 탭으로 복귀한다`, () => {
+  // 글쓰기는 들어온 탭 스택 위에 쌓이므로 아래 화면으로 pop 하고(iOS 스와이프와 같은 곳),
+  // 이력이 없을 때만 원래 탭으로 간다.
+  test(`${returnTo} 글쓰기의 헤더와 Android Back은 아래 화면으로, 이력이 없으면 원래 탭으로 복귀한다`, () => {
     for (const canGoBack of [true, false]) {
       const h = harness({ returnTo, canGoBack });
       h.focus();
       assert.equal(h.hardware(), true, "The create screen must consume Android Back");
       h.header();
-      assert.deepEqual(h.navigation, [`navigate:${returnTo}`, `navigate:${returnTo}`]);
+      const expected = canGoBack ? "back" : `navigate:${returnTo}`;
+      assert.deepEqual(h.navigation, [expected, expected]);
     }
   });
 }
@@ -174,7 +180,7 @@ test("웹과 iOS는 Android 구독 없이 기존 헤더 복귀를 유지한다",
     assert.equal(h.focus(), undefined);
     assert.equal(h.hardware(), undefined);
     h.header();
-    assert.deepEqual(h.navigation, [`navigate:${COMMUNITY_TAB_ROUTE}`]);
+    assert.deepEqual(h.navigation, ["back"]);
   }
 });
 
@@ -182,7 +188,7 @@ test("등록 완료 화면의 Android Back도 기존 확인 버튼의 완료 경
   const h = harness({ boardType: "suggestion", createdPostId: 42 });
   h.focus();
   assert.equal(h.hardware(), true);
-  assert.deepEqual(h.navigation, [`replace:${postCreateCompletionRoute("suggestion", 42, 7)}`]);
+  assert.deepEqual(h.navigation, [`dismissTo:${postCreateCompletionRoute("suggestion", 42, 7)}`]);
 });
 
 test("등록 완료 후 남아 있는 선택기 상태는 확인과 Back 복귀를 막지 않는다", () => {
@@ -202,7 +208,7 @@ test("게시판 선택창이 펼쳐져 있으면 먼저 닫고 다음 Back에서
   assert.equal(h.state.selectionSheet, null);
   h.focus();
   h.hardware();
-  assert.deepEqual(h.navigation, [`navigate:${COMMUNITY_TAB_ROUTE}`]);
+  assert.deepEqual(h.navigation, ["back"]);
 });
 
 test("작성 중 펼친 날짜 선택기도 Back에서 먼저 닫는다", () => {
@@ -213,7 +219,7 @@ test("작성 중 펼친 날짜 선택기도 Back에서 먼저 닫는다", () => 
   assert.equal(h.state.datePickerOpen, false);
   h.focus();
   h.hardware();
-  assert.deepEqual(h.navigation, [`navigate:${PARTICIPATION_TAB_ROUTE}`]);
+  assert.deepEqual(h.navigation, ["back"]);
 });
 
 test("작성 중인 내용이 있으면 헤더와 Android Back이 곧바로 나가지 않고 확인창을 연다", () => {
@@ -232,7 +238,7 @@ test("작성 취소를 확인하면 폼을 비우고 원래 탭으로 복귀한�
   h.discard();
   assert.equal(h.state.discardPromptOpen, false);
   assert.deepEqual(h.cleared, ["form", "attachments", "participants", "participantQuery", "evidenceLink", "evidenceMode", "activitySource"]);
-  assert.deepEqual(h.navigation, [`navigate:${COMMUNITY_TAB_ROUTE}`]);
+  assert.deepEqual(h.navigation, ["back"]);
 });
 
 test("수정 취소를 확인하면 폼을 비우지 않고 수정 전 게시글 상세로 돌아간다", () => {
@@ -262,7 +268,7 @@ test("등록 완료 후에는 변경사항이 남아 있어도 확인창 없이 
   h.focus();
   assert.equal(h.hardware(), true);
   assert.equal(h.state.discardPromptOpen, false);
-  assert.deepEqual(h.navigation, [`replace:${postCreateCompletionRoute("suggestion", 42, 7)}`]);
+  assert.deepEqual(h.navigation, [`dismissTo:${postCreateCompletionRoute("suggestion", 42, 7)}`]);
 });
 
 test("iOS 스와이프로 나가려 해도 확인창을 먼저 띄운다", () => {

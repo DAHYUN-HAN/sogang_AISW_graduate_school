@@ -15,7 +15,7 @@ function compile(code: string) {
   }).outputText;
 }
 
-const create = parse("app/(tabs)/board/post/create.tsx");
+const create = parse("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx");
 const screen = create.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === "PostCreateScreen");
 assert.ok(screen);
 const screenCode = compile(`(${screen.getText(create).replace("export default ", "")})()`);
@@ -41,7 +41,7 @@ test("기존 글 수정은 포커스 전환만으로 작성 중인 폼을 초기
 });
 
 test("목록에서 글쓰기를 열면 검색 입력과 결과를 초기화하고 선택한 분류는 유지한다", () => {
-  const board = parse("app/(tabs)/board/[boardId].tsx");
+  const board = parse("app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx");
   const expressions = new Map<string, string>();
   function visit(node: ts.Node) {
     if (ts.isVariableDeclaration(node) && node.initializer) expressions.set(node.name.getText(board), node.initializer.getText(board));
@@ -71,7 +71,7 @@ test("목록에서 글쓰기를 열면 검색 입력과 결과를 초기화하�
 test("자료공유 전체에서 글쓰기를 열면 게시판을 정하지 않고 그룹만 넘긴다", () => {
   // 전체는 여러 게시판을 모아 보는 상태다. 마지막으로 들른 게시판이 그대로
   // 선택돼 있으면 사용자가 의도하지 않은 게시판에 글이 올라간다.
-  const board = parse("app/(tabs)/board/[boardId].tsx");
+  const board = parse("app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx");
   const expressions = new Map<string, string>();
   function visit(node: ts.Node) {
     if (ts.isVariableDeclaration(node) && node.initializer) expressions.set(node.name.getText(board), node.initializer.getText(board));

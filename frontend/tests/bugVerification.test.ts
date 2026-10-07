@@ -3,17 +3,17 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const postCardSource = readFileSync("components/PostCard.tsx", "utf8");
-const postDetailSource = readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8");
-const postCreateSource = readFileSync("app/(tabs)/board/post/create.tsx", "utf8");
-const boardDetailSource = readFileSync("app/(tabs)/board/[boardId].tsx", "utf8");
-const homeSource = readFileSync("app/(tabs)/home.tsx", "utf8");
-const communitySource = readFileSync("app/(tabs)/community.tsx", "utf8");
+const postDetailSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
+const postCreateSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
+const boardDetailSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx", "utf8");
+const homeSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8");
+const communitySource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/community.tsx", "utf8");
 const loginSource = readFileSync("app/auth/login.tsx", "utf8");
 
 test("#14·15 행사 사진첩 더보기는 커뮤니티를 행사 사진첩 기본 상태로 다시 연다", () => {
   assert.match(
     homeSource,
-    /<SectionHeader\s+title="행사 사진첩"[\s\S]*?requestTabRootReset\("community"\)[\s\S]*?router\.navigate\(COMMUNITY_TAB_ROUTE as never\)[\s\S]*?\/>/,
+    /<SectionHeader\s+title="행사 사진첩"[\s\S]*?requestTabRootReset\("community"\)[\s\S]*?navigateToTabRoot\("community"\)[\s\S]*?\/>/,
   );
   assert.doesNotMatch(
     homeSource,
@@ -26,7 +26,8 @@ test("#16 전공 커뮤니티 상세는 목록으로 복귀하고 전체 보드 
   assert.doesNotMatch(boardDetailSource, /\/\(tabs\)\/boards/);
   assert.doesNotMatch(homeSource, /\/\(tabs\)\/boards/);
   assert.match(boardDetailSource, /postDetailRoute\(postId, boardId, detailReturnRoute\)/);
-  assert.match(postDetailSource, /router\.navigate\(route as never\)/);
+  // 돌아갈 목록이 탭 첫 화면이면 그 탭 스택으로 옮기는 공통 이동기를 쓴다.
+  assert.match(postDetailSource, /navigate: navigateToRoute/);
   assert.match(postDetailSource, /onPress=\{handlePostBack\}/);
   assert.match(postDetailSource, /BackHandler\.addEventListener\("hardwareBackPress"/);
   assert.match(boardDetailSource, /BackHandler\.addEventListener\("hardwareBackPress"/);

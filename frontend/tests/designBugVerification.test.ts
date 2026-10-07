@@ -11,17 +11,17 @@ const styleBlock = (fileSource: string, styleName: string) => {
 };
 
 const tabLayoutSource = source("app/(tabs)/_layout.tsx");
-const homeSource = source("app/(tabs)/home.tsx");
+const homeSource = source("app/(tabs)/(home,notices,community,participation,council)/home.tsx");
 const calendarSource = source("components/CalendarMonth.tsx");
-const noticeListSource = source("app/(tabs)/notices.tsx");
-const boardSource = source("app/(tabs)/board/[boardId].tsx");
-const postDetailSource = source("app/(tabs)/board/post/[postId].tsx");
-const postCreateSource = source("app/(tabs)/board/post/create.tsx");
-const postEditSource = source("app/(tabs)/board/post/edit/[postId].tsx");
-const mutualAidCompleteSource = source("app/(tabs)/council/mutual-aid-complete.tsx");
-const searchSource = source("app/(tabs)/search.tsx");
+const noticeListSource = source("app/(tabs)/(home,notices,community,participation,council)/notices.tsx");
+const boardSource = source("app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx");
+const postDetailSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx");
+const postCreateSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx");
+const postEditSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx");
+const mutualAidCompleteSource = source("app/(tabs)/(home,notices,community,participation,council)/council/mutual-aid-complete.tsx");
+const searchSource = source("app/(tabs)/(home,notices,community,participation,council)/search.tsx");
 const loginSource = source("app/auth/login.tsx");
-const councilSource = source("app/(tabs)/council.tsx");
+const councilSource = source("app/(tabs)/(home,notices,community,participation,council)/council.tsx");
 const schoolEmailSource = source("components/SchoolEmailInput.tsx");
 const legalDocumentSource = source("components/LegalDocumentScreen.tsx");
 const postCardSource = source("components/PostCard.tsx");
@@ -207,7 +207,7 @@ test("스레드 하단 여백은 대댓글 유무에 따라 28\/16으로 갈린�
 });
 
 test("본문 반응행의 댓글 수를 누르면 하단 댓글 입력창에 커서가 간다", () => {
-  const detail = source("app/(tabs)/board/post/[postId].tsx");
+  const detail = source("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx");
   assert.match(detail, /accessibilityLabel="댓글 쓰기"[\s\S]{0,260}commentInputRef\.current\?\.focus\(\)/);
   assert.doesNotMatch(detail, /<View style=\{styles\.iconAction\}>\s*\n\s*<Ionicons name="chatbubble-outline"/);
 });

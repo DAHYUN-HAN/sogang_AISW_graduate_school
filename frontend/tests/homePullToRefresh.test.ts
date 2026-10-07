@@ -8,7 +8,7 @@ import { currentKoreaMonth } from "../utils/eventCalendar";
 import { enabledRefetch, refreshQueries } from "../utils/pullToRefresh";
 
 const source = ts.createSourceFile(
-  "home.tsx", readFileSync("app/(tabs)/home.tsx", "utf8"),
+  "home.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8"),
   ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX,
 );
 const home = source.statements.find(

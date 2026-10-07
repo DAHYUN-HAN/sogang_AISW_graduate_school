@@ -10,7 +10,7 @@ import * as participationGuide from "../utils/participationGuide";
 
 const source = ts.createSourceFile(
   "create.tsx",
-  readFileSync("app/(tabs)/board/post/create.tsx", "utf8"),
+  readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8"),
   ts.ScriptTarget.Latest,
   true,
   ts.ScriptKind.TSX,

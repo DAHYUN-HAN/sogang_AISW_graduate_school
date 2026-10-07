@@ -65,9 +65,9 @@ test("기타 분류 보라색은 앱 전체가 한 값을 쓴다", () => {
   const sources = [
     "components/PostCard.tsx",
     "components/NoticeRow.tsx",
-    "app/(tabs)/settings/activity.tsx",
-    "app/(tabs)/board/post/[postId].tsx",
-    "app/(tabs)/home.tsx",
+    "app/(tabs)/(home,notices,community,participation,council)/settings/activity.tsx",
+    "app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx",
+    "app/(tabs)/(home,notices,community,participation,council)/home.tsx",
     "utils/eventCategoryPresentation.ts",
   ].map((path) => readFileSync(path, "utf8"));
 

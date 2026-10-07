@@ -39,19 +39,19 @@ for (const type of ["posts", "bookmarks", "comments"]) {
       "react-native": { View: "View", Pressable: "Pressable", Text: "Text", FlatList: "FlatList",
         StyleSheet: { create: (styles: unknown) => styles } },
       "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 24 }) },
-      "../../../components/LoadingState": { default: "LoadingState" },
-      "../../../components/NetworkErrorState": { NetworkErrorFallback: "NetworkErrorFallback" },
-      "../../../components/icons": { BackIcon: "BackIcon" },
-      "../../../hooks/useReturnToMyPageDrawer": { useReturnToMyPageDrawer: (route: string) => {
+      "../../../../components/LoadingState": { default: "LoadingState" },
+      "../../../../components/NetworkErrorState": { NetworkErrorFallback: "NetworkErrorFallback" },
+      "../../../../components/icons": { BackIcon: "BackIcon" },
+      "../../../../hooks/useReturnToMyPageDrawer": { useReturnToMyPageDrawer: (route: string) => {
         assert.equal(route, "/settings/activity");
         return { returnToMyPageDrawer: () => calls.push("return-to-drawer"), onLayout: () => calls.push("layout") };
       } },
-      "../../../services/api": {}, "../../../utils/appRoutes": appRoutes,
-      "../../../utils/dateFormat": { formatBoardDate: () => "26.09.10(목)" },
-      "../../../utils/userActivityPresentation": { userActivityCategoryLabel: () => "기타공지" },
+      "../../../../services/api": {}, "../../../../utils/appRoutes": appRoutes,
+      "../../../../utils/dateFormat": { formatBoardDate: () => "26.09.10(목)" },
+      "../../../../utils/userActivityPresentation": { userActivityCategoryLabel: () => "기타공지" },
     };
     const exports = {} as { default: () => Element };
-    const code = ts.transpileModule(readFileSync("app/(tabs)/settings/activity.tsx", "utf8"), {
+    const code = ts.transpileModule(readFileSync("app/(tabs)/(home,notices,community,participation,council)/settings/activity.tsx", "utf8"), {
       compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
     }).outputText;
     runInNewContext(code, { exports, require: (name: string) => {

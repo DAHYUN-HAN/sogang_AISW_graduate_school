@@ -10,7 +10,7 @@ import {
   toastHoldMs,
 } from "../utils/toast";
 
-const createSource = readFileSync("app/(tabs)/board/post/create.tsx", "utf8");
+const createSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
 const toastSource = readFileSync("components/Toast.tsx", "utf8");
 
 test("토스트 문구는 디자인에 적힌 문장을 그대로 쓴다", () => {

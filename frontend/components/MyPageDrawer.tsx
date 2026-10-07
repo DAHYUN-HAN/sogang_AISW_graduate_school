@@ -18,6 +18,7 @@ import {
   navigateBackToMyPageDrawer,
 } from "../utils/myPageNavigation";
 import { clearStoredPushToken, getStoredPushToken } from "../utils/pushTokenStorage";
+import { navigateToTabRoot, tabNameFromRoute } from "../utils/tabNavigation";
 
 import { BackIcon, ChevronRightIcon } from "./icons";
 import { formatCohortName } from "../utils/userLabel";
@@ -131,7 +132,8 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
     navigateBackToMyPageDrawer(
       returnOrigin,
       {
-        navigate: (route) => router.navigate(route as never),
+        // 마이페이지 화면은 원래 탭 스택 위에 쌓여 있으니 그 탭 첫 화면까지 비운다.
+        navigate: (route) => navigateToTabRoot(tabNameFromRoute(route) ?? "home"),
       },
       (onShown) => {
         drawerOriginRef.current = returnOrigin;

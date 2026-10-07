@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const postDetailSource = readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8");
-const faqSource = readFileSync("app/(tabs)/faq.tsx", "utf8");
+const postDetailSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
+const faqSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/faq.tsx", "utf8");
 
 test("사진첩은 이미지가 한 장일 때 같은 썸네일을 다시 표시하지 않는다", () => {
   assert.match(

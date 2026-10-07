@@ -4,7 +4,7 @@ import test from "node:test";
 
 import { postCreateRoute } from "../utils/appRoutes";
 
-const createSource = readFileSync("app/(tabs)/board/post/create.tsx", "utf8");
+const createSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
 
 test("게시판 선택은 드롭다운이 아니라 아래에서 올라오는 시트를 쓴다", () => {
   // 동아리·경조사 선택과 같은 SelectionSheet 한 가지로 맞춘다.

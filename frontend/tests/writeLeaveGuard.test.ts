@@ -7,8 +7,8 @@ import ts from "typescript";
 import { requestWriteLeave, setWriteLeaveGuard, writeLeaveGuard } from "../stores/writeLeaveGuard";
 
 const layoutSource = readFileSync("app/(tabs)/_layout.tsx", "utf8");
-const createSource = readFileSync("app/(tabs)/board/post/create.tsx", "utf8");
-const editSource = readFileSync("app/(tabs)/board/post/edit/[postId].tsx", "utf8");
+const createSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
+const editSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
 
 test("가로채기가 없으면 부르는 쪽이 평소대로 이동한다", () => {
   setWriteLeaveGuard(null);
@@ -46,7 +46,7 @@ function runTabPress(guarded: boolean) {
     prevented: 0,
     tabRootPressAction: () => ({ route: "/(tabs)/community", resetTab: "community" }),
     requestTabRootReset: (tab: string) => reset.push(tab),
-    router: { navigate: (route: string) => navigated.push(route) },
+    navigateToTabRoot: (tab: string) => navigated.push(`/(tabs)/${tab}`),
     requestWriteLeave: (proceed: () => void) => {
       if (!guarded) return false;
       held = proceed;

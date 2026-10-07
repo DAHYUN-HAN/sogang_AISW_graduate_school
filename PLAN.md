@@ -111,6 +111,19 @@ This repository already has the correct broad architecture.
 - A provider-neutral operational-alert adapter now covers unhandled API exceptions, notification worker failures, and push send/ticket/receipt failures with structured non-PII context. Production startup requires an approved HTTPS webhook; provider selection, secret registration, routing, and live delivery remain external operations work.
 - Store readiness is tracked separately. Android branding/native identity, 10 EAS public production values, and the new-registration upload key are prepared. On 2026-09-09 the user deferred remote push; strict checks pass with the explicit disabled flag and Firebase/FCM activation is later-release work. Signed AAB `outputs/android/AI-SW-CAMPUS-0.1.0-2.aab` was generated and passed bundle, signature, API 36, 16 KB alignment, and secret-scan checks. Final policy content, physical-device QA, Play submission, and iOS archive remain open; see `docs/qa/ANDROID_BRANDING_2026-09-08.md`.
 
+### Navigation decision: one stack per bottom tab (2026-10-07)
+
+The five bottom tabs no longer share a hidden `board` tab. `app/(tabs)/(home,notices,community,participation,council)/` is an Expo Router shared-route group: every tab owns its own native stack containing its root screen plus the board, post, create/edit, search, notifications, FAQ, and My Page (settings) screens. A screen opened from a tab is pushed onto that tab's stack, so the stack order is the order the user saw.
+
+- Why: iOS edge-swipe back is performed by UIKit and pops whatever screen is underneath. With the shared hidden board stack, the screen underneath could be an unrelated earlier post (e.g. Participation post → Community post → swipe showed the Participation post), while header Back and Android Back followed `returnTo` to the correct list. Hidden-tab roots (search, notifications, FAQ, My Page) could not be swiped at all, and visited posts accumulated in the hidden stack.
+- Rule: header Back, Android Back, iOS swipe, and browser Back all return to the previous screen in the current tab. `returnTo` remains only as a fallback when there is no screen underneath (web refresh, direct link).
+- Tab press and tab-root navigation use `utils/tabNavigation.ts` (`navigateToTabRoot`), which switches the tab and pops its stack to the root. Plain `router.navigate("/(tabs)/<tab>")` must not be used inside tabs because it would push that tab's root onto the current stack.
+- Screens with in-screen back states (post menus/sheets, board search/sort, cohort/past-council detail, create date picker and completion, edit board menu) intercept only the iOS swipe through `hooks/useSwipeBackInScreen.ts`, matching Android Back.
+- A post opened from a push notification opens on the Home stack as Home → Notifications → post, matching the previous Android Back order.
+- The bottom-tab highlight keeps the previous rule for board lists and posts: they highlight their board's category tab (a Community post opened from Home highlights Community) even though Back returns to Home. Other screens highlight the tab that owns the stack.
+- The member account-deletion screen keeps the bottom tab bar, matching the shipped app. The 2026-08-16 rule to hide it there had never taken effect (the old highlight tab bar rendered the last visible tab's options) and was removed rather than activated by this restructure.
+- My Page screens are pushed with the drawer still covering them; the drawer is lifted only after native-stack reports `transitionEnd`, so the underlying tab does not flash (600 ms fallback; web does not wait).
+
 Phase 2 converted the Notion planning into concrete API, DB, auth, route, and implementation documents. Phase 3 and Phase 4 should now be treated as development sprints.
 
 ## Phase 2 Source Documents

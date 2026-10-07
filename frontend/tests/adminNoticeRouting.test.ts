@@ -20,7 +20,7 @@ function route(mode: "edit" | "create", boardType: string | undefined, platform 
       if (id.endsWith("/hooks/usePosts")) return {usePostDetail: () => ({data: {data: {id: 88, board_id: 9, is_notice: isNotice}}, isLoading: false, refetch:()=>{retries++;}})};
       if (id.endsWith("/hooks/useApi")) return {useBoardsQuery: () => ({data: {data: [{boards: boardType ? [{id: 9, board_type: boardType}] : []}]}, isLoading: queryState==="loading",isError:queryState==="error",refetch:()=>{retries++;}})};
       if (id.endsWith("/AdminWorkspace")) return {useAdminWorkspace:()=>({boards:boardType?[{id:9,board_type:boardType}]:[],boardsQuery:{isPending:queryState==="loading",isError:queryState==="error",isSuccess:queryState==="success",refetch:()=>{retries++;}}})};
-      if (id.includes("/(tabs)/board/post/")) return {__esModule: true, default: "GenericEditor"};
+      if (id.includes("/(tabs)/(home,notices,community,participation,council)/board/post/")) return {__esModule: true, default: "GenericEditor"};
       if (id.endsWith("/LoadingState")) return {__esModule: true, default: "Loading"};
       if (id.endsWith("/BackButton")) return {__esModule:true,default:"BackButton"};
       if (id.endsWith("/AppTypography")) return {AppText:"Text"};

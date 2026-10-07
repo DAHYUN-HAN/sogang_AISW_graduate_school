@@ -6,7 +6,7 @@ import ts from "typescript";
 
 import { noticeRefreshControlRefreshing } from "../utils/pullToRefresh";
 
-const source = ts.createSourceFile("notices.tsx", readFileSync("app/(tabs)/notices.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const source = ts.createSourceFile("notices.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/notices.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 let expression: string | undefined;
 function visit(node: ts.Node) {
   if (ts.isJsxAttribute(node) && node.name.getText(source) === "refreshing" && node.initializer && ts.isJsxExpression(node.initializer)) {

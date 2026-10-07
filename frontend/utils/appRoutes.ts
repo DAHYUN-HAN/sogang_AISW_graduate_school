@@ -254,9 +254,11 @@ export function postCreateBackDecision(
   canGoBack: boolean,
   boardId: number,
 ): PostCreateBackDecision {
+  // 탭마다 스택이 따로라 아래 화면이 곧 들어온 화면이다. returnTo는 스택이 비어
+  // 돌아갈 곳이 없을 때(웹 새로고침, 직접 링크)만 쓴다.
+  if (canGoBack) return { action: "back" };
   const safeReturnTo = postDetailReturnRoute(returnTo);
   if (safeReturnTo) return { action: "navigate", route: safeReturnTo };
-  if (canGoBack) return { action: "back" };
   return { action: "replace", route: boardRoute(boardId) };
 }
 
@@ -323,9 +325,11 @@ export function postDetailBackDecision(
   fromBoardId?: unknown,
   returnTo?: unknown,
 ): PostDetailBackDecision {
+  // iOS 가장자리 스와이프는 스택 아래 화면을 꺼낸다. 헤더·안드로이드도 같은 곳으로
+  // 가도록 pop을 먼저 하고, returnTo는 아래 화면이 없을 때만 쓴다.
+  if (canGoBack) return { action: "back" };
   const safeReturnTo = postDetailReturnRoute(returnTo);
   if (safeReturnTo) return { action: "navigate", route: safeReturnTo };
-  if (canGoBack) return { action: "back" };
   const sourceBoardId = routeBoardId(fromBoardId);
   if (sourceBoardId) return { action: "replace", route: boardRoute(sourceBoardId) };
   return { action: "replace", route: boardParentRoute(board) };

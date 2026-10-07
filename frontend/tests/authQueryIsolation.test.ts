@@ -22,6 +22,7 @@ test("changing accounts discards private edit data, signed media URLs and mounte
     useState: (initial: any) => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === "function" ? initial() : initial; return [slots[i], () => {}]; },
     useMemo: (factory: () => unknown, deps: unknown[]) => { const i = cursor++; if (!slots[i] || deps.some((value, n) => value !== slots[i].deps[n])) slots[i] = { deps, value: factory() }; return slots[i].value; },
     useEffect: () => {}, useWindowDimensions: () => ({ width: 1280 }), useFonts: () => [true],
+    useNavigationContainerRef: () => ({}), registerTabNavigationContainer: () => {},
     useUserStore: (selector: (state: unknown) => unknown) => selector({ user, isAuthenticated: Boolean(user), hasHydrated: true, hydrateSession: () => {} }),
     isAdminUser: (value: typeof user) => value?.role === "admin", Platform: { OS: "web" }, shouldShowSplash: () => false,
     View: "View", KeyboardViewport: "KeyboardViewport", StatusBar: "StatusBar", NotificationBootstrap: "NotificationBootstrap", UsageTracking: "UsageTracking", StatusBarScrim: "StatusBarScrim", AppNetworkError: "AppNetworkError",

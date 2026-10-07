@@ -7,7 +7,7 @@ import ts from "typescript";
 import { isNetworkError } from "../utils/networkError";
 import { enabledRefetch, refreshQueries } from "../utils/pullToRefresh";
 
-const source = ts.createSourceFile("home.tsx", readFileSync("app/(tabs)/home.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const source = ts.createSourceFile("home.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const screen = source.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === "HomeScreen")!;
 const js = ts.transpileModule(screen.getText(source).replace("export default ", "") + "\ntree = HomeScreen();", {
   compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },

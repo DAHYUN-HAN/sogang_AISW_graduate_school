@@ -1,6 +1,5 @@
 import { BottomTabBar, type BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { router, Tabs, usePathname } from "expo-router";
-import { useRef } from "react";
+import { Tabs } from "expo-router";
 import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -13,7 +12,7 @@ import {
   type VisibleTabRootName,
 } from "../../stores/tabRootResetStore";
 import { requestWriteLeave } from "../../stores/writeLeaveGuard";
-import { shouldHideTabBar } from "../../utils/tabBarVisibility";
+import { navigateToTabRoot } from "../../utils/tabNavigation";
 
 // 탭 한 칸의 내용물은 아이콘 22 + 간격 3 + 라벨 13 = 38pt다. 아래 높이에서
 // 위아래 여백을 뺀 값이 이보다 작으면 라벨이 잘린다.
@@ -31,8 +30,6 @@ const TAB_BAR_STYLE = {
   backgroundColor: "#FFFFFF",
 };
 
-const VISIBLE_TAB_NAMES = new Set(["home", "notices", "community", "participation", "council"]);
-
 function handleTabRootPress(
   tabName: VisibleTabRootName,
   event: { preventDefault: () => void },
@@ -43,7 +40,8 @@ function handleTabRootPress(
     if (action.resetTab) {
       requestTabRootReset(action.resetTab);
     }
-    router.navigate(action.route as never);
+    // 그 탭 스택에 쌓여 있던 글·게시판은 비우고 첫 화면을 연다.
+    navigateToTabRoot(tabName);
   };
   // 글쓰기·수정 중이면 폼 화면이 확인창을 띄우고, 사용자가 취소를 고른 뒤에
   // 누른 탭으로 옮긴다.
@@ -51,31 +49,25 @@ function handleTabRootPress(
   go();
 }
 
-// 숨김 탭(board/events 등)이 포커스되면 기본 탭바는 아무 탭도 하이라이트하지 않는다.
-// 게시판 화면이 기록한 소속 카테고리(board), 그 외에는 마지막 방문 탭을 하이라이트한다.
+// 게시판·글 화면은 들어온 탭 스택 위에 있어도(홈에서 연 커뮤니티 글은 홈 스택)
+// 그 글이 속한 카테고리 탭을 하이라이트한다. 화면이 기록한 소속 탭을 쓰고, 그 밖의
+// 화면(탭 첫 화면, 검색, 알림, 마이페이지)은 지금 탭을 그대로 하이라이트한다.
 function CategoryHighlightTabBar(props: BottomTabBarProps) {
-  const highlightTab = useTabHighlightStore((state) => state.tab);
-  const lastVisibleTabRef = useRef("home");
+  const highlightTabs = useTabHighlightStore((state) => state.tabs);
   const { state } = props;
-  const focusedName = state.routes[state.index]?.name;
+  const stack = state.routes[state.index]?.state;
+  const topScreen = stack?.routes[stack.index ?? stack.routes.length - 1];
+  // 맨 위 화면이 직접 기록한 값만 쓴다. 아직 기록 전(글을 불러오는 중)이면 지금 탭.
+  const highlightTab = topScreen?.key ? highlightTabs[topScreen.key] : undefined;
+  if (!topScreen?.name.startsWith("board/") || !highlightTab) return <BottomTabBar {...props} />;
 
-  if (focusedName && VISIBLE_TAB_NAMES.has(focusedName)) {
-    lastVisibleTabRef.current = focusedName;
-    return <BottomTabBar {...props} />;
-  }
-
-  const targetName = focusedName === "board" ? highlightTab : lastVisibleTabRef.current;
-  const targetIndex = state.routes.findIndex((route) => route.name === targetName);
-  if (targetIndex < 0) {
-    return <BottomTabBar {...props} />;
-  }
+  const targetIndex = state.routes.findIndex((route) => route.name === `(${highlightTab})`);
+  if (targetIndex < 0) return <BottomTabBar {...props} />;
   return <BottomTabBar {...props} state={{ ...state, index: targetIndex }} />;
 }
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const pathname = usePathname();
-  const hideTabBar = shouldHideTabBar(pathname);
   // Keep the tab content height while reserving the system navigation area once.
   const tabBarStyle = {
     ...TAB_BAR_STYLE,
@@ -86,7 +78,7 @@ export default function TabsLayout() {
   return (
     <MyPageDrawerProvider>
       <Tabs
-        initialRouteName="home"
+        initialRouteName="(home)"
         backBehavior="initialRoute"
         tabBar={(props) => <CategoryHighlightTabBar {...props} />}
         screenOptions={{
@@ -96,13 +88,14 @@ export default function TabsLayout() {
           // Figma: 라벨 11/13 Regular (react-navigation 기본 fontWeight 500 오버라이드)
           tabBarLabelStyle: { fontSize: 11, fontFamily: "Pretendard_400Regular", fontWeight: "normal", lineHeight: 13, marginTop: 3, marginBottom: 0 },
           tabBarItemStyle: { paddingVertical: 0 },
+          // 회원 탈퇴 화면도 다른 화면처럼 탭바를 유지한다(2026-10-07 결정, PLAN.md).
           tabBarStyle,
           tabBarHideOnKeyboard: true,
           headerShown: false,
         }}
       >
         <Tabs.Screen
-          name="home"
+          name="(home)"
           listeners={() => ({
             tabPress: (event) => handleTabRootPress("home", event),
           })}
@@ -112,7 +105,7 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="notices"
+          name="(notices)"
           listeners={() => ({
             tabPress: (event) => handleTabRootPress("notices", event),
           })}
@@ -122,7 +115,7 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="community"
+          name="(community)"
           listeners={() => ({
             tabPress: (event) => handleTabRootPress("community", event),
           })}
@@ -132,7 +125,7 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="participation"
+          name="(participation)"
           listeners={() => ({
             tabPress: (event) => handleTabRootPress("participation", event),
           })}
@@ -142,7 +135,7 @@ export default function TabsLayout() {
           }}
         />
         <Tabs.Screen
-          name="council"
+          name="(council)"
           listeners={() => ({
             tabPress: (event) => handleTabRootPress("council", event),
           })}
@@ -151,19 +144,6 @@ export default function TabsLayout() {
             tabBarIcon: ({ color }) => <CouncilTabIcon color={color} size={22} />,
           }}
         />
-        <Tabs.Screen
-          name="settings"
-          options={{
-            title: "설정",
-            href: null,
-            tabBarStyle: hideTabBar ? { display: "none" } : tabBarStyle,
-          }}
-        />
-        {/* 탭바를 유지한 채 여는 화면들 — 탭 버튼으로는 노출하지 않는다.
-            board는 중첩 Stack이라 진입마다 새 화면이 push되어 params/상태가 늘 새것이다. */}
-        {["search", "faq", "notifications", "board", "council/mutual-aid-complete"].map((name) => (
-          <Tabs.Screen key={name} name={name} options={{ href: null }} />
-        ))}
       </Tabs>
     </MyPageDrawerProvider>
   );

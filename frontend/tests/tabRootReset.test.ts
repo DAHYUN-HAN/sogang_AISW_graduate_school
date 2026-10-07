@@ -11,12 +11,13 @@ import {
 } from "../stores/tabRootResetStore";
 
 const layoutSource = readFileSync("app/(tabs)/_layout.tsx", "utf8");
-const noticesSource = readFileSync("app/(tabs)/notices.tsx", "utf8");
-const communitySource = readFileSync("app/(tabs)/community.tsx", "utf8");
-const participationSource = readFileSync("app/(tabs)/participation.tsx", "utf8");
+const noticesSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/notices.tsx", "utf8");
+const communitySource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/community.tsx", "utf8");
+const participationSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/participation.tsx", "utf8");
 
 function tabScreenBlock(tabName: VisibleTabRootName) {
-  const nameIndex = layoutSource.indexOf(`name="${tabName}"`);
+  // 탭마다 스택을 가진 공용 그룹이라 Tabs.Screen 이름은 "(home)"처럼 그룹 이름이다.
+  const nameIndex = layoutSource.indexOf(`name="(${tabName})"`);
   assert.notEqual(nameIndex, -1, `${tabName} Tabs.Screen이 있어야 합니다.`);
 
   const blockStart = layoutSource.lastIndexOf("<Tabs.Screen", nameIndex);
@@ -73,7 +74,9 @@ test("다섯 하단 탭은 tabPress를 공통 루트 이동 처리기로 전달�
   assert.match(layoutSource, /event\.preventDefault\(\)/);
   assert.match(layoutSource, /tabRootPressAction/);
   assert.match(layoutSource, /requestTabRootReset\(action\.resetTab\)/);
-  assert.match(layoutSource, /router\.navigate\(action\.route/);
+  // router.navigate는 지금 탭 스택에 그 탭 화면을 한 번 더 쌓으므로 쓰지 않는다.
+  assert.match(layoutSource, /navigateToTabRoot\(tabName\)/);
+  assert.doesNotMatch(layoutSource, /router\.navigate\(/);
   assert.doesNotMatch(layoutSource, /navigation\.isFocused\(\)/);
 });
 

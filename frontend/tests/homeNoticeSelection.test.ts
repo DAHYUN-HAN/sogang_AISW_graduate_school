@@ -5,7 +5,7 @@ import test from "node:test";
 import type { ApiSuccess, PostListItem } from "../types";
 import * as noticeFeed from "../utils/noticeFeed";
 
-const homeSource = readFileSync("app/(tabs)/home.tsx", "utf8");
+const homeSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8");
 
 type HomeNoticePreviewLoader = (params: {
   scope: "notices";
@@ -45,6 +45,6 @@ test("홈 공지 미리보기는 최신 두 개를 한 번의 집계 요청으�
 test("#186 홈 공지사항 더보기는 이전 필터와 무관하게 전체 공지 루트를 연다", () => {
   assert.match(
     homeSource,
-    /<SectionHeader\s+title="공지사항"[\s\S]*?requestTabRootReset\("notices"\)[\s\S]*?router\.navigate\(NOTICES_TAB_ROUTE as never\)[\s\S]*?\/>/,
+    /<SectionHeader\s+title="공지사항"[\s\S]*?requestTabRootReset\("notices"\)[\s\S]*?navigateToTabRoot\("notices"\)[\s\S]*?\/>/,
   );
 });

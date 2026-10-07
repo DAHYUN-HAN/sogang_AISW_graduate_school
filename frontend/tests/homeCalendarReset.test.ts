@@ -12,7 +12,7 @@ import {
   shiftCalendarMonth,
 } from "../utils/eventCalendar";
 
-const homeSource = readFileSync("app/(tabs)/home.tsx", "utf8");
+const homeSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8");
 const source = ts.createSourceFile("home.tsx", homeSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const screen = source.statements.find(
   (node): node is ts.FunctionDeclaration =>

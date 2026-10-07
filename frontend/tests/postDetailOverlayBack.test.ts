@@ -10,7 +10,7 @@ import { COMMUNITY_TAB_ROUTE, navigateFromPostDetail } from "../utils/appRoutes"
 // useCallback memoization also catches missing dependencies when a sheet opens.
 const source = ts.createSourceFile(
   "postDetail.tsx",
-  readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8"),
+  readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8"),
   ts.ScriptTarget.Latest,
   true,
   ts.ScriptKind.TSX,
@@ -51,6 +51,8 @@ function harness() {
   let cached: { callback: () => void; dependencies: unknown[] } | undefined;
   const bindings = {
     post, board, params, router, navigateFromPostDetail,
+    navigateToRoute: (route: string) => navigation.push(route),
+    replaceWithRoute: (route: string) => navigation.push(route),
     setReportTarget: (target: typeof state.reportTarget) => { state.reportTarget = target; },
     setShowPostMenu: (show: boolean) => { state.showPostMenu = show; },
     setShowDeleteConfirm: (show: boolean) => { state.showDeleteConfirm = show; },
@@ -82,7 +84,7 @@ for (const type of ["post", "comment"] as const) {
     assert.equal(h.state.reportTarget, null);
     assert.deepEqual(h.navigation, []);
     h.back();
-    assert.deepEqual(h.navigation, [COMMUNITY_TAB_ROUTE]);
+    assert.deepEqual(h.navigation, ["back"]);
     // Returning to the retained detail cannot reveal the dismissed sheet.
     assert.equal(h.state.reportTarget, null);
   });
@@ -95,7 +97,7 @@ test("더보기 메뉴도 Back을 먼저 소비하고 게시글을 유지한다"
   assert.equal(h.state.showPostMenu, false);
   assert.deepEqual(h.navigation, []);
   h.back();
-  assert.deepEqual(h.navigation, [COMMUNITY_TAB_ROUTE]);
+  assert.deepEqual(h.navigation, ["back"]);
 });
 
 test("게시글 삭제 확인은 Back으로 취소하되 삭제 요청 중에는 화면을 벗어나지 않는다", () => {
@@ -129,5 +131,5 @@ test("댓글 삭제 확인은 요청 종료 후 Back으로 닫고 이전 오류�
 test("열린 창이 없으면 기존 게시글 목록 복귀 동작을 그대로 실행한다", () => {
   const h = harness();
   h.back();
-  assert.deepEqual(h.navigation, [COMMUNITY_TAB_ROUTE]);
+  assert.deepEqual(h.navigation, ["back"]);
 });

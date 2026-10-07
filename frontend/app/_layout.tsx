@@ -1,6 +1,6 @@
 import { useFonts } from "expo-font";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, usePathname } from "expo-router";
+import { Stack, useNavigationContainerRef, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
@@ -17,6 +17,7 @@ import { APP_FONTS } from "../utils/fontAssets";
 import { appFontStyle, applyWebFontSmoothing } from "../utils/fonts";
 import { isAdminUser } from "../utils/permissions";
 import { MINIMUM_SPLASH_DURATION_MS, shouldShowSplash } from "../utils/splash";
+import { registerTabNavigationContainer } from "../utils/tabNavigation";
 
 // Keep the native launch screen until the ready navigator has laid out.
 if (Platform.OS !== "web") {
@@ -44,6 +45,11 @@ export default function RootLayout() {
   const isWeb = Platform.OS === "web";
   const pathname = usePathname();
   const useWebFrame = useMemberWebFrame(Platform.OS, width, pathname, isAdmin);
+  const navigationContainerRef = useNavigationContainerRef();
+
+  useEffect(() => {
+    registerTabNavigationContainer(navigationContainerRef);
+  }, [navigationContainerRef]);
 
   useEffect(() => () => queryClient.clear(), [queryClient]);
 

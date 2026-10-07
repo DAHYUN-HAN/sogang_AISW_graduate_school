@@ -171,24 +171,28 @@ test("상조회와 건의 작성 완료는 기존 게시판 복귀 경로를 유
   assert.equal(postCreateCompletionRoute("suggestion", 170, 12), "/board/12");
 });
 
-test("자료공유 글쓰기는 기존 탐색 기록과 무관하게 커뮤니티로 복귀하도록 출발지를 기록한다", () => {
+// 탭마다 스택이 따로라 아래 화면이 곧 들어온 화면이다. 그래서 pop을 먼저 하고,
+// 출발지(returnTo)는 아래 화면이 없을 때(웹 새로고침, 직접 링크)만 쓴다.
+test("자료공유 글쓰기는 출발지를 기록하고, 아래 화면이 없을 때만 커뮤니티로 복귀한다", () => {
   assert.equal(
     postCreateRouteFromBoardList(7, "시험족보", true, false, COMMUNITY_TAB_ROUTE),
     "/board/post/create?boardId=7&category=%EC%8B%9C%ED%97%98%EC%A1%B1%EB%B3%B4&returnTo=%2F(tabs)%2Fcommunity",
   );
+  assert.deepEqual(postCreateBackDecision(COMMUNITY_TAB_ROUTE, true, 7), { action: "back" });
   assert.deepEqual(
-    postCreateBackDecision(COMMUNITY_TAB_ROUTE, true, 7),
+    postCreateBackDecision(COMMUNITY_TAB_ROUTE, false, 7),
     { action: "navigate", route: COMMUNITY_TAB_ROUTE },
   );
 });
 
-test("스터디 모집 글쓰기는 기존 탐색 기록과 무관하게 참여활동으로 복귀한다", () => {
+test("스터디 모집 글쓰기는 출발지를 기록하고, 아래 화면이 없을 때만 참여활동으로 복귀한다", () => {
   assert.equal(
     postCreateRouteFromBoardList(25, "모집", true, false, PARTICIPATION_TAB_ROUTE),
     "/board/post/create?boardId=25&category=%EB%AA%A8%EC%A7%91&returnTo=%2F(tabs)%2Fparticipation",
   );
+  assert.deepEqual(postCreateBackDecision(PARTICIPATION_TAB_ROUTE, true, 25), { action: "back" });
   assert.deepEqual(
-    postCreateBackDecision(PARTICIPATION_TAB_ROUTE, true, 25),
+    postCreateBackDecision(PARTICIPATION_TAB_ROUTE, false, 25),
     { action: "navigate", route: PARTICIPATION_TAB_ROUTE },
   );
 });
@@ -362,6 +366,14 @@ test("일반 글쓰기와 일반 수정 화면은 기존 공통 뒤로가기를 
     backDecision({
       returnTo: COMMUNITY_TAB_ROUTE,
       canGoBack: true,
+      boardId: 7,
+    }),
+    { action: "back" },
+  );
+  assert.deepEqual(
+    backDecision({
+      returnTo: COMMUNITY_TAB_ROUTE,
+      canGoBack: false,
       boardId: 7,
     }),
     { action: "navigate", route: COMMUNITY_TAB_ROUTE },
@@ -559,14 +571,11 @@ test("상세 복귀 경로는 앱 내부 목록 화면만 허용한다", () => {
   assert.equal(postDetailReturnRoute("/board/post/645"), null);
 });
 
-test("명시된 목록 화면은 일반 뒤로가기보다 우선해 기존 탭 상태를 복원한다", () => {
+test("명시된 목록 화면은 아래 화면이 없을 때 그 탭으로 복귀하는 대비책이다", () => {
+  const board = { slug: "study-activity", category: "study", board_type: "activity_certification" };
+  assert.deepEqual(postDetailBackDecision(board, true, "28", PARTICIPATION_TAB_ROUTE), { action: "back" });
   assert.deepEqual(
-    postDetailBackDecision(
-      { slug: "study-activity", category: "study", board_type: "activity_certification" },
-      true,
-      "28",
-      PARTICIPATION_TAB_ROUTE,
-    ),
+    postDetailBackDecision(board, false, "28", PARTICIPATION_TAB_ROUTE),
     { action: "navigate", route: PARTICIPATION_TAB_ROUTE },
   );
 });
@@ -617,21 +626,22 @@ test("직접 링크로 연 일반 상세 글은 제품 상위 경로로 복귀�
   );
 });
 
-test("공통 뒤로가기 실행기는 탐색 기록이 있으면 기존 목록을 복원한다", () => {
-  const calls: string[] = [];
-  navigateFromPostDetail(
-    { slug: "exam-archive", category: "resources", board_type: "resource" },
-    "16",
-    COMMUNITY_TAB_ROUTE,
-    {
-      canGoBack: () => true,
-      back: () => calls.push("back"),
-      navigate: (route) => calls.push(`navigate:${route}`),
-      replace: (route) => calls.push(`replace:${route}`),
-    }
-  );
-
-  assert.deepEqual(calls, [`navigate:${COMMUNITY_TAB_ROUTE}`]);
+test("공통 뒤로가기 실행기는 탐색 기록이 있으면 pop, 없으면 기존 목록으로 간다", () => {
+  for (const [canGoBack, expected] of [[true, "back"], [false, `navigate:${COMMUNITY_TAB_ROUTE}`]] as const) {
+    const calls: string[] = [];
+    navigateFromPostDetail(
+      { slug: "exam-archive", category: "resources", board_type: "resource" },
+      "16",
+      COMMUNITY_TAB_ROUTE,
+      {
+        canGoBack: () => canGoBack,
+        back: () => calls.push("back"),
+        navigate: (route) => calls.push(`navigate:${route}`),
+        replace: (route) => calls.push(`replace:${route}`),
+      }
+    );
+    assert.deepEqual(calls, [expected]);
+  }
 });
 
 test("게시판 경로 파라미터는 양의 정수만 허용한다", () => {
@@ -646,7 +656,8 @@ test("내 활동 상세에서 돌아올 때 작성·댓글·스크랩 필터를 
     const route = `/(tabs)/settings/activity?type=${type}`;
     assert.equal(postDetailReturnRoute(route), route);
     assert.equal(postDetailRoute(123, undefined, route), `/board/post/123?returnTo=${encodeURIComponent(route)}`);
-    assert.deepEqual(postDetailBackDecision(null, true, undefined, route), { action: "navigate", route });
+    assert.deepEqual(postDetailBackDecision(null, true, undefined, route), { action: "back" });
+    assert.deepEqual(postDetailBackDecision(null, false, undefined, route), { action: "navigate", route });
   }
 });
 
@@ -672,8 +683,9 @@ test("수정 후 복원된 상세의 뒤로가기는 모든 진입 목록 스택
   ];
 
   for (const route of listRoutes) {
+    assert.deepEqual(postDetailBackDecision(board, true, "25", route), { action: "back" });
     assert.deepEqual(
-      postDetailBackDecision(board, true, "25", route),
+      postDetailBackDecision(board, false, "25", route),
       { action: "navigate", route },
     );
   }

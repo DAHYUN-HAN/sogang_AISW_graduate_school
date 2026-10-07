@@ -37,7 +37,8 @@ test("tab fallback retains lower priority after detail return, drawer close and 
       listeners.push(fn);
       return { remove: () => { listeners.splice(listeners.indexOf(fn), 1); } };
     } },
-    router: { canGoBack: () => true, navigate: () => actions.push("home") },
+    router: { canGoBack: () => true },
+    navigateToTabRoot: () => actions.push("home"),
   });
   const closeDrawer = () => actions.push("drawer");
   render(false, closeDrawer);

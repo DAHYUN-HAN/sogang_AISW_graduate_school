@@ -9,7 +9,7 @@ import * as routes from "../utils/appRoutes";
 // Exercise the actual screen callbacks/subscriptions, not a second copy of the
 // navigation policy. Native keyboard/parent-listener ordering is checked in APK QA.
 function screenSource(path: string) {
-  return ts.createSourceFile(path, readFileSync(`app/(tabs)/${path}.tsx`, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  return ts.createSourceFile(path, readFileSync(`app/(tabs)/(home,notices,community,participation,council)/${path}.tsx`, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 }
 
 function declarations(source: ts.SourceFile, names: string[]) {
@@ -53,11 +53,14 @@ function harness(path: string, options: Record<string, unknown> = {}) {
     } },
     Keyboard: { dismiss() {} },
     router: {
-      canGoBack: () => true,
+      canGoBack: () => options.canGoBack !== false,
       back: () => navigation.push("back"),
       navigate: (route: string) => navigation.push(`navigate:${route}`),
       replace: (route: string) => navigation.push(`replace:${route}`),
     },
+    navigateToTabRoot: (tab: string) => navigation.push(`navigate:/(tabs)/${tab}`),
+    navigateToRoute: (route: string) => navigation.push(`navigate:${route}`),
+    replaceWithRoute: (route: string) => navigation.push(`replace:${route}`),
     setShowSearch: (value: boolean) => { state.showSearch = value; },
     setSortMenuOpen: (value: boolean) => { state.sortMenuOpen = value; },
     setQuery: (value: string) => { state.query = value; },
@@ -88,13 +91,18 @@ function harness(path: string, options: Record<string, unknown> = {}) {
   };
 }
 
+// 화면들은 들어온 탭 스택 위에 쌓이므로 아래 화면이 있으면 pop 한다(iOS 스와이프와
+// 같은 곳). 아래 화면이 없을 때만 원래 탭이나 returnTo로 간다.
 for (const [path, options, expected] of [
-  ["faq", {}, "navigate:/(tabs)/council"],
-  ["search", { isNoticeSearch: true }, "navigate:/(tabs)/notices"],
-  ["board/post/[postId]", { params: { returnTo: "/(tabs)/community" } }, "navigate:/(tabs)/community"],
+  ["faq", {}, "back"],
+  ["faq", { canGoBack: false }, "navigate:/(tabs)/council"],
+  ["search", { isNoticeSearch: true }, "back"],
+  ["search", { isNoticeSearch: true, canGoBack: false }, "navigate:/(tabs)/notices"],
+  ["board/post/[postId]", { params: { returnTo: "/(tabs)/community" } }, "back"],
+  ["board/post/[postId]", { params: { returnTo: "/(tabs)/community" }, canGoBack: false }, "navigate:/(tabs)/community"],
   ["board/post/edit/[postId]", { params: {} }, "back"],
 ] as const) {
-  test(`${path}: header and Android Back share the origin even before data loads`, () => {
+  test(`${path}${"canGoBack" in options ? " (no history)" : ""}: header and Android Back share the origin even before data loads`, () => {
     const h = harness(path, options);
     assert.equal(h.back(), undefined);
     const blur = h.focus();
@@ -107,7 +115,7 @@ for (const [path, options, expected] of [
     assert.equal(h.back(), true, "refocus reinstalls Back");
   });
 
-  test(`${path}: iOS/web do not install an Android listener`, () => {
+  test(`${path}${"canGoBack" in options ? " (no history)" : ""}: iOS/web do not install an Android listener`, () => {
     for (const OS of ["ios", "web"]) {
       const h = harness(path, { ...options, Platform: { OS } });
       h.focus();

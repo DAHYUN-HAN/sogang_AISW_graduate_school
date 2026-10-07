@@ -4,7 +4,7 @@ import test from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 
-const homeSource = readFileSync("app/(tabs)/home.tsx", "utf8");
+const homeSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8");
 const calendarSource = readFileSync("components/CalendarMonth.tsx", "utf8");
 const source = ts.createSourceFile("home.tsx", homeSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 

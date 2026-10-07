@@ -1,1 +1,1 @@
-export { default } from "../../../../(tabs)/board/post/[postId]";
+export { default } from "../../../../(tabs)/(home,notices,community,participation,council)/board/post/[postId]";

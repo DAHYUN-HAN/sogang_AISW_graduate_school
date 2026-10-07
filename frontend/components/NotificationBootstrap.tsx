@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import Constants from "expo-constants";
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, View } from "react-native";
@@ -9,6 +8,7 @@ import { useUserStore } from "../stores/userStore";
 import type { NotificationItem } from "../types";
 import { notificationContentRoute } from "../utils/appRoutes";
 import { setStoredPushToken } from "../utils/pushTokenStorage";
+import { openTabStack } from "../utils/tabNavigation";
 import { showWebNotification } from "../utils/webNotifications";
 import { NoticeToastIcon } from "./icons";
 
@@ -63,7 +63,17 @@ async function openNotification(notification: Pick<NotificationItem, "id" | "pos
     // The notification can still be opened even if read-state sync fails.
   }
 
-  router.push(notificationContentRoute(notification) as never);
+  const route = notificationContentRoute(notification);
+  if (!route) return;
+  // 알림으로 연 글의 뒤로가기는 알림 목록, 그다음 홈이다. 어느 탭에 있었든 그 순서를
+  // 홈 탭 스택에 그대로 쌓아 iOS 스와이프도 같은 화면을 꺼내게 한다.
+  const [path, query = ""] = route.split("?");
+  const params: Record<string, string> = { postId: path.split("/").pop() ?? "" };
+  for (const pair of query.split("&").filter(Boolean)) {
+    const [key, value = ""] = pair.split("=");
+    params[key] = decodeURIComponent(value);
+  }
+  openTabStack("home", [{ name: "notifications" }, { name: "board/post/[postId]", params }]);
 }
 
 async function registerPushToken() {

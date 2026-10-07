@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const modalSource = readFileSync("components/DiscardWriteModal.tsx", "utf8");
-const createSource = readFileSync("app/(tabs)/board/post/create.tsx", "utf8");
-const editSource = readFileSync("app/(tabs)/board/post/edit/[postId].tsx", "utf8");
+const createSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
+const editSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
 
 test("게시판 변경 확인창 문구는 디자인에 적힌 문장을 그대로 쓴다", () => {
   // Figma Screen/Common/BoardChangeConfirmModal (node 1527:54)
@@ -61,9 +61,9 @@ test("비울 때는 빈 값을 직접 넘긴다", () => {
 
 test("수정 화면의 게시판 선택도 아래에서 올라오는 시트를 쓴다", () => {
   // 작성 화면과 같은 컴포넌트를 쓴다. 각자 그리면 모양이 갈라진다.
-  assert.match(editSource, /import SelectionSheet from "\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/components\/SelectionSheet"/);
+  assert.match(editSource, /import SelectionSheet from "\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/components\/SelectionSheet"/);
   assert.match(editSource, /<SelectionSheet\s+visible=\{isBoardMenuOpen\}/);
-  assert.match(createSource, /import SelectionSheet, \{ type SelectionOption \} from "\.\.\/\.\.\/\.\.\/\.\.\/components\/SelectionSheet"/);
+  assert.match(createSource, /import SelectionSheet, \{ type SelectionOption \} from "\.\.\/\.\.\/\.\.\/\.\.\/\.\.\/components\/SelectionSheet"/);
   // 칸 아래 펼치던 옛 목록은 남기지 않는다.
   assert.doesNotMatch(editSource, /styles\.boardMenu/);
   assert.doesNotMatch(editSource, /styles\.boardOption/);

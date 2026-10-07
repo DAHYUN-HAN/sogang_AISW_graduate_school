@@ -9,8 +9,8 @@ import { mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEven
 
 import { resourcePostMetadata } from "../utils/resourcePostFields";
 
-const edit = ts.createSourceFile("edit.tsx", readFileSync("app/(tabs)/board/post/edit/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-const create = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const edit = ts.createSourceFile("edit.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const create = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const mediaPickerSource = readFileSync("utils/mediaPicker.ts", "utf8");
 function expression(source: ts.SourceFile, find: (node: ts.Node) => boolean) {
   let found: ts.Node | undefined;

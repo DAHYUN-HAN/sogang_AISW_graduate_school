@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const notification = readFileSync("components/NotificationBootstrap.tsx", "utf8");
-const board = readFileSync("app/(tabs)/board/[boardId].tsx", "utf8");
-const create = readFileSync("app/(tabs)/board/post/create.tsx", "utf8");
+const board = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx", "utf8");
+const create = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
 
 test("모든 알림은 PR 원본 토스트 디자인과 고정 위치를 사용한다", () => {
   assert.doesNotMatch(notification, /notificationToastKind\(visibleNotification\.notification_type\)/);
@@ -42,9 +42,9 @@ test("활동 인증 폼은 PR 원본 문구를 표시한다", () => {
   assert.match(create, /input:[\s\S]*fontSize: 14[\s\S]*lineHeight: 17/);
 });
 
-const detail = readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8");
+const detail = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
 
-const notices = readFileSync("app/(tabs)/notices.tsx", "utf8");
+const notices = readFileSync("app/(tabs)/(home,notices,community,participation,council)/notices.tsx", "utf8");
 
 test("공지 목록 정리 후에도 검색과 네 필터 새로고침이 남는다", () => {
   assert.match(notices, /router\.push\("\/search\?scope=notices"/);

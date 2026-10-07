@@ -152,11 +152,11 @@ test("한 번 가져온 스와이프는 바깥 스크롤에 내주지 않는다"
 
 test("높이가 고정인 캐러셀은 네이티브 페이징을 쓴다", () => {
   // 손가락을 따라 사진이 밀려야 매끄럽다. PanResponder로는 그게 안 된다.
-  const slider = readFileSync("app/(tabs)/board/[boardId].tsx", "utf8");
+  const slider = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx", "utf8");
   assert.match(slider, /PhotoPager/, "임원진·기장단·역대는 PhotoPager를 써야 한다");
   assert.doesNotMatch(slider, /createPhotoSwipeConfig/, "페이저로 옮겼으면 PanResponder 판정은 남기지 않는다");
 
-  const detail = readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8");
+  const detail = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
   assert.match(detail, /PhotoPager/, "사진첩·활동인증은 PhotoPager를 써야 한다");
   assert.match(detail, /isActivityCertification && imageAttachments\.length > 0/, "활동인증도 페이저를 타야 한다");
   // 원우회 활동은 사진 원래 비율로 보여 주는 디자인이라 아직 PanResponder를 쓴다.
@@ -175,13 +175,13 @@ test("활동인증 프레임 높이는 가장 큰 값으로 고정된다", () =>
   assert.equal(Math.max(...heights), 400, "섞이면 큰 쪽에 맞춰 잘리지 않아야 한다");
 
   // 화면이 최댓값을 고르는 규칙을 그대로 쓰는지 확인한다.
-  const detail = readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8");
+  const detail = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
   assert.match(detail, /height > prev \? height : prev/, "보고된 프레임 높이의 최댓값을 써야 한다");
 });
 
 test("탭을 가로채지 않는다", () => {
   // 가로채면 눌러서 확대 보기를 여는 동작이 죽는다.
-  for (const file of ["app/(tabs)/board/[boardId].tsx", "app/(tabs)/board/post/[postId].tsx"]) {
+  for (const file of ["app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx", "app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx"]) {
     const source = readFileSync(file, "utf8");
     assert.doesNotMatch(source, /onStartShouldSetPanResponder/, `${file}은 탭을 가로채면 안 된다`);
   }

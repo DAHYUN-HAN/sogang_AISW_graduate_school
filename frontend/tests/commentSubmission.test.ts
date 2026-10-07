@@ -6,7 +6,7 @@ import ts from "typescript";
 
 import { commentSubmissionValue } from "../utils/commentKeyboard";
 
-const source = ts.createSourceFile("detail.tsx", readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const source = ts.createSourceFile("detail.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 let initializer: ts.Expression | undefined;
 function visit(node: ts.Node) {
   if (ts.isVariableDeclaration(node) && node.name.getText(source) === "handleCreateComment") initializer = node.initializer;

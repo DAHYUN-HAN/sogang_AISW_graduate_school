@@ -2,7 +2,7 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { Platform } from "react-native";
 import { useAdminWorkspace } from "../../../components/admin/AdminWorkspace";
 import AdminPostRouteState from "../../../components/admin/AdminPostRouteState";
-import PostCreateScreen from "../../(tabs)/board/post/create";
+import PostCreateScreen from "../../(tabs)/(home,notices,community,participation,council)/board/post/create";
 
 export default function AdminPostCreateRoute() {
   const {boardId} = useLocalSearchParams<{boardId: string}>();

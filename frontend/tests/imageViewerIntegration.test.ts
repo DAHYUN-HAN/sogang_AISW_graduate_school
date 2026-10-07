@@ -7,7 +7,7 @@ import ts from "typescript";
 import { constrainTransform, imagePageAfterSwipe, zoomAroundPoint } from "../utils/imageViewer";
 import { shouldOpenPostAttachment } from "../utils/postDetailImagePresentation";
 
-const detail = ts.createSourceFile("detail.tsx", readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const detail = ts.createSourceFile("detail.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const viewer = ts.createSourceFile("viewer.tsx", readFileSync("components/ImageViewerModal.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 function expression(source: ts.SourceFile, name: string) {
   let found: ts.Node | undefined;

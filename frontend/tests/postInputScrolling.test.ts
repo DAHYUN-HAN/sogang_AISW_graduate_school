@@ -6,7 +6,7 @@ import ts from "typescript";
 
 // Render the actual form field to check its layout/prop contract. Native gesture
 // ownership and caret visibility are verified separately in the Android APK.
-const source = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const source = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const declarations = source.statements.filter((node) =>
   (ts.isFunctionDeclaration(node) && node.name?.text === "FormTextInput") ||
   (ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => ["COLORS", "styles"].includes(declaration.name.getText(source)))),

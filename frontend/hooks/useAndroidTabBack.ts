@@ -3,7 +3,7 @@ import { useCallback, useLayoutEffect, useRef } from "react";
 import { BackHandler, Platform } from "react-native";
 
 import { androidTabBackAction } from "../utils/androidTabBack";
-import { HOME_TAB_ROUTE } from "../utils/appRoutes";
+import { navigateToTabRoot } from "../utils/tabNavigation";
 
 export function useAndroidTabBack(drawerOpen: boolean, closeDrawer: () => void) {
   const pathname = usePathname();
@@ -24,7 +24,7 @@ export function useAndroidTabBack(drawerOpen: boolean, closeDrawer: () => void) 
           return true;
         }
         if (action === "home") {
-          router.navigate(HOME_TAB_ROUTE);
+          navigateToTabRoot("home");
           return true;
         }
         // Preserve detail-screen handlers; only Home may fall through to Android.

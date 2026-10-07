@@ -13,8 +13,8 @@ import {
 } from "../utils/mutualAid";
 import { postEditRouteForPostDetail } from "../utils/appRoutes";
 
-const detailSource = readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8");
-const editFormSource = readFileSync("app/(tabs)/board/post/create.tsx", "utf8");
+const detailSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
+const editFormSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
 
 test("상조회 작성자 작업 권한은 처리중·완료·반려 상태별 정책을 따른다", () => {
   assert.equal(canEditMutualAidRequest("processing"), true);

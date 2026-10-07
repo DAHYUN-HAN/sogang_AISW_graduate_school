@@ -74,6 +74,11 @@ function harness(origin = "/home") {
     "../stores/userStore": { useUserStore: (select: (state: object) => unknown) => select({ isAuthenticated: true }) },
     "../services/api": {}, "../utils/pushTokenStorage": {},
     "../utils/myPageNavigation": navigation,
+    // 마이페이지 화면은 원래 탭 스택 위에 있으므로 복귀는 그 탭 첫 화면까지 비우는 이동이다.
+    "../utils/tabNavigation": {
+      navigateToTabRoot: (tab: string) => calls.push(`navigate:/(tabs)/${tab}`),
+      tabNameFromRoute: (route: string) => route.split("/").pop(),
+    },
     "../utils/userLabel": userLabel,
     "./ProfileAvatar": { default: "Avatar" }, "./icons": { BackIcon: "BackIcon", ChevronRightIcon: "ChevronRightIcon" },
     "./MyPageDrawerOverlay": { default: "Overlay" },
@@ -213,8 +218,9 @@ test("iOS 기본 스와이프 뒤로가기는 꺼두지 않는다", () => {
   // 그 자체 제스처를 없애서 해결했다. 플랫폼 기본 제스처까지 끄지 않는다.
   for (const layout of [
     "app/_layout.tsx",
-    "app/(tabs)/board/_layout.tsx",
-    "app/(tabs)/settings/_layout.tsx",
+    "app/(tabs)/_layout.tsx",
+    // 게시판·마이페이지는 이제 탭마다의 스택 한 곳에 쌓인다.
+    "app/(tabs)/(home,notices,community,participation,council)/_layout.tsx",
   ]) {
     assert.doesNotMatch(readFileSync(layout, "utf8"), /gestureEnabled: false/, `${layout}에서 기본 제스처를 껐다`);
   }

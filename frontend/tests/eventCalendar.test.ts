@@ -56,7 +56,7 @@ test("오늘 진행 중인 다일 일정도 예정 일정 후보에 포함한다
 });
 
 test("홈 화살표와 빈 일정 영역은 다른 일정 페이지로 이동하지 않는다", () => {
-  const homeSource = readFileSync("app/(tabs)/home.tsx", "utf8");
+  const homeSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8");
   assert.doesNotMatch(homeSource, /router\.push\("\/events\/calendar"/);
   assert.match(homeSource, /onPress=\{\(\) => onChangeMonth\(-1\)\}/);
   assert.match(homeSource, /onPress=\{\(\) => onChangeMonth\(1\)\}/);
@@ -87,7 +87,7 @@ test("날짜 점과 선택한 날 목록은 같은 결과를 본다", () => {
 });
 
 test("홈 달력은 날짜를 눌러도 화면을 옮기지 않고 카드 안에서 펼친다", () => {
-  const homeSource = readFileSync("app/(tabs)/home.tsx", "utf8");
+  const homeSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8");
   // 날짜 탭은 선택만 바꾼다. 예전처럼 그날 일정 화면으로 보내면 안 된다.
   assert.match(homeSource, /setPicked\(\{ monthKey, day: cell\.day \}\)/);
   assert.doesNotMatch(homeSource, /eventDayRoute/);

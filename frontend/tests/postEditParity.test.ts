@@ -8,8 +8,8 @@ import {
   withResourcePostMetadata,
 } from "../utils/resourcePostFields";
 
-const editSource = readFileSync("app/(tabs)/board/post/edit/[postId].tsx", "utf8");
-const createSource = readFileSync("app/(tabs)/board/post/create.tsx", "utf8");
+const editSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
+const createSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
 
 test("등급 입력 정의는 작성·수정이 같은 것을 쓴다", () => {
   // 각자 선언하면 라벨이나 순서가 조용히 갈라진다.

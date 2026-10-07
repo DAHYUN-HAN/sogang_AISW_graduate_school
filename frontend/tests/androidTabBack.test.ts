@@ -86,7 +86,7 @@ function hookHarness(platform = "android") {
       },
     },
     "../utils/androidTabBack": { androidTabBackAction },
-    "../utils/appRoutes": { HOME_TAB_ROUTE: "/(tabs)/home" },
+    "../utils/tabNavigation": { navigateToTabRoot: (tab: string) => calls.push(`/(tabs)/${tab}`) },
   };
   runInNewContext(code, { exports: moduleExports, require: (name: string) => modules[name] });
   return {

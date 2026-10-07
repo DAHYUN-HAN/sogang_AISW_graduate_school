@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-const detail = readFileSync("app/(tabs)/board/post/[postId].tsx", "utf8");
+const detail = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
 const renderer = readFileSync("components/ActivityCertificationMediaImage.tsx", "utf8");
 
 test("활동 인증 상세는 게시판 metadata의 이미지 규칙을 전용 렌더러에 전달한다", () => {

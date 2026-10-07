@@ -3,7 +3,7 @@ import { Platform } from "react-native";
 import { usePostDetail } from "../../../../../hooks/usePosts";
 import { useAdminWorkspace } from "../../../../../components/admin/AdminWorkspace";
 import AdminPostRouteState from "../../../../../components/admin/AdminPostRouteState";
-import PostEditScreen from "../../../../(tabs)/board/post/edit/[postId]";
+import PostEditScreen from "../../../../(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId]";
 
 export default function AdminPostEditRoute() {
   const {postId} = useLocalSearchParams<{postId: string}>();
