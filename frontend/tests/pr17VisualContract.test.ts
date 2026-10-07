@@ -74,9 +74,9 @@ test("공지 이미지는 가로 4:3·세로 4:5 프레임만 사용하고 PR �
   assert.match(detail, /fileName:[\s\S]*fontSize: 13[\s\S]*lineHeight: 16/);
 });
 
-test("공식 답변은 PR 전용 이미지, 빈 대표 이미지는 벡터 아이콘을 사용한다", () => {
+test("공식 답변 제목은 이모지를 제외하고 빈 대표 이미지는 벡터 아이콘을 사용한다", () => {
   assert.match(detail, /<ImagePlaceholderIcon size=\{36\}/);
-  assert.match(detail, /<Image source=\{require\("\.\.\/\.\.\/\.\.\/\.\.\/assets\/images\/council-reply\.png"\)\}/);
+  assert.doesNotMatch(detail, /council-reply\.png/);
   assert.doesNotMatch(detail, /<CouncilReplyIcon/);
 });
 

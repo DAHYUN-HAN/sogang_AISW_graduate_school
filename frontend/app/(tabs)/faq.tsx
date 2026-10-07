@@ -3,6 +3,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BackHandler, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../components/AppTypography";
+import { NetworkErrorFallback } from "../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../components/LoadingState";
@@ -31,6 +32,7 @@ export default function FAQScreen() {
   const [faqs, setFaqs] = useState<FAQItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [expandedFaqIds, setExpandedFaqIds] = useState<Set<number>>(createFaqAccordionState);
 
   const handleBack = useCallback(() => router.navigate("/(tabs)/council"), []);
@@ -46,10 +48,12 @@ export default function FAQScreen() {
   const loadFAQs = useCallback(async () => {
     setIsLoading(true);
     setIsError(false);
+    setLoadError(null);
     try {
       const response = await faqApi.getFAQs();
       setFaqs(response.data);
-    } catch {
+    } catch (error) {
+      setLoadError(error);
       setIsError(true);
     } finally {
       setIsLoading(false);
@@ -78,12 +82,14 @@ export default function FAQScreen() {
       {isLoading ? (
         <LoadingState />
       ) : isError ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>FAQ를 불러오지 못했습니다.</Text>
-          <Pressable accessibilityRole="button" onPress={() => void loadFAQs()} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </Pressable>
-        </View>
+        <NetworkErrorFallback error={loadError} onRetry={() => void loadFAQs()}>
+          <View style={styles.center}>
+            <Text style={styles.errorText}>FAQ를 불러오지 못했습니다.</Text>
+            <Pressable accessibilityRole="button" onPress={() => void loadFAQs()} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        </NetworkErrorFallback>
       ) : (
         <ScrollView style={styles.scroller} contentContainerStyle={styles.content}>
           {visibleFAQs.length === 0 ? (

@@ -4,9 +4,12 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Alert, Image, type ImageSourcePropType, Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { AppText as Text } from "../../components/AppTypography";
+import NetworkErrorState, { NetworkErrorFallback } from "../../components/NetworkErrorState";
+import { isNetworkError } from "../../utils/networkError";
 
+import { calendarMonthStyles } from "../../components/CalendarMonth";
 import { MediaImageBackground } from "../../components/MediaImage";
 import HomeSectionGate from "../../components/HomeSectionGate";
 import { BackIcon, BellIcon, EmptyCalendarIcon, ForwardIcon, ProfileIcon } from "../../components/icons";
@@ -105,8 +108,7 @@ function pickBannerImage(banner: BannerItem | undefined, width: number) {
 }
 
 function monthLabel(date: Date) {
-  // Figma 캘린더 카드(1615:105)의 "2026.06" 표기.
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}`;
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
 }
 
 function noticeDotColor(value?: string | null) {
@@ -191,16 +193,7 @@ function calendarScaleForWidth(windowWidth: number) {
 function calendarStyles(scale: number) {
   const r = (value: number) => value * scale;
   return StyleSheet.create({
-    card: {
-      borderRadius: r(12),
-      backgroundColor: COLORS.surface,
-      borderWidth: 0.5,
-      borderColor: COLORS.border,
-      padding: r(14),
-    },
-    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: r(10) },
-    arrow: { width: r(24), height: r(24), alignItems: "center", justifyContent: "center" },
-    month: { color: COLORS.text, fontSize: r(16), fontWeight: "600", lineHeight: r(19) },
+    ...calendarMonthStyles(scale),
     chips: { flexDirection: "row", gap: r(6), marginBottom: r(10) },
     chip: {
       flexDirection: "row",
@@ -217,46 +210,13 @@ function calendarStyles(scale: number) {
     chipDot: { width: r(7), height: r(7), borderRadius: r(3.5) },
     chipText: { color: "#6B7280", fontSize: r(12), fontWeight: "600" },
     chipTextActive: { color: "#FFFFFF" },
-    grid: { flexDirection: "row", flexWrap: "wrap", rowGap: r(2) },
-    weekday: {
-      width: "14.285%",
-      color: COLORS.subtle,
-      fontSize: r(11),
-      fontWeight: "400",
-      lineHeight: r(13),
-      textAlign: "center",
-      marginBottom: r(8),
-    },
-    weekdaySunday: { color: "#993556" },
-    dayCell: { width: "14.285%", height: r(44), alignItems: "center", paddingTop: r(5) },
-    // Android(Fabric)는 배경색이 나중에 붙는 뷰에서 borderRadius를 간헐적으로 놓친다.
-    // 배경색과 radius를 항상 같은 스타일 객체에 두고 radius는 크기의 절반으로 고정한다.
-    dayBadge: {
-      width: r(24),
-      height: r(24),
-      borderRadius: r(12),
-      overflow: "hidden",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    dayBadgeSelected: { backgroundColor: COLORS.primary, borderRadius: r(12) },
-    dayBadgeToday: { backgroundColor: "#E6F1FB", borderRadius: r(12) },
-    dayText: {
-      color: COLORS.text,
-      fontSize: r(13),
-      fontWeight: "400",
-      lineHeight: r(16),
-      textAlign: "center",
-      includeFontPadding: false,
-    },
-    dayTextSelected: { color: "#FFFFFF", fontWeight: "500" },
-    dayTextToday: { color: "#0C447C", fontWeight: "500" },
     dayDots: { flexDirection: "row", gap: r(3), height: r(4), marginTop: r(3) },
     dayDot: { width: r(4), height: r(4), borderRadius: r(2) },
     scheduleHeader: { flexDirection: "row", alignItems: "center", gap: r(6), marginTop: r(10), marginBottom: r(8) },
     scheduleTitle: { color: COLORS.text, fontSize: r(14), fontWeight: "600", lineHeight: r(17) },
     scheduleCount: { color: "#6B7280", fontSize: r(12), fontWeight: "400", lineHeight: r(14) },
-    scheduleEmpty: { color: "#6B7280", fontSize: r(13), fontWeight: "400", lineHeight: r(16), paddingVertical: r(8) },
+    scheduleEmptyContainer: { alignSelf: "stretch", alignItems: "center", justifyContent: "center", paddingVertical: r(24), gap: r(6) },
+    scheduleEmpty: { color: COLORS.subtle, fontSize: r(13), fontWeight: "400", lineHeight: r(16), textAlign: "center" },
     scheduleCard: {
       flexDirection: "row",
       alignItems: "center",
@@ -268,6 +228,7 @@ function calendarStyles(scale: number) {
       paddingVertical: r(11),
       marginBottom: r(8),
     },
+    scheduleCardLast: { marginBottom: 0 },
     scheduleBar: { width: r(3), alignSelf: "stretch", borderRadius: r(3) },
     scheduleBody: { flex: 1, gap: r(3) },
     scheduleCategory: { fontSize: r(11), fontWeight: "700", lineHeight: r(13) },
@@ -286,17 +247,10 @@ function IconButton({ label, onPress, children }: { label: string; onPress: () =
   );
 }
 
-// 홈 섹션 아이콘. 행사 사진첩=카메라, 동문회 주소록=클립보드.
-const HOME_ICON_PHOTO_ALBUM: ImageSourcePropType = require("../../assets/images/home-icon-photo-album.png");
-const HOME_ICON_ALUMNI: ImageSourcePropType = require("../../assets/images/home-icon-alumni.png");
-// 홈 인사말 손 흔드는 아이콘.
-const HOME_ICON_GREETING: ImageSourcePropType = require("../../assets/images/home-icon-greeting.png");
-
-function SectionHeader({ title, icon, actionLabel = "더보기", onPress }: { title: string; icon?: ImageSourcePropType; actionLabel?: string; onPress?: () => void }) {
+function SectionHeader({ title, actionLabel = "더보기", onPress }: { title: string; actionLabel?: string; onPress?: () => void }) {
   return (
     <View style={styles.sectionHeader}>
       <View style={styles.sectionTitleRow}>
-        {icon ? <Image source={icon} style={styles.sectionTitleIcon} resizeMode="contain" /> : null}
         <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       {onPress ? (
@@ -337,15 +291,17 @@ function HomeEmptyState({ type }: { type: "notices" | "popular" | "album" }) {
   );
 }
 
-function HomeErrorState({ label, onRetry }: { label: string; onRetry: () => void }) {
+function HomeErrorState({ label, error, onRetry }: { label: string; error?: unknown; onRetry: () => void }) {
   return (
-    <View style={styles.emptyState}>
-      <Ionicons name="cloud-offline-outline" size={30} color="#AAB2BF" />
-      <Text style={styles.emptyStateTitle}>{label}을 불러오지 못했습니다.</Text>
-      <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-        <Text style={styles.retryButtonText}>다시 시도</Text>
-      </Pressable>
-    </View>
+    <NetworkErrorFallback error={error} onRetry={onRetry}>
+      <View style={styles.emptyState}>
+        <Ionicons name="cloud-offline-outline" size={30} color="#AAB2BF" />
+        <Text style={styles.emptyStateTitle}>{label}을 불러오지 못했습니다.</Text>
+        <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>다시 시도</Text>
+        </Pressable>
+      </View>
+    </NetworkErrorFallback>
   );
 }
 
@@ -491,12 +447,14 @@ function NoticeList({
   boards,
   loading,
   isError,
+  error,
   onRetry,
 }: {
   posts: PostListItem[];
   boards: Board[];
   loading: boolean;
   isError: boolean;
+  error?: unknown;
   onRetry: () => void;
 }) {
   if (loading) {
@@ -508,7 +466,7 @@ function NoticeList({
   }
 
   if (isError) {
-    return <HomeErrorState label="공지사항" onRetry={onRetry} />;
+    return <HomeErrorState error={error} label="공지사항" onRetry={onRetry} />;
   }
 
   const rows = posts;
@@ -677,12 +635,14 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
         <Text style={cal.scheduleTitle}>
           {`${month.getMonth() + 1}월 ${selectedDay}일 (${WEEKDAYS[selectedDate.getDay()]})`}
         </Text>
-        <Text style={cal.scheduleCount}>{`일정 ${selectedEvents.length}개`}</Text>
+        {selectedEvents.length > 0 ? <Text style={cal.scheduleCount}>{`일정 ${selectedEvents.length}개`}</Text> : null}
       </View>
       {selectedEvents.length === 0 ? (
-        <Text style={cal.scheduleEmpty}>이 날은 일정이 없어요</Text>
+        <View style={cal.scheduleEmptyContainer}>
+          <Text style={cal.scheduleEmpty}>등록된 일정이 없어요</Text>
+        </View>
       ) : (
-        selectedEvents.map((event) => {
+        selectedEvents.map((event, index) => {
           const accent = eventCategoryAccent(event.category);
           // 짝이 되는 공지가 있을 때만 누를 수 있다. 없으면 화살표도 두지 않아
           // 눌러도 아무 일이 없다는 것이 보이게 한다.
@@ -696,7 +656,7 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
                 if (!noticePostId) return;
                 router.push(postDetailRoute(noticePostId, undefined, HOME_TAB_ROUTE) as never);
               }}
-              style={cal.scheduleCard}
+              style={[cal.scheduleCard, index === selectedEvents.length - 1 ? cal.scheduleCardLast : null]}
             >
               <View style={[cal.scheduleBar, { backgroundColor: accent }]} />
               <View style={cal.scheduleBody}>
@@ -717,11 +677,13 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
 function HomePopularPostsSection({
   boardId,
   boardsError,
+  boardsLoadError,
   compact,
   refetchBoards,
 }: {
   boardId?: number;
   boardsError: boolean;
+  boardsLoadError?: unknown;
   compact: boolean;
   refetchBoards: () => Promise<unknown>;
 }) {
@@ -740,7 +702,7 @@ function HomePopularPostsSection({
           <Text style={styles.emptyText}>인기 글을 불러오는 중이에요</Text>
         </View>
       ) : boardsError || popularQuery.isError ? (
-        <HomeErrorState label="인기 게시글" onRetry={() => void Promise.all([refetchBoards(), popularQuery.refetch()])} />
+        <HomeErrorState error={boardsLoadError ?? popularQuery.error} label="인기 게시글" onRetry={() => void Promise.all([refetchBoards(), popularQuery.refetch()])} />
       ) : rows.length === 0 ? (
         <HomeEmptyState type="popular" />
       ) : (
@@ -839,6 +801,7 @@ export default function HomeScreen() {
   const {
     data: boardGroups,
     isError: boardsError,
+    error: boardsLoadError,
     isLoading: boardsLoading,
     isRefetching: boardsRefetching,
     refetch: refetchBoards,
@@ -891,6 +854,14 @@ export default function HomeScreen() {
     || eventsQuery.isRefetching
     || albumQuery.isRefetching
     || notificationQuery.isRefetching;
+  const hasHomeNetworkError = [
+    boardsError ? boardsLoadError : null,
+    bannersQuery.isError ? bannersQuery.error : null,
+    noticesQuery.isError ? noticesQuery.error : null,
+    eventsQuery.isError ? eventsQuery.error : null,
+    albumBoardId && albumQuery.isError ? albumQuery.error : null,
+    isAuthenticated && notificationQuery.isError ? notificationQuery.error : null,
+  ].some(isNetworkError);
   const refreshHome = () => {
     void refreshQueries([
       refetchBoards,
@@ -915,7 +886,7 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={[styles.content, { paddingTop: Math.max(insets.top + 12, 21) }]}
+      contentContainerStyle={[styles.content, hasHomeNetworkError ? styles.networkErrorContent : null, { paddingTop: Math.max(insets.top + 12, 21) }]}
       refreshControl={<RefreshControl refreshing={!isHomeLoading && isRefreshing} onRefresh={refreshHome} tintColor={COLORS.primary} />}
     >
       <View style={styles.header}>
@@ -924,7 +895,6 @@ export default function HomeScreen() {
             <Text style={styles.greeting} numberOfLines={1}>
               안녕하세요, {displayName}님
             </Text>
-            <Image source={HOME_ICON_GREETING} style={styles.greetingIcon} resizeMode="contain" />
           </View>
         </View>
         <View style={styles.headerActions}>
@@ -937,92 +907,100 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {isHomeLoading ? <ActivityIndicator accessibilityLabel="홈 콘텐츠 로딩" size="small" color={COLORS.primary} /> : null}
-
-      {bannersQuery.isLoading ? (
-        <View style={styles.loadingBox}>
-          <Text style={styles.emptyText}>배너를 불러오는 중이에요</Text>
+      {hasHomeNetworkError ? (
+        <View style={styles.networkErrorBody}>
+          <NetworkErrorState onRetry={refreshHome} />
         </View>
-      ) : bannersQuery.isError ? (
-        <HomeErrorState label="홈 배너" onRetry={() => void bannersQuery.refetch()} />
       ) : (
-        <HomeBannerCarousel banners={banners} />
-      )}
+        <>
+          {isHomeLoading ? <ActivityIndicator accessibilityLabel="홈 콘텐츠 로딩" size="small" color={COLORS.primary} /> : null}
 
-      <SectionHeader
-        title="공지사항"
-        onPress={() => {
-          requestTabRootReset("notices");
-          router.navigate(NOTICES_TAB_ROUTE as never);
-        }}
-      />
-      <NoticeList
-        posts={notices}
-        boards={noticeBoards}
-        loading={noticesQuery.isLoading || boardsLoading}
-        isError={boardsError || noticesQuery.isError}
-        onRetry={() => void Promise.all([refetchBoards(), noticesQuery.refetch()])}
-      />
-
-      <SectionHeader title="서강생활 일정" />
-      {eventsQuery.isLoading ? (
-        <View style={styles.loadingBox}>
-          <Text style={styles.emptyText}>일정을 불러오는 중이에요</Text>
-        </View>
-      ) : eventsQuery.isError ? (
-        <HomeErrorState label="일정" onRetry={() => void eventsQuery.refetch()} />
-      ) : (
-        <CalendarCard
-          events={events}
-          month={month}
-          onChangeMonth={(delta) => setMonth((value) => shiftCalendarMonth(value, delta))}
-        />
-      )}
-
-      <HomeSectionGate visible={SHOW_HOME_POPULAR_POSTS}>
-        <HomePopularPostsSection
-          boardId={popularBoardId}
-          boardsError={boardsError}
-          compact={compact}
-          refetchBoards={refetchBoards}
-        />
-      </HomeSectionGate>
-
-      <SectionHeader
-        title="행사 사진첩"
-        icon={HOME_ICON_PHOTO_ALBUM}
-        onPress={() => {
-          requestTabRootReset("community");
-          router.navigate(COMMUNITY_TAB_ROUTE as never);
-        }}
-      />
-      {albumQuery.isLoading ? (
-        <View style={styles.loadingBox}>
-          <Text style={styles.emptyText}>사진첩을 불러오는 중이에요</Text>
-        </View>
-      ) : boardsError || albumQuery.isError ? (
-        <HomeErrorState label="행사 사진첩" onRetry={() => void Promise.all([refetchBoards(), albumQuery.refetch()])} />
-      ) : (
-        <AlbumStrip posts={albumPosts} />
-      )}
-
-      <Pressable
-        accessibilityLabel="동문회 주소록"
-        accessibilityRole="link"
-        onPress={openAlumniDirectory}
-        style={styles.alumniDirectoryRow}
-      >
-        <View style={styles.alumniDirectoryLeading}>
-          <View style={styles.alumniDirectoryCopy}>
-            <View style={styles.alumniDirectoryTitleRow}>
-              <Image source={HOME_ICON_ALUMNI} style={styles.alumniDirectoryIcon} resizeMode="contain" />
-              <Text style={styles.alumniDirectoryTitle}>동문회 주소록</Text>
+          {bannersQuery.isLoading ? (
+            <View style={styles.loadingBox}>
+              <Text style={styles.emptyText}>배너를 불러오는 중이에요</Text>
             </View>
-            <Text style={styles.alumniDirectoryDescription}>선배 원우들의 연락처를 확인해보세요</Text>
-          </View>
-        </View>
-        <ForwardIcon size={18} color={COLORS.muted} />
-      </Pressable>
+          ) : bannersQuery.isError ? (
+            <HomeErrorState error={bannersQuery.error} label="홈 배너" onRetry={() => void bannersQuery.refetch()} />
+          ) : (
+            <HomeBannerCarousel banners={banners} />
+          )}
+
+          <SectionHeader
+            title="공지사항"
+            onPress={() => {
+              requestTabRootReset("notices");
+              router.navigate(NOTICES_TAB_ROUTE as never);
+            }}
+          />
+          <NoticeList
+            posts={notices}
+            boards={noticeBoards}
+            loading={noticesQuery.isLoading || boardsLoading}
+            isError={boardsError || noticesQuery.isError}
+            error={boardsLoadError ?? noticesQuery.error}
+            onRetry={() => void Promise.all([refetchBoards(), noticesQuery.refetch()])}
+          />
+
+          <SectionHeader title="서강생활 일정" />
+          {eventsQuery.isLoading ? (
+            <View style={styles.loadingBox}>
+              <Text style={styles.emptyText}>일정을 불러오는 중이에요</Text>
+            </View>
+          ) : eventsQuery.isError ? (
+            <HomeErrorState error={eventsQuery.error} label="일정" onRetry={() => void eventsQuery.refetch()} />
+          ) : (
+            <CalendarCard
+              events={events}
+              month={month}
+              onChangeMonth={(delta) => setMonth((value) => shiftCalendarMonth(value, delta))}
+            />
+          )}
+
+          <HomeSectionGate visible={SHOW_HOME_POPULAR_POSTS}>
+            <HomePopularPostsSection
+              boardId={popularBoardId}
+              boardsError={boardsError}
+              boardsLoadError={boardsLoadError}
+              compact={compact}
+              refetchBoards={refetchBoards}
+            />
+          </HomeSectionGate>
+
+          <SectionHeader
+            title="행사 사진첩"
+            onPress={() => {
+              requestTabRootReset("community");
+              router.navigate(COMMUNITY_TAB_ROUTE as never);
+            }}
+          />
+          {albumQuery.isLoading ? (
+            <View style={styles.loadingBox}>
+              <Text style={styles.emptyText}>사진첩을 불러오는 중이에요</Text>
+            </View>
+          ) : boardsError || albumQuery.isError ? (
+            <HomeErrorState error={boardsLoadError ?? albumQuery.error} label="행사 사진첩" onRetry={() => void Promise.all([refetchBoards(), albumQuery.refetch()])} />
+          ) : (
+            <AlbumStrip posts={albumPosts} />
+          )}
+
+          <Pressable
+            accessibilityLabel="동문회 주소록"
+            accessibilityRole="link"
+            onPress={openAlumniDirectory}
+            style={styles.alumniDirectoryRow}
+          >
+            <View style={styles.alumniDirectoryLeading}>
+              <View style={styles.alumniDirectoryCopy}>
+                <View style={styles.alumniDirectoryTitleRow}>
+                  <Text style={styles.alumniDirectoryTitle}>동문회 주소록</Text>
+                </View>
+                <Text style={styles.alumniDirectoryDescription}>선배 원우들의 연락처를 확인해보세요</Text>
+              </View>
+            </View>
+            <ForwardIcon size={18} color={COLORS.muted} />
+          </Pressable>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -1037,6 +1015,8 @@ const styles = StyleSheet.create({
     paddingTop: 21,
     paddingBottom: 16,
   },
+  networkErrorContent: { flexGrow: 1, backgroundColor: "#FFFFFF" },
+  networkErrorBody: { flex: 1, justifyContent: "center", backgroundColor: "#FFFFFF" },
   header: {
     height: 57,
     justifyContent: "flex-end",
@@ -1055,10 +1035,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  greetingIcon: {
-    width: 22,
-    height: 22,
   },
   greeting: {
     color: COLORS.text,
@@ -1130,10 +1106,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  sectionTitleIcon: {
-    width: 20,
-    height: 20,
   },
   sectionTitle: {
     color: COLORS.text,
@@ -1388,10 +1360,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-  },
-  alumniDirectoryIcon: {
-    width: 20,
-    height: 20,
   },
   alumniDirectoryTitle: {
     color: COLORS.text,

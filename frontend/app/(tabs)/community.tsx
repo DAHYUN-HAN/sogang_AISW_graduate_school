@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../components/AppTypography";
+import { NetworkErrorFallback } from "../../components/NetworkErrorState";
 
 import BoardPostsScreen from "./board/[boardId]";
 import LoadingState from "../../components/LoadingState";
@@ -20,7 +21,7 @@ export default function CommunityScreen() {
 }
 
 function CommunityContent() {
-  const { data, isLoading, isError, refetch } = useBoardsQuery();
+  const { data, isLoading, isError, error, refetch } = useBoardsQuery();
   const boards = data?.data.flatMap((group) => group.boards) ?? [];
   const initialBoard =
     boards.find((board) => board.slug === "event-album") ??
@@ -33,15 +34,17 @@ function CommunityContent() {
 
   if (!initialBoard) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.title}>{isError ? "커뮤니티를 불러오지 못했습니다." : "연결된 커뮤니티 게시판이 없습니다."}</Text>
-        <Text style={styles.message}>게시판 시드와 서버 연결 상태를 확인해주세요.</Text>
-        {isError ? (
-          <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <NetworkErrorFallback error={error} onRetry={() => void refetch()}>
+        <View style={styles.center}>
+          <Text style={styles.title}>{isError ? "커뮤니티를 불러오지 못했습니다." : "연결된 커뮤니티 게시판이 없습니다."}</Text>
+          <Text style={styles.message}>게시판 시드와 서버 연결 상태를 확인해주세요.</Text>
+          {isError ? (
+            <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </NetworkErrorFallback>
     );
   }
 

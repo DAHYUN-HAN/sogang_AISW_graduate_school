@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../components/AppTypography";
+import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../../components/LoadingState";
@@ -159,12 +160,14 @@ export default function ProfileSettingsScreen() {
       {profileQuery.isLoading ? (
         <LoadingState />
       ) : profileQuery.isError ? (
-        <View style={styles.center}>
-          <Text style={styles.loadErrorText}>프로필을 불러오지 못했습니다.</Text>
-          <Pressable accessibilityRole="button" onPress={() => void profileQuery.refetch()} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </Pressable>
-        </View>
+        <NetworkErrorFallback error={profileQuery.error} onRetry={() => void profileQuery.refetch()}>
+          <View style={styles.center}>
+            <Text style={styles.loadErrorText}>프로필을 불러오지 못했습니다.</Text>
+            <Pressable accessibilityRole="button" onPress={() => void profileQuery.refetch()} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        </NetworkErrorFallback>
       ) : (
         <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroller} contentContainerStyle={styles.content}>
         <View style={styles.avatarSection}>

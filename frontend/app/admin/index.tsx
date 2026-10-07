@@ -125,7 +125,7 @@ import type {
   MutualAidStatus,
 } from "../../types";
 
-import { BackIcon } from "../../components/icons";
+import CalendarMonth from "../../components/CalendarMonth";
 const COLORS = {
   primary: "#2761FF",
   primary50: "#EDF2FE",
@@ -347,7 +347,6 @@ const NOTICE_CATEGORY_OPTIONS = [
   { value: "other", label: "기타 공지" },
 ] as const;
 
-const EVENT_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
 const EVENT_TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
   const hour = Math.floor(index / 2);
   const minute = index % 2 === 0 ? "00" : "30";
@@ -532,33 +531,6 @@ function parseDateTimeValue(value?: string | null) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
-function monthLabelValue(date: Date) {
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
-}
-
-function buildAdminCalendarCells(month: Date) {
-  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1).getDay();
-  const lastDate = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const cells: { key: string; date?: Date }[] = [];
-  for (let index = 0; index < firstDay; index += 1) {
-    cells.push({ key: `blank-${index}` });
-  }
-  for (let day = 1; day <= lastDate; day += 1) {
-    cells.push({ key: `day-${day}`, date: new Date(month.getFullYear(), month.getMonth(), day) });
-  }
-  while (cells.length % 7 !== 0) {
-    cells.push({ key: `blank-${cells.length}` });
-  }
-  return cells;
-}
-
-function sameDate(left: Date | null, right?: Date) {
-  if (!left || !right) {
-    return false;
-  }
-  return left.getFullYear() === right.getFullYear() && left.getMonth() === right.getMonth() && left.getDate() === right.getDate();
-}
-
 export type ExternalLinkDraftState = { boardId: number | null; draft: string };
 
 export function externalLinkBoardTransition(
@@ -677,7 +649,6 @@ function EventDateTimePicker({
     }
   }, [value]);
 
-  const cells = buildAdminCalendarCells(visibleMonth);
   const time = timeOnlyValue(value, fallbackTime);
 
   const changeMonth = (delta: number) => {
@@ -706,61 +677,12 @@ function EventDateTimePicker({
         <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Pressable hitSlop={8} onPress={() => changeMonth(-1)} style={{ padding: 6 }}>
-          <BackIcon size={20} color={COLORS.text} />
-        </Pressable>
-        <Text style={{ color: COLORS.primary900, fontSize: 16, fontWeight: "900" }}>{monthLabelValue(visibleMonth)}</Text>
-        <Pressable hitSlop={8} onPress={() => changeMonth(1)} style={{ padding: 6 }}>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
-        </Pressable>
-      </View>
-
-      <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-        {EVENT_WEEKDAYS.map((day, index) => (
-          <Text
-            key={`${label}-${day}`}
-            style={{
-              width: `${100 / 7}%`,
-              textAlign: "center",
-              color: index === 0 ? COLORS.error : COLORS.muted,
-              fontSize: 12,
-              fontWeight: "900",
-              paddingVertical: 5,
-            }}
-          >
-            {day}
-          </Text>
-        ))}
-        {cells.map((cell) => {
-          const selected = sameDate(selectedDate, cell.date);
-          return (
-            <Pressable
-              key={`${label}-${cell.key}`}
-              disabled={!cell.date}
-              onPress={() => cell.date && selectDate(cell.date)}
-              style={{ width: `${100 / 7}%`, alignItems: "center", paddingVertical: 4 }}
-            >
-              {cell.date ? (
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderWidth: selected ? 0 : 1,
-                    borderColor: COLORS.border,
-                    backgroundColor: selected ? COLORS.primary : COLORS.surface,
-                  }}
-                >
-                  <Text style={{ color: selected ? "#ffffff" : COLORS.text, fontWeight: "900" }}>{cell.date.getDate()}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
+      <CalendarMonth
+        month={visibleMonth}
+        selectedDay={selectedDate && selectedDate.getFullYear() === visibleMonth.getFullYear() && selectedDate.getMonth() === visibleMonth.getMonth() ? selectedDate.getDate() : undefined}
+        onChangeMonth={changeMonth}
+        onSelect={selectDate}
+      />
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <Text style={{ color: COLORS.muted, fontWeight: "900" }}>시간</Text>

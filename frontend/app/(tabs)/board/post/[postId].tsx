@@ -4,6 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, BackHandler, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
+import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CommentItem from "../../../../components/CommentItem";
@@ -245,7 +246,7 @@ export default function PostDetailScreen() {
   const userId = useUserStore((state) => state.userId);
   const currentUser = useUserStore((state) => state.user);
 
-  const { data: postRes, isError, isLoading, refetch } = usePostDetail(postId);
+  const { data: postRes, isError, error, isLoading, refetch } = usePostDetail(postId);
   const { data: boardsRes } = useBoardsQuery();
 
   const post = postRes?.data;
@@ -404,12 +405,14 @@ export default function PostDetailScreen() {
     return (
       <View style={styles.screen}>
         {navigationHeader}
-        <View style={styles.center}>
-          <Text style={styles.loadErrorText}>게시글을 불러오지 못했습니다.</Text>
-          <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </Pressable>
-        </View>
+        <NetworkErrorFallback error={error} onRetry={() => void refetch()}>
+          <View style={styles.center}>
+            <Text style={styles.loadErrorText}>게시글을 불러오지 못했습니다.</Text>
+            <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        </NetworkErrorFallback>
       </View>
     );
   }
@@ -435,7 +438,17 @@ export default function PostDetailScreen() {
           ? "마감"
           : "진행중"
       : categoryLabel(post.category, isAdminParticipationGuide ? "모집중" : board?.board_type === "notice" ? "공지" : board?.name ?? "게시글");
-  const tone = categoryTone(label);
+  const tone = isSuggestionRequest
+    ? post.suggestion?.status === "answered"
+      ? { bg: "#EAF3DE", fg: "#3B6D11" }
+      : { bg: "#FAEEDA", fg: "#854F0B" }
+    : isMutualAidRequest
+      ? post.mutual_aid?.status === "completed"
+        ? { bg: "#EAF3DE", fg: "#3B6D11" }
+        : post.mutual_aid?.status === "rejected"
+          ? { bg: "#FBEAF0", fg: "#993556" }
+          : { bg: "#E6F1FB", fg: "#0C447C" }
+      : categoryTone(label);
   const applicationUrl = participationApplicationUrl(metadata);
   const isRecruitmentClosed =
     String(metadata.recruitment_status ?? post.category ?? "").toLowerCase().includes("closed") ||
@@ -865,10 +878,9 @@ export default function PostDetailScreen() {
                 </Pressable>
               </>
             ) : null}
-            {/* Figma: 사진첩 상세에는 n/N 카운터가 없다 */}
-            {!isPhotoAlbum ? (
-              <View style={styles.galleryCount}>
-                <Text style={styles.galleryCountText}>{normalizedGalleryIndex + 1} / {galleryTotal}</Text>
+            {!isPhotoAlbum || imageAttachments.length > 0 ? (
+              <View pointerEvents="none" style={[styles.galleryCount, isPhotoAlbum ? styles.albumGalleryCount : null]}>
+                <Text style={[styles.galleryCountText, isPhotoAlbum ? styles.albumGalleryCountText : null]}>{normalizedGalleryIndex + 1} / {galleryTotal}</Text>
               </View>
             ) : null}
           </>
@@ -1196,7 +1208,6 @@ export default function PostDetailScreen() {
         {post.suggestion?.admin_reply ? (
           <View style={styles.officialReplyBox}>
             <View style={styles.officialReplyTitleRow}>
-              <Image source={require("../../../../assets/images/council-reply.png")} style={styles.officialReplyIcon} />
               <Text style={styles.officialReplyTitle}>원우회 답변</Text>
             </View>
             <Text style={styles.officialReplyBody}>{post.suggestion.admin_reply}</Text>
@@ -2055,6 +2066,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
+  albumGalleryCount: {
+    right: 17,
+    bottom: 17,
+    zIndex: 4,
+  },
+  albumGalleryCountText: {
+    lineHeight: 14,
+  },
   galleryCountText: {
     color: "#FFFFFF",
     fontSize: 12,
@@ -2333,12 +2352,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   mutualAidPill: {
-    borderRadius: 999, // Figma: 25h, padding 5/10
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   mutualAidPillText: {
-    fontSize: 12, // Figma 상태칩: Medium 12/14, 24h
+    fontSize: 12,
     fontWeight: "500",
     lineHeight: 14,
   },
@@ -2408,10 +2429,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-  },
-  officialReplyIcon: {
-    width: 16,
-    height: 16,
   },
   officialReplyTitle: {
     color: "#2761FF",

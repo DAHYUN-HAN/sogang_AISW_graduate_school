@@ -61,7 +61,7 @@ test("홈 화살표와 빈 일정 영역은 다른 일정 페이지로 이동하
   assert.match(homeSource, /onPress=\{\(\) => onChangeMonth\(1\)\}/);
   assert.match(homeSource, /from_date: monthRange\.start, to_date: monthRange\.end/);
   // 일정이 없는 날은 누를 것이 없어야 한다. Pressable이 아니라 안내 문구만 둔다.
-  assert.match(homeSource, /<Text style=\{cal\.scheduleEmpty\}>이 날은 일정이 없어요<\/Text>/);
+  assert.match(homeSource, /<Text style=\{cal\.scheduleEmpty\}>등록된 일정이 없어요<\/Text>/);
 });
 
 test("날짜별 일정은 시작 시각 순으로 담기고 걸친 날마다 들어간다", () => {
