@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
+import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../../components/LoadingState";
@@ -56,6 +57,7 @@ export default function NotificationSettingsScreen() {
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [savingKey, setSavingKey] = useState<keyof NotificationSettings | null>(null);
 
   const loadSettings = useCallback(async () => {
@@ -65,10 +67,12 @@ export default function NotificationSettingsScreen() {
     }
     setIsLoading(true);
     setIsError(false);
+    setLoadError(null);
     try {
       const response = await notificationApi.getSettings();
       setSettings(response.data);
-    } catch {
+    } catch (error) {
+      setLoadError(error);
       setIsError(true);
     } finally {
       setIsLoading(false);
@@ -111,12 +115,14 @@ export default function NotificationSettingsScreen() {
       {isLoading ? (
         <LoadingState />
       ) : isError ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>알림 설정을 불러오지 못했습니다.</Text>
-          <Pressable accessibilityRole="button" onPress={() => void loadSettings()} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </Pressable>
-        </View>
+        <NetworkErrorFallback error={loadError} onRetry={() => void loadSettings()}>
+          <View style={styles.center}>
+            <Text style={styles.errorText}>알림 설정을 불러오지 못했습니다.</Text>
+            <Pressable accessibilityRole="button" onPress={() => void loadSettings()} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        </NetworkErrorFallback>
       ) : (
         <View style={styles.list}>
           {SETTING_ROWS.map((row) => (

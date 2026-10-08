@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../components/AppTypography";
+import { NetworkErrorFallback } from "../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -91,7 +92,7 @@ function decorateItems(items: NotificationItem[]) {
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { data, isLoading, isError, isRefetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const { data, isLoading, isError, error, isRefetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["notifications"],
     queryFn: ({ pageParam }) => notificationApi.getNotifications(pageParam, 30),
     initialPageParam: 1,
@@ -157,17 +158,19 @@ export default function NotificationsScreen() {
           refreshing={isRefetching}
           contentContainerStyle={[styles.listContent, rows.length === 0 ? styles.emptyContent : null]}
           ListEmptyComponent={
-            <View style={styles.emptyBox}>
-              {isError ? (
-                <Text style={styles.emptyText}>알림을 불러오지 못했습니다. 당겨서 다시 시도해주세요.</Text>
-              ) : (
-                <>
-                  <Ionicons name="calendar-outline" size={32} color={COLORS.emptyIcon} />
-                  <Text style={styles.emptyTitle}>아직 알림이 없어요</Text>
-                  <Text style={styles.emptySub}>새로운 소식이 있으면 알려드릴게요</Text>
-                </>
-              )}
-            </View>
+            <NetworkErrorFallback error={isError ? error : null} onRetry={() => void refetch()}>
+              <View style={styles.emptyBox}>
+                {isError ? (
+                  <Text style={styles.emptyText}>알림을 불러오지 못했습니다. 당겨서 다시 시도해주세요.</Text>
+                ) : (
+                  <>
+                    <Ionicons name="calendar-outline" size={32} color={COLORS.emptyIcon} />
+                    <Text style={styles.emptyTitle}>아직 알림이 없어요</Text>
+                    <Text style={styles.emptySub}>새로운 소식이 있으면 알려드릴게요</Text>
+                  </>
+                )}
+              </View>
+            </NetworkErrorFallback>
           }
           ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 18 }} /> : null}
           renderItem={({ item: row }) => {

@@ -6,6 +6,7 @@ import { Controller, useForm } from "react-hook-form";
 import { Alert as NativeAlert, BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../../components/AppTypography";
 import { useCallback, useMemo, useEffect, useRef, useState } from "react";
+import { NetworkErrorFallback } from "../../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -102,7 +103,7 @@ export default function PostEditScreen() {
     returnTo?: string;
   }>();
   const postId = Number(params.postId);
-  const { data, isError, isLoading, refetch } = usePostDetail(postId, true, true);
+  const { data, isError, error, isLoading, refetch } = usePostDetail(postId, true, true);
   const post = data?.data;
   const { data: boardsRes } = useBoardsQuery();
   const boards = boardsRes?.data.flatMap((group) => group.boards) ?? [];
@@ -325,12 +326,14 @@ export default function PostEditScreen() {
     return (
       <View style={styles.screen}>
         {navigationHeader}
-        <View style={styles.center}>
-          <Text style={styles.loadErrorText}>게시글을 불러오지 못했습니다.</Text>
-          <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>다시 시도</Text>
-          </Pressable>
-        </View>
+        <NetworkErrorFallback error={error} onRetry={() => void refetch()}>
+          <View style={styles.center}>
+            <Text style={styles.loadErrorText}>게시글을 불러오지 못했습니다.</Text>
+            <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
+              <Text style={styles.retryButtonText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        </NetworkErrorFallback>
       </View>
     );
   }

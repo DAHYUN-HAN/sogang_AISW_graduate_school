@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
+import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../../components/LoadingState";
@@ -53,7 +54,7 @@ export default function ActivityScreen() {
   const params = useLocalSearchParams<{ type?: string }>();
   const { returnToMyPageDrawer, onLayout } = useReturnToMyPageDrawer("/settings/activity");
   const [type, setType] = useState<FilterValue>(() => normalizeType(params.type));
-  const { data, isLoading, isError, isRefetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const { data, isLoading, isError, error, isRefetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["activity", type],
     queryFn: ({ pageParam }) => userApi.getActivity({ type, page: pageParam, size: 30 }),
     initialPageParam: 1,
@@ -96,9 +97,11 @@ export default function ActivityScreen() {
           refreshing={isRefetching}
           contentContainerStyle={[styles.listContent, items.length === 0 ? styles.emptyContent : null]}
           ListEmptyComponent={
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyText}>{isError ? "활동을 불러오지 못했습니다. 당겨서 다시 시도해주세요." : "표시할 활동이 없습니다."}</Text>
-            </View>
+            <NetworkErrorFallback error={isError ? error : null} onRetry={() => void refetch()}>
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyText}>{isError ? "활동을 불러오지 못했습니다. 당겨서 다시 시도해주세요." : "표시할 활동이 없습니다."}</Text>
+              </View>
+            </NetworkErrorFallback>
           }
           ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 18 }} /> : null}
           renderItem={({ item }) => {

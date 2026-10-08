@@ -114,7 +114,6 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
             <Text style={styles.privateAddText}>{uploading ? "업로드 중" : "파일 추가"}</Text>
           </Pressable>
         </View>
-        {uploading ? <Text accessibilityLiveRegion="polite" style={styles.status}>파일을 업로드하고 있어요.</Text> : null}
         {preview ? <ImageViewerModal images={[preview]} initialIndex={0} onClose={() => setPreview(null)} /> : null}
       </View>
     );
@@ -168,7 +167,6 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
         </View>
       ) : null}
 
-      {uploading ? <Text accessibilityLiveRegion="polite" style={styles.status}>파일을 업로드하고 있어요.</Text> : null}
       {preview ? <ImageViewerModal images={[preview]} initialIndex={0} onClose={() => setPreview(null)} /> : null}
     </View>
   );
@@ -207,6 +205,5 @@ const styles = StyleSheet.create({
   fileChange: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   fileRemove: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
   change: { color: "#6B7280", fontSize: 12, fontWeight: "600" },
-  status: { color: "#667085", fontSize: 12 },
   disabled: { opacity: 0.45 },
 });

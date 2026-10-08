@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Platform, Pressable, View } from "react-native";
 import { z } from "zod";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppTypography";
-import { BackIcon } from "../../components/icons";
+import CalendarMonth from "../CalendarMonth";
 import MediaImage, { MediaImageBackground } from "../../components/MediaImage";
 import { API_ORIGIN } from "../../services/api";
 import type { AdminReportItem, AdminUserItem, ApiSuccess, BannerItem, Board, EventItem, FAQItem, MajorOption, MutualAidStatus, PostListItem, ReportStatus } from "../../types";
@@ -651,7 +651,6 @@ export function EventDateTimePicker({
     }
   }, [value]);
 
-  const cells = buildAdminCalendarCells(visibleMonth);
   const time = timeOnlyValue(value, fallbackTime);
 
   const changeMonth = (delta: number) => {
@@ -680,61 +679,12 @@ export function EventDateTimePicker({
         <Ionicons name="calendar-outline" size={20} color={COLORS.primary} />
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-        <Pressable hitSlop={8} onPress={() => changeMonth(-1)} style={{ padding: 6 }}>
-          <BackIcon size={20} color={COLORS.text} />
-        </Pressable>
-        <Text style={{ color: COLORS.primary900, fontSize: 16, fontWeight: "600" }}>{monthLabelValue(visibleMonth)}</Text>
-        <Pressable hitSlop={8} onPress={() => changeMonth(1)} style={{ padding: 6 }}>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.text} />
-        </Pressable>
-      </View>
-
-      <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
-        {EVENT_WEEKDAYS.map((day, index) => (
-          <Text
-            key={`${label}-${day}`}
-            style={{
-              width: `${100 / 7}%`,
-              textAlign: "center",
-              color: index === 0 ? COLORS.error : COLORS.muted,
-              fontSize: 12,
-              fontWeight: "600",
-              paddingVertical: 5,
-            }}
-          >
-            {day}
-          </Text>
-        ))}
-        {cells.map((cell) => {
-          const selected = sameDate(selectedDate, cell.date);
-          return (
-            <Pressable
-              key={`${label}-${cell.key}`}
-              disabled={!cell.date}
-              onPress={() => cell.date && selectDate(cell.date)}
-              style={{ width: `${100 / 7}%`, alignItems: "center", paddingVertical: 4 }}
-            >
-              {cell.date ? (
-                <View
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    borderWidth: selected ? 0 : 1,
-                    borderColor: COLORS.border,
-                    backgroundColor: selected ? COLORS.primary : COLORS.surface,
-                  }}
-                >
-                  <Text style={{ color: selected ? "#ffffff" : COLORS.text, fontWeight: "600" }}>{cell.date.getDate()}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-          );
-        })}
-      </View>
+      <CalendarMonth
+        month={visibleMonth}
+        selectedDay={selectedDate && selectedDate.getFullYear() === visibleMonth.getFullYear() && selectedDate.getMonth() === visibleMonth.getMonth() ? selectedDate.getDate() : undefined}
+        onChangeMonth={changeMonth}
+        onSelect={selectDate}
+      />
 
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <Text style={{ color: COLORS.muted, fontWeight: "600" }}>시간</Text>

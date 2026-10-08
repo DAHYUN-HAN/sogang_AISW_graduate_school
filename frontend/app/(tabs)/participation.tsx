@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../components/AppTypography";
+import { NetworkErrorFallback } from "../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import BoardPostsScreen from "./board/[boardId]";
@@ -127,7 +128,7 @@ function ParticipationContent() {
   const insets = useSafeAreaInsets();
   const [activeGroup, setActiveGroup] = useState<GroupKey>("club");
   const [mode, setMode] = useState<ModeKey>("guide");
-  const { data, isLoading, isError, refetch } = useBoardsQuery();
+  const { data, isLoading, isError, error, refetch } = useBoardsQuery();
   const boards = useMemo(() => flattenBoards(data?.data), [data?.data]);
   const group = GROUPS.find((item) => item.key === activeGroup) ?? GROUPS[0];
   const guideBoards = group.guideSlugs.map((slug) => findBoard(boards, slug)).filter(Boolean) as Board[];
@@ -205,12 +206,14 @@ function ParticipationContent() {
         </LinearGradient>
 
         {isError ? (
-          <View style={styles.messageBox}>
-            <Text style={styles.errorText}>참여활동 정보를 불러오지 못했습니다.</Text>
-            <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
-              <Text style={styles.retryButtonText}>다시 시도</Text>
-            </Pressable>
-          </View>
+          <NetworkErrorFallback error={error} onRetry={() => void refetch()}>
+            <View style={styles.messageBox}>
+              <Text style={styles.errorText}>참여활동 정보를 불러오지 못했습니다.</Text>
+              <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>다시 시도</Text>
+              </Pressable>
+            </View>
+          </NetworkErrorFallback>
         ) : null}
 
         {mode === "guide" ? (

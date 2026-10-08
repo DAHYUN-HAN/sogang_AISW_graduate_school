@@ -40,6 +40,7 @@ for (const type of ["posts", "bookmarks", "comments"]) {
         StyleSheet: { create: (styles: unknown) => styles } },
       "react-native-safe-area-context": { useSafeAreaInsets: () => ({ top: 24 }) },
       "../../../components/LoadingState": { default: "LoadingState" },
+      "../../../components/NetworkErrorState": { NetworkErrorFallback: "NetworkErrorFallback" },
       "../../../components/icons": { BackIcon: "BackIcon" },
       "../../../hooks/useReturnToMyPageDrawer": { useReturnToMyPageDrawer: (route: string) => {
         assert.equal(route, "/settings/activity");

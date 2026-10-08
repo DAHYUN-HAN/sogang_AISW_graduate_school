@@ -6,7 +6,7 @@ import test from "node:test";
 import { runInNewContext } from "node:vm";
 import ts from "typescript";
 import { createAdminDialogQueue } from "../utils/adminDialogQueue";
-import { adminMemberPasswordError } from "../utils/adminMemberEditing";
+import { adminMemberPasswordError, memberDraft, memberUpdatePayload } from "../utils/adminMemberEditing";
 
 function harness() {
   const path = resolve("utils/adminAlert.ts"), nativeRequire = createRequire(path);
@@ -172,10 +172,10 @@ test("actual self-profile save preserves pending confirmations and login generat
   origin.alert("pending profile-session confirmation");
   const session=view.store.getState(),generation=session.sessionGeneration;
   const item={...session.user,is_active:true,enrollment_status:"active",major:"AI",created_at:"2026-10-08T00:00:00Z"};
-  const draft={...item,nickname:"New name",cohort:"9"};
+  const draft={...memberDraft(item),nickname:"New name",cohort:"9"};
   await runInNewContext(controllerCallback("components/admin/AdminMemberEditor.tsx","save"),{
     baseline:item,item,draft,profileDirty:true,savingRef:{current:false},activeMajors:[{name:"AI"}],
-    memberUpdatePayload:(before:unknown,after:unknown)=>({nickname:"New name",cohort:"9"}),memberDraft:(value:unknown)=>value,
+    memberUpdatePayload,memberDraft,
     setSaving:()=>{},setNotice:()=>{},setBaseline:()=>{},setDraft:()=>{},
     adminApi:{updateUser:async()=>{}},useUserStore:view.store,client:{invalidateQueries:async()=>{}},
   });
@@ -184,4 +184,38 @@ test("actual self-profile save preserves pending confirmations and login generat
   assert.equal(view.queue.current()?.title,"pending profile-session confirmation");
   view.queue.choose(0);origin.alert("profile recovery");
   assert.equal(view.queue.current()?.title,"profile recovery");
+});
+
+test("a late refresh from an earlier same-token login neither overwrites nor clears the replacement login",async()=>{
+  const view=harness(),axios=createRequire(resolve("services/api.ts"))("axios");
+  let started!:()=>void,finish!:(value:unknown)=>void;
+  const refreshStarted=new Promise<void>(resolve=>{started=resolve;});
+  const refreshResponse=new Promise(resolve=>{finish=resolve;});
+  const api=view.load(resolve("services/api.ts"),{
+    "expo-constants":{__esModule:true,default:{expoConfig:{}}},
+    axios:{...axios,create:(config:unknown)=>{
+      const client=axios.create(config);
+      client.defaults.adapter=async(request:any)=>{
+        const response={status:200,statusText:"OK",headers:{},config:request,data:{status:"success",data:{}}};
+        if(request.url==="/auth/refresh"){
+          started();await refreshResponse;
+          return {...response,data:{status:"success",data:{access_token:"late-A-access",refresh_token:"late-A-refresh"}}};
+        }
+        throw new axios.AxiosError("expired","ERR_BAD_REQUEST",request,undefined,{...response,status:401});
+      };
+      return client;
+    }},
+  });
+  const request=api.api.get("/admin/protected-test");
+  const rejected=assert.rejects(request);
+  await refreshStarted;
+  const previous=view.store.getState();
+  previous.setSession({user:previous.user,access_token:previous.accessToken,refresh_token:previous.refreshToken});
+  const generation=view.store.getState().sessionGeneration;
+  view.currentAlert().alert("replacement-login confirmation");
+  finish(undefined);await rejected;
+  assert.equal(view.store.getState().isAuthenticated,true,"old refresh failure cannot sign out the new login");
+  assert.equal(view.store.getState().sessionGeneration,generation);
+  assert.equal(view.store.getState().accessToken,"dummy-A");
+  assert.equal(view.queue.current()?.title,"replacement-login confirmation");
 });

@@ -5,6 +5,7 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 
 const homeSource = readFileSync("app/(tabs)/home.tsx", "utf8");
+const calendarSource = readFileSync("components/CalendarMonth.tsx", "utf8");
 const source = ts.createSourceFile("home.tsx", homeSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 
 const card = source.statements.find(
@@ -97,7 +98,8 @@ test("달력은 카드 폭에 맞춰 시안 비율 그대로 커진다", () => {
   assert.match(homeSource, /fontSize: r\(13\)/);
   assert.match(homeSource, /width: r\(4\), height: r\(4\)/);
   // 테두리는 얇은 선이라 키우지 않는다.
-  assert.match(homeSource, /borderWidth: 0\.5,\s*\n\s*borderColor: COLORS\.border,/);
+  assert.match(homeSource, /\.\.\.calendarMonthStyles\(scale\)/);
+  assert.match(calendarSource, /borderWidth: 0\.5,\s*\n\s*borderColor: COLORS\.border,/);
 
   // 배율은 아주 좁은 화면에서도, 태블릿처럼 넓은 화면에서도 극단으로 가지 않는다.
   const scaleFor = (cardWidth: number) => Math.min(cardWidth / 320, 1.25);

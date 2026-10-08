@@ -4,6 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../components/AppTypography";
+import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import ImageViewerModal from "../../../components/ImageViewerModal";
@@ -374,6 +375,7 @@ function CohortLeaderScreen({
   posts,
   isLoading,
   isError,
+  error,
   refreshing,
   onRefresh,
   onRetry,
@@ -385,6 +387,7 @@ function CohortLeaderScreen({
   posts: PostListItem[];
   isLoading: boolean;
   isError: boolean;
+  error?: unknown;
   refreshing: boolean;
   onRefresh: () => void;
   onRetry: () => void;
@@ -439,10 +442,12 @@ function CohortLeaderScreen({
           contentContainerStyle={[styles.executiveContent, leaders.length === 0 ? styles.emptyContent : null]}
           ListEmptyComponent={
             isError ? (
-              <Pressable onPress={onRetry} style={styles.errorBox}>
-                <Text style={styles.errorTitle}>기장단 정보를 불러오지 못했습니다.</Text>
-                <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
-              </Pressable>
+              <NetworkErrorFallback error={error} onRetry={onRetry}>
+                <Pressable onPress={onRetry} style={styles.errorBox}>
+                  <Text style={styles.errorTitle}>기장단 정보를 불러오지 못했습니다.</Text>
+                  <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
+                </Pressable>
+              </NetworkErrorFallback>
             ) : (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyText}>기장단 정보가 없습니다.</Text>
@@ -522,10 +527,12 @@ function PhotoSlider({ photos }: { photos: string[] }) {
           >
             <Ionicons name="chevron-forward" size={16} color="#FFFFFF" />
           </Pressable>
-          <View style={styles.pastPhotoIndicator}>
-            <Text style={styles.pastPhotoIndicatorText}>{current + 1} / {photos.length}</Text>
-          </View>
         </>
+      ) : null}
+      {photos.length > 0 ? (
+        <View pointerEvents="none" style={styles.pastPhotoIndicator}>
+          <Text style={styles.pastPhotoIndicatorText}>{current + 1} / {photos.length}</Text>
+        </View>
       ) : null}
       {viewerIndex !== null ? (
         <ImageViewerModal
@@ -692,6 +699,7 @@ function CouncilActivityHistoryScreen({
   posts,
   isLoading,
   isError,
+  error,
   refreshing,
   refreshError,
   onRefresh,
@@ -708,6 +716,7 @@ function CouncilActivityHistoryScreen({
   posts: PostListItem[];
   isLoading: boolean;
   isError: boolean;
+  error?: unknown;
   refreshing: boolean;
   refreshError: boolean;
   onRefresh: () => void;
@@ -756,10 +765,12 @@ function CouncilActivityHistoryScreen({
           }
           ListEmptyComponent={
             isError ? (
-              <Pressable onPress={onRetry} style={styles.errorBox}>
-                <Text style={styles.errorTitle}>활동내역을 불러오지 못했습니다.</Text>
-                <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
-              </Pressable>
+              <NetworkErrorFallback error={error} onRetry={onRetry}>
+                <Pressable onPress={onRetry} style={styles.errorBox}>
+                  <Text style={styles.errorTitle}>활동내역을 불러오지 못했습니다.</Text>
+                  <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
+                </Pressable>
+              </NetworkErrorFallback>
             ) : (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyText}>활동내역이 없습니다.</Text>
@@ -894,10 +905,6 @@ function ActivityTile({ post, boardSlug, index, isLast, onPress }: { post: PostL
   // 동아리·네트워킹 인증은 기존처럼 소감과 배지를 우선하고, 스터디만 모집/스터디 제목을 함께 표시한다.
   const preview = activityCertificationPreview(post, boardSlug);
   const thumbnailUrl = imageUrl(post.thumbnail_url);
-  const activityDate =
-    typeof post.metadata?.activity_date === "string" && post.metadata.activity_date.trim()
-      ? post.metadata.activity_date
-      : post.created_at;
 
   return (
     <Pressable onPress={() => onPress(post.id)} style={[styles.activityCard, isLast ? styles.activityCardLast : null]}>
@@ -925,7 +932,7 @@ function ActivityTile({ post, boardSlug, index, isLast, onPress }: { post: PostL
           </Text>
         ) : null}
         <Text style={styles.activityDate}>
-          {`${formatCohortName(post.author_cohort, post.author_nickname)} · ${formatBoardDate(activityDate)}`}
+          {`${formatCohortName(post.author_cohort, post.author_nickname)} · ${formatBoardDate(post.created_at)}`}
         </Text>
       </View>
     </Pressable>
@@ -1141,6 +1148,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         posts={posts}
         isLoading={isLoading}
         isError={isError}
+        error={activePostsQuery?.error}
         refreshing={isRefreshingFirstPage}
         onRefresh={() => void feedController.refreshFirstPage()}
         onRetry={() => void feedController.retry()}
@@ -1168,6 +1176,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         posts={posts}
         isLoading={isLoading}
         isError={isError}
+        error={activePostsQuery?.error}
         refreshing={isRefreshingFirstPage}
         refreshError={refreshFirstPageError !== null}
         onRefresh={() => void feedController.refreshFirstPage()}
@@ -1208,6 +1217,19 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
                 placeholderTextColor="#A6ACB7"
                 style={[styles.searchBarInput, { outlineStyle: "none" } as never]}
               />
+              {queryInput ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="검색어 지우기"
+                  hitSlop={8}
+                  onPress={() => {
+                    setQueryInput("");
+                    setQuery("");
+                  }}
+                >
+                  <Ionicons name="close-circle" size={18} color="#A6ACB7" />
+                </Pressable>
+              ) : null}
             </View>
           </>
         ) : (
@@ -1317,10 +1339,12 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
           columnWrapperStyle={isAlbum ? styles.albumRow : undefined}
           ListEmptyComponent={
             isError ? (
-              <Pressable onPress={() => void feedController.retry()} style={styles.errorBox}>
-                <Text style={styles.errorTitle}>게시글을 불러오지 못했습니다.</Text>
-                <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
-              </Pressable>
+              <NetworkErrorFallback error={activePostsQuery?.error} onRetry={() => void feedController.retry()}>
+                <Pressable onPress={() => void feedController.retry()} style={styles.errorBox}>
+                  <Text style={styles.errorTitle}>게시글을 불러오지 못했습니다.</Text>
+                  <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
+                </Pressable>
+              </NetworkErrorFallback>
             ) : (
               <View style={styles.emptyBox}>
                 <EmptyCalendarIcon size={32} />
@@ -1401,6 +1425,7 @@ const styles = StyleSheet.create({
   },
   searchBarInput: {
     flex: 1,
+    minWidth: 0,
     color: COLORS.text,
     fontSize: 14,
     fontWeight: "400",
@@ -1913,8 +1938,9 @@ const styles = StyleSheet.create({
   },
   pastPhotoIndicator: {
     position: "absolute",
-    right: 16,
-    bottom: 16,
+    right: 17,
+    bottom: 17,
+    zIndex: 4,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
@@ -1923,7 +1949,7 @@ const styles = StyleSheet.create({
   pastPhotoIndicatorText: {
     color: "#FFFFFF",
     fontSize: 12,
-    lineHeight: 15,
+    lineHeight: 14,
     fontWeight: "400",
   },
   cohortGreeting: {

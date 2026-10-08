@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
+import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useMeQuery } from "../../../hooks/useApi";
@@ -33,7 +34,7 @@ const MENU_ITEMS = [
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { data, isError, isLoading, refetch } = useMeQuery();
+  const { data, isError, error, isLoading, refetch } = useMeQuery();
   const refreshToken = useUserStore((state) => state.refreshToken);
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const clearSession = useUserStore((state) => state.clearSession);
@@ -71,9 +72,11 @@ export default function SettingsScreen() {
 
       <ScrollView style={styles.scroller} contentContainerStyle={styles.content}>
         {isError ? (
-          <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.loadErrorBox}>
-            <Text style={styles.loadErrorText}>프로필을 불러오지 못했습니다. 다시 시도</Text>
-          </Pressable>
+          <NetworkErrorFallback error={error} onRetry={() => void refetch()}>
+            <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.loadErrorBox}>
+              <Text style={styles.loadErrorText}>프로필을 불러오지 못했습니다. 다시 시도</Text>
+            </Pressable>
+          </NetworkErrorFallback>
         ) : null}
         <Pressable onPress={() => router.push("/settings/profile")} style={styles.profileRow}>
           {isLoading ? (

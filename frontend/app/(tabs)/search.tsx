@@ -4,6 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useState } from "react";
 import { ActivityIndicator, BackHandler, FlatList, Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppTypography";
+import { NetworkErrorFallback } from "../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { searchApi } from "../../services/api";
@@ -71,6 +72,7 @@ export default function SearchScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [requestError, setRequestError] = useState<unknown>(null);
   const recentQuery = useQuery({ queryKey: ["recent-searches"], queryFn: searchApi.recent, enabled: !isNoticeSearch });
 
   const handleBack = useCallback(() => {
@@ -90,6 +92,7 @@ export default function SearchScreen() {
 
   const runSearch = async (nextPage = 1, keyword = query.trim(), noticeFilter = selectedNoticeFilter) => {
     if (keyword.length < 2) {
+      setRequestError(null);
       setError("검색어를 두 글자 이상 입력해주세요.");
       return;
     }
@@ -97,6 +100,7 @@ export default function SearchScreen() {
       if (nextPage === 1) setIsLoading(true);
       else setIsLoadingMore(true);
       setError("");
+      setRequestError(null);
       const response = await searchApi.search({
         q: keyword,
         scope: isNoticeSearch ? "notices" : undefined,
@@ -110,7 +114,8 @@ export default function SearchScreen() {
       setPage(response.pagination?.page ?? nextPage);
       setTotalPages(response.pagination?.total_pages ?? nextPage);
       queryClient.invalidateQueries({ queryKey: ["recent-searches"] });
-    } catch {
+    } catch (error) {
+      setRequestError(error);
       setError("검색 결과를 불러오지 못했습니다. 다시 시도해주세요.");
     } finally {
       setIsLoading(false);
@@ -138,6 +143,7 @@ export default function SearchScreen() {
         onChangeText={(value) => {
           setQuery(value);
           setError("");
+          setRequestError(null);
         }}
         onSubmitEditing={() => void runSearch()}
         placeholder={isNoticeSearch ? "검색어를 입력하세요" : "게시글, 작성자 검색"}
@@ -194,7 +200,11 @@ export default function SearchScreen() {
         </View>
       ) : null}
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {error ? (
+        <NetworkErrorFallback error={requestError} onRetry={() => void runSearch(1, query)}>
+          <Text style={styles.errorText}>{error}</Text>
+        </NetworkErrorFallback>
+      ) : null}
 
       {!isNoticeSearch && !hasSearched && !isLoading ? (
         <View style={styles.recentSection}>

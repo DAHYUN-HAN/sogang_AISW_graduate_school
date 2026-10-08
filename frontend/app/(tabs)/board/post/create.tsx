@@ -7,12 +7,14 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps,
 import { Controller, useForm } from "react-hook-form";
 import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, type TextStyle } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
+import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
 import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon, NoticeAlertIcon, ParticipantAddIcon } from "../../../../components/icons";
 import { useBoardsQuery } from "../../../../hooks/useApi";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../hooks/usePosts";
+import CalendarMonth from "../../../../components/CalendarMonth";
 import CompletionState from "../../../../components/CompletionState";
 import DiscardWriteModal from "../../../../components/DiscardWriteModal";
 import ClubOperationStatusField from "../../../../components/ClubOperationStatusField";
@@ -229,8 +231,6 @@ function activitySelectPlaceholder(slug?: string) {
   return "동아리명을 선택하세요";
 }
 
-const CAL_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"];
-
 function InlineCalendar({
   value,
   minimumDate,
@@ -251,61 +251,24 @@ function InlineCalendar({
     return { y: month.year, m: month.monthIndex };
   });
 
-  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
-  const firstWeekday = new Date(view.y, view.m, 1).getDay();
-  const cells: (number | null)[] = [
-    ...Array(firstWeekday).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
-  ];
-  const selected = value ?? "";
-  const goPrev = () => setView((v) => (v.m === 0 ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 }));
-  const goNext = () => setView((v) => (v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 }));
+  const selectedMonth = value ? calendarMonthFromDotDate(value) : undefined;
+  const selectedDay = selectedMonth?.year === view.y && selectedMonth.monthIndex === view.m ? Number(value?.split(".")[2]) : undefined;
   const nextView = view.m === 11 ? { y: view.y + 1, m: 0 } : { y: view.y, m: view.m + 1 };
   const isNextDisabled = isCalendarMonthAfterMaximum(nextView.y, nextView.m, maximumDate);
 
   return (
-    <View style={styles.calCard}>
-      <View style={styles.calHeader}>
-        <Pressable hitSlop={10} onPress={goPrev} style={styles.calNav}>
-          <BackIcon size={20} color={COLORS.text} />
-        </Pressable>
-        <Text style={styles.calTitle}>{`${view.y}년 ${view.m + 1}월`}</Text>
-        <Pressable
-          accessibilityState={{ disabled: isNextDisabled }}
-          disabled={isNextDisabled}
-          hitSlop={10}
-          onPress={goNext}
-          style={[styles.calNav, isNextDisabled ? styles.calNavDisabled : null]}
-        >
-          <Ionicons name="chevron-forward" size={20} color={isNextDisabled ? COLORS.subtle : COLORS.text} />
-        </Pressable>
-      </View>
-      <View style={styles.calWeekRow}>
-        {CAL_WEEKDAYS.map((w) => (
-          <Text key={w} style={styles.calWeekday}>{w}</Text>
-        ))}
-      </View>
-      <View style={styles.calGrid}>
-        {cells.map((day, index) => {
-          if (day === null) return <View key={`e-${index}`} style={styles.calCell} />;
-          const dateStr = formatDotDate(new Date(view.y, view.m, day));
-          const isSelected = dateStr === selected;
-          const isDisabled = !isCalendarDateWithinBounds(dateStr, { minimumDate, maximumDate });
-          return (
-            <Pressable
-              accessibilityState={{ disabled: isDisabled, selected: isSelected }}
-              disabled={isDisabled}
-              key={dateStr}
-              onPress={() => onSelect(dateStr)}
-              style={styles.calCell}
-            >
-              <View style={[styles.calDay, isSelected ? styles.calDaySelected : null, isDisabled ? styles.calDayDisabled : null]}>
-                <Text style={[styles.calDayText, isSelected ? styles.calDayTextSelected : null, isDisabled ? styles.calDayTextDisabled : null]}>{day}</Text>
-              </View>
-            </Pressable>
-          );
+    <View style={{ marginTop: 8 }}>
+      <CalendarMonth
+        month={new Date(view.y, view.m, 1)}
+        selectedDay={selectedDay}
+        nextDisabled={isNextDisabled}
+        onChangeMonth={(delta) => setView((current) => {
+          const next = new Date(current.y, current.m + delta, 1);
+          return { y: next.getFullYear(), m: next.getMonth() };
         })}
-      </View>
+        isDateDisabled={(date) => !isCalendarDateWithinBounds(formatDotDate(date), { minimumDate, maximumDate })}
+        onSelect={(date) => onSelect(formatDotDate(date))}
+      />
     </View>
   );
 }
@@ -349,7 +312,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const existingPost = editPostQuery.data?.data;
   const boardId = existingPost?.board_id ?? selectedBoardId;
 
-  const { data: boardsRes, isError: isBoardsError, isLoading: isBoardsLoading, refetch: refetchBoards } = useBoardsQuery();
+  const { data: boardsRes, isError: isBoardsError, error: boardsLoadError, isLoading: isBoardsLoading, refetch: refetchBoards } = useBoardsQuery();
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [participantQuery, setParticipantQuery] = useState("");
@@ -1091,16 +1054,18 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
   if (postId && (editPostQuery.isError || isBoardsError || !existingPost || !board)) {
     return (
-      <View style={styles.editStateScreen}>
-        <Text style={styles.editStateText}>수정할 활동인증을 불러오지 못했습니다.</Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => void Promise.all([editPostQuery.refetch(), refetchBoards()])}
-          style={styles.editRetryButton}
-        >
-          <Text style={styles.editRetryButtonText}>다시 시도</Text>
-        </Pressable>
-      </View>
+      <NetworkErrorFallback error={editPostQuery.error ?? boardsLoadError} onRetry={() => void Promise.all([editPostQuery.refetch(), refetchBoards()])}>
+        <View style={styles.editStateScreen}>
+          <Text style={styles.editStateText}>수정할 활동인증을 불러오지 못했습니다.</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void Promise.all([editPostQuery.refetch(), refetchBoards()])}
+            style={styles.editRetryButton}
+          >
+            <Text style={styles.editRetryButtonText}>다시 시도</Text>
+          </Pressable>
+        </View>
+      </NetworkErrorFallback>
     );
   }
 
@@ -2887,35 +2852,6 @@ const styles = StyleSheet.create({
     borderWidth: 1, // Figma focus: 1px #21262E
     borderColor: "#21262E",
   },
-  calCard: {
-    marginTop: 8,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    padding: 12,
-    backgroundColor: COLORS.bg,
-  },
-  calHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 4,
-    marginBottom: 12,
-  },
-  calNav: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
-  calNavDisabled: { opacity: 0.45 },
-  calTitle: { color: COLORS.text, fontSize: 16, fontWeight: "600" },
-  calWeekRow: { flexDirection: "row", marginBottom: 4 },
-  calWeekday: { flex: 1, textAlign: "center", color: COLORS.subtle, fontSize: 12, fontWeight: "500" },
-  calGrid: { flexDirection: "row", flexWrap: "wrap" },
-  // 100/7%(14.2857…)는 7칸 합이 100%를 넘어 마지막 칸이 줄바꿈된다. 홈 캘린더와 같이 14.285%를 쓴다.
-  calCell: { width: "14.285%", alignItems: "center", justifyContent: "center", paddingVertical: 4 },
-  calDay: { width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: 18 },
-  calDaySelected: { backgroundColor: COLORS.primary },
-  calDayDisabled: { backgroundColor: "#F7F8FA" },
-  calDayText: { color: COLORS.text, fontSize: 14, fontWeight: "400" },
-  calDayTextSelected: { color: "#FFFFFF", fontWeight: "600" },
-  calDayTextDisabled: { color: "#C7CBD2" },
   optionalMark: {
     color: "#A6ACB7",
     fontSize: 12,

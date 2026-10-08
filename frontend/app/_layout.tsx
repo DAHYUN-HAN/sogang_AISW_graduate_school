@@ -9,6 +9,7 @@ import { Image, Platform, StyleSheet, useWindowDimensions, View } from "react-na
 import NotificationBootstrap from "../components/NotificationBootstrap";
 import UsageTracking from "../components/UsageTracking";
 import { useMemberWebFrame } from "../utils/adminMain";
+import AppNetworkError from "../components/AppNetworkError";
 import StatusBarScrim from "../components/StatusBarScrim";
 import KeyboardViewport from "../components/KeyboardViewport";
 import { useUserStore } from "../stores/userStore";
@@ -110,6 +111,7 @@ export default function RootLayout() {
             <Stack.Screen name="legal/account-deletion" options={{ headerShown: false }} />
             <Stack.Screen name="legal/support" options={{ headerShown: false }} />
           </Stack>
+          <AppNetworkError />
           <StatusBarScrim />
         </KeyboardViewport>
       </View>

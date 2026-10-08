@@ -60,6 +60,7 @@ function layoutHarness(platform: "android" | "ios" | "web") {
     "../components/NotificationBootstrap": { default: "NotificationBootstrap" },
     "../components/UsageTracking": { default: "UsageTracking" },
     "../utils/adminMain": { useMemberWebFrame },
+    "../components/AppNetworkError": { default: "AppNetworkError" },
     "../components/StatusBarScrim": { default: "StatusBarScrim" },
     "../components/KeyboardViewport": { default: "KeyboardViewport" },
     "../stores/userStore": { useUserStore: (select: (store: typeof state) => unknown) => select(state) },

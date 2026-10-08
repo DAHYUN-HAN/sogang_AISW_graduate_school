@@ -24,7 +24,7 @@ test("changing accounts discards private edit data, signed media URLs and mounte
     useEffect: () => {}, useWindowDimensions: () => ({ width: 1280 }), useFonts: () => [true],
     useUserStore: (selector: (state: unknown) => unknown) => selector({ user, isAuthenticated: Boolean(user), hasHydrated: true, hydrateSession: () => {} }),
     isAdminUser: (value: typeof user) => value?.role === "admin", Platform: { OS: "web" }, shouldShowSplash: () => false,
-    View: "View", KeyboardViewport: "KeyboardViewport", StatusBar: "StatusBar", NotificationBootstrap: "NotificationBootstrap", UsageTracking: "UsageTracking", StatusBarScrim: "StatusBarScrim",
+    View: "View", KeyboardViewport: "KeyboardViewport", StatusBar: "StatusBar", NotificationBootstrap: "NotificationBootstrap", UsageTracking: "UsageTracking", StatusBarScrim: "StatusBarScrim", AppNetworkError: "AppNetworkError",
     Stack: { Protected: "Protected", Screen: "Screen" }, element: (type: unknown, props: any, ...children: unknown[]) => ({ type, props, children }),
   });
   const render = () => { cursor = 0; return root(); };

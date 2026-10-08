@@ -167,9 +167,9 @@ for (const path of ["board/post/[postId]", "board/post/edit/[postId]"]) {
       let backs = 0;
       const result = runInNewContext(jsx, {
         React: { createElement: (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props, children }) },
-        View: "View", Text: "Text", Pressable: "Pressable", BackButton: "BackButton", LoadingState: "LoadingState", BackIcon: "BackIcon", CloseIcon: "CloseIcon",
+        View: "View", Text: "Text", Pressable: "Pressable", BackButton: "BackButton", LoadingState: "LoadingState", NetworkErrorFallback: "NetworkErrorFallback", BackIcon: "BackIcon", CloseIcon: "CloseIcon",
         styles: {}, COLORS: {}, insets: { top: 0 }, board: undefined, isStudyRecruit: false,
-        isLoading, isError: true, post: undefined, event: undefined,
+        isLoading, isError: true, error: undefined, post: undefined, event: undefined,
         handleBack: () => backs++, handlePostBack: () => backs++, goBack: () => backs++, requestClose: () => backs++,
       });
       const controls: { onPress?: () => void }[] = [];
