@@ -1,5 +1,7 @@
 # Codex Work Backlog
 
+2026-10-08 WP5/WP8/WP9 integration/deployment: harden credential deletion races and mutual-aid evidence policy, isolate administrator dialogs across sessions, preserve notice body anchors via dedicated editing, and serialize PostgreSQL board hierarchy writes. Consolidate current administrator/usage/poll work with latest main; preserve every named branch tip before deletion. Execute isolated PostgreSQL migration/API tests, full merged-tree checks and a verified production DB/media backup before GCP synchronization. Plan: `docs/superpowers/plans/2026-10-08-integrate-admin-polls-deploy.md`.
+
 This file turns the Notion Phase 1-4 planning into concrete work for coding agents.
 
 ## Immediate Goal
@@ -221,6 +223,8 @@ Definition of done:
 - CI fails on TypeScript errors, backend syntax errors, and migration syntax errors.
 - Docker runtime smoke test is passed or blocked with the exact reason.
 
+Verification note (2026-09-30): Removed ten confirmed unused imports across frontend and backend under WP1 lint hygiene. Frontend lint has 0 errors and 2 unrelated duplicate-import warnings; typecheck and all 798 tests pass. Backend changed-file F401 and compile checks pass; pytest reports 498 passed, 1 skipped. SQLAlchemy model-registration imports in `app/models/__init__.py` remain intentional.
+
 ## Work Package 2: Phase 3 DB Build and Initial Data
 
 Source: Notion `DB build and initial data setup`.
@@ -317,6 +321,71 @@ Definition of done:
 
 ## Work Package 6: Phase 4 Notifications and Notices
 
+- 2026-10-07 WP6/WP8/WP9 P0 notice-editor follow-up: replace 신청·접수 마감 text
+  entry with the shared date/time picker and preserve KST across save/re-edit.
+  Insert attached images at the selected body cursor; edit text before/after
+  them, remove them from the body, and synchronize attachment replacement/
+  deletion. Keep legacy text, attachments, image viewer and polls. Versioned
+  image offsets live in existing metadata, with protected attachment IDs only.
+  Linked council notices render inline images once. Verification evidence:
+  `docs/qa/NOTICE_BODY_EDITOR_2026-10-07.md`.
+
+- 2026-10-07 WP6/WP8/WP9 P0 attendance-poll correction, approved “수정 진행”:
+  independent cards in a notice (up to 20), exactly two editable text labels,
+  default YES / NO, single selection, and manual administrator close per card.
+  No poll date deadline; notice application deadlines remain. Partial vote
+  replacement preserves other cards, revoting preserves unique participants,
+  and named results use Council person cards. First-vote/closed locks are per
+  card; another card can be appended after votes or closure. Migration 0034
+  backfills legacy manual closure and locks while retaining IDs/votes/media;
+  obsolete generic poll records remain available as results. White/blue admin
+  editor and member cards updated, including asynchronous close draft protection.
+  Verification: `docs/qa/ATTENDANCE_POLLS_2026-10-07.md`. PostgreSQL concurrency
+  and physical Android/iOS checks remain `Phase 5 QA`; no production migration.
+
+- 2026-10-08 WP6/WP8/WP9 P0 poll usability: complete the approved audit fixes:
+  pre-vote lock/deadline guidance, read-only draft preview, explicit saved-question
+  close confirmation, API-specific error and confirmed poll-only reload recovery,
+  page-batched admin poll counts, member saved-answer receipts and multi-card
+  progress, and truthful unsaved status. Preserve unsaved body/media on recovery,
+  independent cards, permissions and current visual direction. Verification:
+  `docs/qa/POLL_USABILITY_2026-10-08.md`; native runtime remains `Phase 5 QA`.
+
+- 2026-10-08 WP6/WP8/WP9 P0 poll visual alignment: user requested closer
+  KakaoTalk styling. Compact flat option rows, 2px result bars, subdued
+  horizontal buttons and plain participant rows with circular cohort badges;
+  full-screen status below 600px, centered dialog on larger screens. White/blue
+  branding and voting/admin behavior remain. Existing Council cards retain
+  their default; total participants are included in the accessible status label.
+  Verification and native limits: `docs/qa/POLL_VISUAL_DESIGN_2026-10-08.md`.
+
+- 2026-10-07 WP6/WP8/WP9 P0 Kakao parity follow-up: compared public reference
+  screenshots and tested the local admin/member flows. Added count-to-people
+  actions before voting, option/member/nonparticipant tabs, administrator copy
+  with fresh IDs and no inherited votes, ended winner/tie markers and refresh.
+  Fixed selection resets when other cards change and web radio Space/ARIA state.
+  Eligible active nonparticipants follow notice/board visibility and expose only
+  name/cohort. Retry retains choices; duplicate taps cannot duplicate requests.
+  Full frontend 891 passed; backend 612 passed, 1 skipped; typecheck, scoped lint,
+  compile and web export passed. Read-only review found no remaining important
+  findings. No migration/deployment. Evidence, intentional differences and native
+  runtime limitations: `docs/qa/KAKAO_POLL_PARITY_2026-10-07.md`.
+
+- Historical baseline, superseded above: 2026-10-07 requested P2 notice polls (WP6/WP8/WP9): prepare the KakaoTalk-style
+  notice-only poll flow with administrator-only configuration and member voting,
+  re-voting, results and visible participant selections. Reuse the Council list
+  card presentation for participants. Approved with “구현” and implemented:
+  normalized poll/question/option/ballot/selection models, migration 0033,
+  atomic administrator settings in post mutations, voting/revoting, public
+  participant profiles, protected images and account-deletion integration.
+  First-vote structure freeze, revision-protected editing/removal, notice-only
+  board moves and conversion guards preserve votes. Web editor supports text,
+  dates, photos, multiple questions/selections and KST deadline controls.
+  Existing post clients that omit poll preserve its data. Verification/review
+  evidence and exact runtime limitations: `docs/qa/NOTICE_POLLS_2026-10-07.md`.
+  PostgreSQL races and physical Android/iOS checks remain `Phase 5 QA`; deployment
+  and production migration are not included.
+
 - 2026-09-17 WP6/WP9 user correction: notice-tab rows and Home notice summaries show `마감 D-N` / `마감 D-day` through the deadline date; expired/undated notices show their publication date without a deadline suffix or dangling separator. This supersedes the notice wording recorded under QA 194/195; schedule-card labels retain their existing behavior. Shared formatting tests (4), typecheck and scoped lint pass. Local mobile-web notice rows cover future/today/expired deadlines; Home confirms the same formatting. Capture: `outputs/qa/image-viewer-2026-09-17/notice-deadline-copy-mobile.png`.
 
 Source: Notion `Core feature B: notifications/notices`.
@@ -344,6 +413,7 @@ Source: Notion `Core feature C: schedule/events`.
 Scope:
 
 - Completed: Home embedded calendar and date-specific day route.
+- 2026-10-07 WP7/WP9 calendar refresh isolation (candidate fix): Home's `RefreshControl` now follows a user-started pull state instead of query `isRefetching`. A follow-up Node probe executes the production month-change callback, query options, and refresh prop expression with the installed real QueryObserver and controlled local responses: six consecutive month changes enable `refreshing` 6/6 times in HEAD and 0/6 in the working tree. This proves the JS state coupling; it does not reproduce visible indicator/layout/scroll movement on iOS. Manual pull still refetches all enabled Home queries, waits for every request to settle, clears on individual failure, and stays suppressed during initial loading. Four new executable screen-wiring regressions, all 810 frontend tests, typecheck, and scoped lint pass. `Phase 5 QA` / `blocked`: native reproduction and root-cause confirmation require an accessible iPhone development session or Mac iOS simulator; this Windows host has no iOS tools, connected Apple device, or relevant mirror/remote window, and the user has only an installed distribution app. Verify original/fixed scroll offsets, content height, and refresh state together before claiming the reported movement is resolved.
 - Completed: event detail screen.
 - Completed QA 201: duplicate standalone event-list and full-calendar UIs are removed; `/events` redirects to Home, event notifications open their specific detail, and the unlinked all-boards and guide-placeholder routes are removed without changing Home schedule, day/detail, or admin management.
 - Completed: admin event create/update/delete UI.
@@ -361,6 +431,93 @@ Definition of done:
 ## Work Package 8: Phase 4 Admin Surface
 
 Source: Notion `Admin page development`.
+
+2026-10-07 participation link deferral (WP8/WP9 P0): per the user's follow-up,
+removed the participation-link field/required validation from club/networking
+registration and editing. The existing API now accepts absent/empty links,
+retaining validation for supplied URLs and its admin-only guard. Operation
+status is saved independently of a URL, and edits retain existing URL metadata.
+Title/content/images, registration destinations and certification rules remain.
+Verification: typecheck/scoped ESLint, 854 frontend tests and 587 backend tests
+(one existing skip/warning), plus the networking create form in the browser. Restarted
+the local preview API; no post/media writes or schema change. Follow-up evidence:
+`docs/qa/ADMIN_PARTICIPATION_WEB_2026-10-07.md`.
+
+2026-10-07 participation management (WP8/WP9 P0): corrected aggregate club/
+networking registration routing, which previously used the first sorted board
+and could open certification creation. Added explicit guide registration and
+certification navigation actions, preserving certification/custom-child
+creation and hidden-board behavior. Networking create/edit now exposes and
+saves the existing operation status alongside club controls. Existing member
+source validation, historical certification editing and backend admin-only
+guide permissions remain intact. Verification: frontend typecheck/scoped
+ESLint, 854 frontend tests, 42 targeted backend tests and browser registration/
+certification navigation. No preview post or media writes. Evidence:
+`docs/qa/ADMIN_PARTICIPATION_WEB_2026-10-07.md`.
+
+2026-10-07 dues theme (WP8/WP9 P0): per the user's follow-up, `/admin/dues` now
+matches the white main/roster theme with a compact search/upload toolbar, neutral
+replacement warning, underline management/one-time-registration tabs and a
+paginated six-column payment table. Restyled payment scope/board editor and
+upload confirmation, retaining original handlers, 100-row pagination, read-only
+identity and native presentation. Verification: typecheck/scoped ESLint, existing
+11 dues/roster/editor regressions and browser tabs/search/reset/import-confirm
+cancel. No real upload or payment mutation. Evidence:
+`docs/qa/ADMIN_DUES_WEB_2026-10-07.md`.
+
+2026-10-07 roster theme (WP8/WP9 P0): per the user's follow-up, web `/admin/roster`
+now matches the main/member theme with one search/upload toolbar, neutral compact
+XLSX guidance and the shared white three-column table. Added search reset and
+retry within the empty/error table area; retained 100-row pagination, identity
+upsert rules, original upload handlers/dialogs and native view. Typecheck, scoped
+ESLint, existing 10 dues/roster frontend regressions and real browser Enter-search/
+reset/empty rendering passed. No data changes or actual workbook upload. Evidence:
+`docs/qa/ADMIN_ROSTER_WEB_2026-10-07.md`.
+
+2026-10-07 member-affiliation removal (WP8/WP9 P0): per the user's follow-up,
+removed the web member editor's company/affiliation, job and position section
+because current signup does not collect these fields. Stored values and backend
+support are preserved; profile/status editing and password reset remain.
+
+2026-10-07 member-password continuation (WP8/WP9 P0): per the user's follow-up,
+added masked new-password/confirmation fields and a separate confirmed password
+reset in the existing web member drawer. The protected dedicated API hashes with
+Argon2, revokes target refresh/push/reset credentials atomically and records only
+affected counts. Login/refresh/password writers share user serialization and
+recheck stale credentials. Self-reset clears the local session and returns to
+login; existing remote access JWTs retain their normal default 15-minute expiry.
+No schema migration or actual preview credential mutation. Verification and
+provisional behavior: `docs/qa/ADMIN_MEMBERS_WEB_2026-10-07.md`. Frontend 849/849,
+backend 582 passed/1 existing skip, typecheck, scoped ESLint and compile passed;
+empty-input browser verification and focused review completed. Real PostgreSQL
+lock contention remains Phase 5 QA, not exercised by the SQLite preview.
+
+2026-10-07 member management (WP8/WP9 P0): per the user's request, web accounts
+now follow the main theme with searchable, server-paginated member rows and an
+on-demand member profile editor. Removed web role conversion; retained enrollment,
+activation and consent-record visibility. Extended the protected existing update
+API for bounded corrections to existing profile columns, with active-major checks,
+immutable email/identity and historical author snapshots, safe audit field names
+and no-op suppression. No DB migration. Decisions/verification:
+`docs/qa/ADMIN_MEMBERS_WEB_2026-10-07.md`.
+
+Member-management verification: frontend 846/846, backend 568 passed/1 skipped,
+typecheck and scoped ESLint passed. Browser verification covers search/filters,
+profile save/reopen/restoration, discard and persistent drafts across same-admin
+Back. Focused review findings were resolved; member saves own an independent
+navigation-lock flag. Evidence is in the member-management QA note above.
+
+2026-10-07 board interior theme (WP8/WP9 P0): board subcategory/status filters now use white tabs with a blue selected underline, matching the administrator main's typography, separators and status colors. Applied the same scoped presentation to board settings, notices, introduction/member editors, FAQ and mutual-aid/suggestion rows; compact actions and neutral policy rows replace large colored blocks. A board-only theme provider retains shared controls' existing appearance outside the web board workspace. Existing handlers, fields, permissions and native presentation remain. Frontend 842/842, typecheck and scoped ESLint passed; actual browser verification is recorded in `docs/qa/ADMIN_BOARDS_WEB_2026-10-07.md`.
+
+2026-10-07 board console refinement (WP8/WP9 P0): implemented the approved white desktop screen with the current member taxonomy (원우회, 참여활동, 커뮤니티, 공지사항), tag filters and a compact paginated post table; removed the board finder. Settings and notice editing open on demand. New boards select a section and optional parent, including nested children. Administrator removal hides the complete branch and preserves posts/comments; hidden boards remain selectable and individually restorable after their parent. Existing dedicated editors and legacy boards remain reachable. Protected APIs validate section/category placement, parent existence, active ancestors and cycles, and filter board sets/notice categories before pagination. No schema change. Frontend 842/842, backend 551 passed/1 skipped, typecheck and scoped lint passed; local browser creation/removal/restoration and 1024/1440px checks recorded in `docs/qa/ADMIN_BOARDS_WEB_2026-10-07.md`.
+
+2026-10-07 all-tabs continuation (WP8/WP9): separate canonical web pages now cover all current administrator tabs under a persistent protected layout. Extracted controls/handlers/page views preserve every specialized board editor, request processing, images, Excel rules, account/report/policy controls, logs/import review and dashboard commands. Web confirmations execute their callbacks. Added the protected KST daily dashboard with seven-day traffic and independent post/comment drilldown. Admin post routes reuse existing forms with admin navigation; old section/event links stay compatible. User-authorized provisional defaults/verification: `docs/qa/ADMIN_PAGES_DECISIONS_2026-10-07.md`. The editor/trend/drilldown scope described as pending in the initial main entry below is now implemented. No additional schema beyond `0032_admin_usage`, production migration, deployment or release work.
+
+2026-10-07 banner refinement (WP8/WP9 P0): exposure bounds now use web calendar/minute-level time controls in KST, convert API UTC dates on edit and convert back on save, allow optional bounds, and block invalid/reversed intervals. The destination picker uses the existing protected published-post API with all-board filtering, search and 10-row pagination; direct links remain available. Banner list/editor now follow the main's white background, section dividers and typography. Image uploads/URLs, three device variants, preview, hide, sort, active toggle and draft persistence remain. No API route or DB schema change.
+
+2026-10-07 dashboard simplification (WP8/WP9 P0): per the user's follow-up, `/admin/dashboard` ends after the daily post/comment lists. Removed its legacy lower section starting with operating shortcuts, including duplicate cumulative statistics, recent audit records and recent posts. Date controls, daily metrics, seven-day traffic, drilldown/pagination and the dedicated admin tabs remain. Existing backend operations and native administration are unchanged.
+
+2026-10-07 main implementation (WP8/WP9 P0 administration / P1 basic statistics): after approving the white main mockup, the user requested “메인부터 작업 시작”. Implemented a full-width web shell and default main, seven daily statistics, global pending/today-handled counts, SQL-filtered/paginated mutual-aid and suggestion queues, protected in-shell request processing and recent operational records. Main omits the requested guidance, quick actions and utilization button. Added authenticated ordinary-member navigation events, excluding administrators/guests under the member-only policy; retries are idempotent, rerenders/ordinary focus do not count and sessions restart after 30 minutes. Uncollected/disabled metrics remain unavailable. Added administrator post/comment audit paths with safe target/change metadata; identical request saves retain handling timestamps and create no duplicate logs. Existing management sections and native behavior remain available. Migration `0032_admin_usage` is required. Other editor designs, seven-day dashboard trends and metric/date drilldown remain pending; metric links currently open the existing dashboard. Spec: `docs/superpowers/specs/2026-10-07-web-only-admin-console-design.md`; implementation/verification: `docs/qa/ADMIN_MAIN_WEB_2026-10-07.md`.
 
 Scope:
 

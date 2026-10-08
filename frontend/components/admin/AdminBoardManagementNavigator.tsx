@@ -220,6 +220,8 @@ function TabButton({
   return (
     <Pressable
       accessibilityRole="tab"
+      aria-selected={selected}
+      aria-disabled={disabled}
       accessibilityState={{ selected, disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -300,6 +302,8 @@ export default function AdminBoardManagementNavigator({
           ))}
         </View>
         <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="고급 설정 · 새 게시판 등록"
           accessibilityState={{ disabled }}
           disabled={disabled}
           onPress={onCreateBoard}

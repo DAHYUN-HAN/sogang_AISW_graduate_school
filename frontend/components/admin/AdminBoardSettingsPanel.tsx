@@ -5,6 +5,7 @@ import type { AdminBoardSettingsDraft } from "../../utils/adminBoardSettings";
 import type { AdminBoardLockedPolicy, AdminBoardSettingKey } from "../../utils/adminContentManagement";
 import type { Board } from "../../types";
 import type { ActivityImageRule } from "../../utils/activityImageLayout";
+import { BOARD_WEB_COLORS, useAdminBoardWebTheme } from "./AdminBoardTheme";
 
 export type AdminBoardSettingsPanelProps = {
   board: Board;
@@ -45,9 +46,10 @@ function Input({
   multiline?: boolean;
   editable?: boolean;
 }) {
+  const boardTheme = useAdminBoardWebTheme();
   return (
     <View style={{ gap: 6 }}>
-      <Text style={{ color: "#374151", fontSize: 12, fontWeight: "900" }}>{label}</Text>
+      <Text style={{ color: "#374151", fontSize: 12, fontWeight: boardTheme ? "600" : "900" }}>{label}</Text>
       <TextInput
         value={value}
         editable={editable}
@@ -59,7 +61,8 @@ function Input({
           borderWidth: 1,
           borderColor: "#E1E4E9",
           backgroundColor: editable ? "#ffffff" : "#F8FAFC",
-          color: "#111827",
+          color: boardTheme ? BOARD_WEB_COLORS.text : "#111827",
+          ...(boardTheme ? { fontSize: 13 } : {}),
           paddingHorizontal: 12,
           paddingVertical: 10,
           textAlignVertical: multiline ? "top" : "center",
@@ -70,6 +73,7 @@ function Input({
 }
 
 function Choice({ label, selected, disabled, onPress }: { label: string; selected: boolean; disabled?: boolean; onPress: () => void }) {
+  const boardTheme = useAdminBoardWebTheme();
   return (
     <Pressable
       accessibilityRole="button"
@@ -86,12 +90,13 @@ function Choice({ label, selected, disabled, onPress }: { label: string; selecte
         paddingVertical: 9,
       }}
     >
-      <Text style={{ color: selected ? "#2761FF" : "#374151", fontSize: 12, fontWeight: "900" }}>{label}</Text>
+      <Text style={{ color: selected ? "#2761FF" : "#374151", fontSize: 12, fontWeight: boardTheme ? "600" : "900" }}>{label}</Text>
     </Pressable>
   );
 }
 
 function ActivityRuleEditor({ label, rule, disabled, onChange }: { label: string; rule: ActivityImageRule; disabled?: boolean; onChange: (rule: ActivityImageRule) => void }) {
+  const boardTheme = useAdminBoardWebTheme();
   const updateNumber = (key: "max_width" | "height" | "max_height", value: string) => {
     const digits = value.replace(/[^0-9]/g, "");
     const next = digits ? Number(digits) : null;
@@ -99,7 +104,7 @@ function ActivityRuleEditor({ label, rule, disabled, onChange }: { label: string
   };
   return (
     <View style={{ gap: 8, borderRadius: 8, borderWidth: 1, borderColor: "#E1E4E9", padding: 10 }}>
-      <Text style={{ color: "#374151", fontSize: 12, fontWeight: "900" }}>{label}</Text>
+      <Text style={{ color: "#374151", fontSize: 12, fontWeight: boardTheme ? "600" : "900" }}>{label}</Text>
       <Text style={{ color: "#6B7280", fontSize: 11 }}>최대 가로 px (120–1600, 빈 값은 화면 너비)</Text>
       <TextInput editable={!disabled} value={rule.max_width === null ? "" : String(rule.max_width)} onChangeText={(value) => updateNumber("max_width", value)} keyboardType="number-pad" style={{ minHeight: 40, borderWidth: 1, borderColor: "#E1E4E9", borderRadius: 6, paddingHorizontal: 10 }} />
       <Text style={{ color: "#6B7280", fontSize: 11 }}>세로 px (빈 값은 원본 비율, 고정 시 120–1600)</Text>
@@ -115,6 +120,7 @@ function ActivityRuleEditor({ label, rule, disabled, onChange }: { label: string
 }
 
 export default function AdminBoardSettingsPanel({ board, draft, lockedPolicies, saving, onChange, onSave }: AdminBoardSettingsPanelProps) {
+  const boardTheme = useAdminBoardWebTheme();
   const lockedDraftFields = new Set(
     lockedPolicies
       .map((policy) => policy.settingKey)
@@ -129,7 +135,7 @@ export default function AdminBoardSettingsPanel({ board, draft, lockedPolicies, 
   return (
     <View style={{ gap: 14 }}>
       <View style={{ gap: 8, borderRadius: 8, backgroundColor: "#F8FAFC", padding: 12 }}>
-        <Text style={{ color: "#0B1F56", fontWeight: "900" }}>구조 식별자 · 변경 불가</Text>
+        <Text style={{ color: boardTheme ? BOARD_WEB_COLORS.text : "#0B1F56", fontWeight: boardTheme ? "600" : "900" }}>구조 식별자 · 변경 불가</Text>
         <Text style={{ color: "#6B7280", fontSize: 12 }}>slug · {board.slug}</Text>
         <Text style={{ color: "#6B7280", fontSize: 12 }}>category · {board.category}</Text>
         <Text style={{ color: "#6B7280", fontSize: 12 }}>board_type · {board.board_type}</Text>
@@ -137,10 +143,10 @@ export default function AdminBoardSettingsPanel({ board, draft, lockedPolicies, 
 
       {lockedPolicies.length > 0 ? (
         <View style={{ gap: 8 }}>
-          <Text style={{ color: "#0B1F56", fontWeight: "900" }}>고정 운영 정책</Text>
+          <Text style={{ color: boardTheme ? BOARD_WEB_COLORS.text : "#0B1F56", fontWeight: boardTheme ? "600" : "900" }}>고정 운영 정책</Text>
           {lockedPolicies.map((policy) => (
-            <View key={policy.key} style={{ gap: 3, borderRadius: 8, borderWidth: 1, borderColor: "#D5E0FE", backgroundColor: "#EDF2FE", padding: 10 }}>
-              <Text style={{ color: "#0B3AC4", fontWeight: "900" }}>{policy.label}</Text>
+            <View key={policy.key} style={{ gap: 3, borderRadius: boardTheme ? 0 : 8, borderWidth: boardTheme ? 0 : 1, borderBottomWidth: 1, borderColor: boardTheme ? BOARD_WEB_COLORS.border : "#D5E0FE", backgroundColor: boardTheme ? BOARD_WEB_COLORS.surface : "#EDF2FE", padding: 10, ...(boardTheme ? { paddingHorizontal: 0 } : {}) }}>
+              <Text style={{ color: boardTheme ? BOARD_WEB_COLORS.text : "#0B3AC4", fontWeight: boardTheme ? "600" : "900" }}>{policy.label}</Text>
               <Text style={{ color: "#374151", fontSize: 12 }}>{policy.reason}</Text>
             </View>
           ))}
@@ -152,7 +158,7 @@ export default function AdminBoardSettingsPanel({ board, draft, lockedPolicies, 
       <Input label="정렬 순서" value={draft.sortOrder} editable={!saving} onChangeText={(value) => update("sortOrder", value.replace(/[^0-9-]/g, ""))} />
 
       <View style={{ gap: 7 }}>
-        <Text style={{ color: "#374151", fontSize: 12, fontWeight: "900" }}>읽기 권한</Text>
+        <Text style={{ color: "#374151", fontSize: 12, fontWeight: boardTheme ? "600" : "900" }}>읽기 권한</Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
           {adminBoardPermissionOptions("read").map((permission) => (
             <Choice key={permission} label={permission} selected={draft.readPermission === permission} disabled={saving || lockedDraftFields.has("readPermission")} onPress={() => update("readPermission", permission)} />
@@ -161,7 +167,7 @@ export default function AdminBoardSettingsPanel({ board, draft, lockedPolicies, 
       </View>
 
       <View style={{ gap: 7 }}>
-        <Text style={{ color: "#374151", fontSize: 12, fontWeight: "900" }}>쓰기 권한</Text>
+        <Text style={{ color: "#374151", fontSize: 12, fontWeight: boardTheme ? "600" : "900" }}>쓰기 권한</Text>
         <View style={{ flexDirection: "row", gap: 8 }}>
           {adminBoardPermissionOptions("write").map((permission) => (
             <Choice key={permission} label={permission} selected={draft.writePermission === permission} disabled={saving || lockedDraftFields.has("writePermission")} onPress={() => update("writePermission", permission)} />
@@ -181,7 +187,7 @@ export default function AdminBoardSettingsPanel({ board, draft, lockedPolicies, 
 
       {board.board_type === "activity_certification" && draft.activityImageLayout ? (
         <View style={{ gap: 10 }}>
-          <Text style={{ color: "#0B1F56", fontWeight: "900" }}>활동 인증 이미지 표시</Text>
+          <Text style={{ color: boardTheme ? BOARD_WEB_COLORS.text : "#0B1F56", fontWeight: boardTheme ? "600" : "900" }}>활동 인증 이미지 표시</Text>
           <ActivityRuleEditor label="기본 규칙" rule={draft.activityImageLayout.default} disabled={saving} onChange={(rule) => onChange({ ...draft, activityImageLayout: { ...draft.activityImageLayout!, default: rule } })} />
           {ORIENTATIONS.map(({ key, label }) => {
             const rule = draft.activityImageLayout?.[key];
@@ -200,11 +206,12 @@ export default function AdminBoardSettingsPanel({ board, draft, lockedPolicies, 
       </Text>
 
       <Pressable
+        accessibilityRole="button"
         disabled={saving}
         onPress={onSave}
-        style={{ alignItems: "center", borderRadius: 6, backgroundColor: "#2761FF", opacity: saving ? 0.5 : 1, padding: 12 }}
+        style={{ alignItems: "center", borderRadius: 6, backgroundColor: "#2761FF", opacity: saving ? 0.5 : 1, padding: 12, ...(boardTheme ? { alignSelf: "flex-start", paddingHorizontal: 16, minHeight: 40 } : {}) }}
       >
-        <Text style={{ color: "#ffffff", fontWeight: "900" }}>{saving ? "저장 중" : "운영 설정 저장"}</Text>
+        <Text style={{ color: "#ffffff", fontWeight: boardTheme ? "600" : "900" }}>{saving ? "저장 중" : "운영 설정 저장"}</Text>
       </Pressable>
     </View>
   );

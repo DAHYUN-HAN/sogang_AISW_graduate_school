@@ -122,7 +122,7 @@ def _issue_tokens(db: Session, user: User) -> dict:
 @router.post("/login")
 def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)):
     enforce_rate_limit(request, action="auth.login", subject=payload.email, limit=8, ip_limit=30, window_seconds=300)
-    user = db.scalar(select(User).where(User.email == payload.email.lower()))
+    user = db.scalar(select(User).where(User.email == payload.email.lower()).with_for_update().execution_options(populate_existing=True))
     if user is None or not verify_password(payload.password, user.password_hash):
         raise AppException(status_code=401, message="Invalid email or password.", code="UNAUTHORIZED")
     if not user.is_active:
@@ -130,7 +130,6 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 
     if password_needs_rehash(user.password_hash):
         user.password_hash = hash_password(payload.password)
-        db.commit()
 
     return success_response(_issue_tokens(db, user))
 
@@ -356,10 +355,15 @@ def refresh(payload: RefreshRequest, request: Request, db: Session = Depends(get
     enforce_rate_limit(request, action="auth.refresh", subject=payload.refresh_token, limit=10, ip_limit=60, window_seconds=300)
     token_hash = hash_token(payload.refresh_token)
     refresh_token = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash))
-    if refresh_token is None or refresh_token.revoked_at is not None or refresh_token.expires_at < utc_now():
+    if refresh_token is None:
         raise AppException(status_code=401, message="Invalid refresh token.", code="UNAUTHORIZED")
 
-    user = db.get(User, refresh_token.user_id)
+    # Serialize credential changes and session issuance on the same user row.
+    # Reload the token after waiting: the identity map may hold a revoked token.
+    user = db.scalar(select(User).where(User.id == refresh_token.user_id).with_for_update().execution_options(populate_existing=True))
+    refresh_token = db.scalar(select(RefreshToken).where(RefreshToken.token_hash == token_hash).execution_options(populate_existing=True))
+    if refresh_token is None or refresh_token.revoked_at is not None or refresh_token.expires_at < utc_now():
+        raise AppException(status_code=401, message="Invalid refresh token.", code="UNAUTHORIZED")
     if user is None or not user.is_active:
         raise AppException(status_code=401, message="Invalid refresh token.", code="UNAUTHORIZED")
 
@@ -660,6 +664,12 @@ def confirm_password_reset(payload: PasswordResetConfirm, request: Request, db: 
     enforce_rate_limit(request, action="auth.password_reset.confirm", subject=payload.token, limit=5, ip_limit=15, window_seconds=900)
     ensure_password_policy(payload.new_password)
     reset_token = db.scalar(select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(payload.token)))
+    if reset_token is None:
+        raise AppException(status_code=400, message="Invalid or expired reset token.", code="BAD_REQUEST")
+    user = db.scalar(select(User).where(User.id == reset_token.user_id).with_for_update().execution_options(populate_existing=True))
+    reset_token = db.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == hash_token(payload.token)).execution_options(populate_existing=True)
+    )
     if (
         reset_token is None
         or reset_token.consumed_at is not None
@@ -668,7 +678,6 @@ def confirm_password_reset(payload: PasswordResetConfirm, request: Request, db: 
     ):
         raise AppException(status_code=400, message="Invalid or expired reset token.", code="BAD_REQUEST")
 
-    user = db.get(User, reset_token.user_id)
     if user is None or not user.is_active:
         raise AppException(status_code=400, message="Invalid or expired reset token.", code="BAD_REQUEST")
 

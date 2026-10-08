@@ -43,7 +43,7 @@ docker compose --env-file .env.qa.example -p aisw_p0qa -f docker-compose.yml -f 
 docker compose --env-file .env.qa.example -p aisw_p0qa -f docker-compose.yml -f docker-compose.qa.yml exec backend alembic heads
 ```
 
-Expected single Alembic head: `0024_faq_attachments`.
+Expected single Alembic head: `0034_attendance_polls`.
 
 3. Open `http://localhost:58081`. The QA frontend runs `npm ci` on every
 container start and uses Expo Fast Refresh for changes under `frontend/`.
@@ -282,7 +282,7 @@ npm run doctor
 npm run export:web
 ```
 
-Run the backend test suite and the QA/production Compose checks above. Historical results at revisions `0016`, `0019`, `0021`, and `0022` do not close the current `0024` gate.
+Run the backend test suite and the QA/production Compose checks above. Historical results at earlier revisions do not close the current `0034_attendance_polls` gate.
 
 Checked on 2026-07-27 against the current worktree:
 

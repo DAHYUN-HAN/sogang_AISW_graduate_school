@@ -2,7 +2,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused, useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router as expoRouter, usePathname, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, type TextStyle } from "react-native";
@@ -81,6 +81,7 @@ import {
   resourcePostFields,
   resourcePostMetadata,
 } from "../../../../utils/resourcePostFields";
+import { adminPostRouter } from "../../../../utils/adminPostRouter";
 
 const COLORS = {
   primary: "#2761FF",
@@ -106,7 +107,6 @@ const schema = z.object({
   eventDate: z.string().optional(),
   relation: z.string().optional(),
   contact: z.string().optional(),
-  applicationUrl: z.string().optional(),
   professor: z.string().optional(),
   difficulty: z.string().optional(),
   satisfaction: z.string().optional(),
@@ -334,6 +334,9 @@ export default function PostCreateScreen() {
 }
 
 function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
+  const adminPathname = usePathname();
+  const adminWorkspace = adminPathname.startsWith("/admin/");
+  const router = useMemo(() => adminPostRouter(expoRouter, adminWorkspace), [adminWorkspace]);
   const insets = useSafeAreaInsets();
 
   const parsedInitialBoardId = Number(params.boardId);
@@ -481,7 +484,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       eventDate: "",
       relation: "",
       contact: "",
-      applicationUrl: "",
       professor: "",
       difficulty: "",
       satisfaction: "",
@@ -523,7 +525,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           (typeof metadata.relation === "string" ? metadata.relation : undefined),
       ),
       contact: typeof metadata.contact === "string" ? metadata.contact : "",
-      applicationUrl: typeof metadata.application_url === "string" ? metadata.application_url : "",
       ...resourcePostFieldValues(resourceFields, metadata),
       operationStatus: operationStatus(metadata),
     });
@@ -632,7 +633,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       ? {
           icon: "people-outline" as const,
           title: `관리자 전용 ${isNetworkingProgram ? "네트워킹" : "동아리"} 게시글`,
-          body: `목록 대표 이미지와 상세 글 이미지를 구분해 등록하고 ${isNetworkingProgram ? "참가 신청" : "가입 신청"} 링크를 연결할 수 있습니다.`,
+          body: "목록 대표 이미지와 상세 글 이미지를 구분해 등록하고 활동 인증을 위한 운영 상태를 설정할 수 있습니다.",
         }
     : isActivity
       ? {
@@ -673,7 +674,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         activitySourcePostId,
       });
     }
-    const metadata: Record<string, string> = {};
+    const metadata: Record<string, unknown> = {};
     if (isMutualAid) {
       if (clean(values.eventDate)) metadata.event_date = clean(values.eventDate) as string;
       if (clean(values.relation)) metadata.relation = clean(values.relation) as string;
@@ -683,22 +684,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       metadata.recruitment_status = values.category === "마감" ? "closed" : "open";
       if (clean(values.contact)) metadata.contact = clean(values.contact) as string;
     }
-    if (isAdminParticipationPost && clean(values.applicationUrl)) {
-      metadata.application_url = clean(values.applicationUrl) as string;
-      if (board?.slug === "club-promo") metadata.operation_status = values.operationStatus;
+    if (isAdminParticipationPost) {
+      Object.assign(metadata, existingPost?.metadata);
+      metadata.operation_status = values.operationStatus;
     }
     Object.assign(metadata, resourcePostMetadata(resourceFields, values));
     return Object.keys(metadata).length > 0 ? metadata : undefined;
-  };
-
-  // 참여 버튼 링크(관리자 전용)만 쓰는 검사. 토스트 전환 대상이 아니라서
-  // 기존과 같은 확인창 문구를 그대로 유지한다.
-  const requireValue = (value: string | undefined, label: string) => {
-    if (clean(value)) {
-      return false;
-    }
-    setNotice({ title: "필수 항목", body: `${label} 항목을 입력하세요.` });
-    return true;
   };
 
   const handleMutationError = () => {
@@ -762,22 +753,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       const participantError = activityParticipantSelectionError(selectedParticipants, existingPost?.metadata);
       if (participantError) {
         showToast(participantError);
-        return;
-      }
-    }
-    if (isAdminParticipationPost) {
-      const applicationUrl = clean(values.applicationUrl);
-      if (requireValue(applicationUrl, "참여 버튼 링크")) {
-        return;
-      }
-      try {
-        const parsed = new URL(applicationUrl as string);
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("INVALID_PROTOCOL");
-      } catch {
-        setNotice({
-          title: "참여 버튼 링크",
-          body: "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요.",
-        });
         return;
       }
     }
@@ -1008,7 +983,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     if (decision.action === "back") router.back();
     else if (decision.action === "navigate") router.navigate(decision.route as never);
     else router.replace(decision.route as never);
-  }, [boardId, boardType, params.editOrigin, params.fromBoardId, params.postId, params.returnTo]);
+  }, [boardId, boardType, params.editOrigin, params.fromBoardId, params.postId, params.returnTo, router]);
 
   const handleCreateBack = useCallback(() => {
     if (createdPostId) {
@@ -1029,7 +1004,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       return;
     }
     leaveCreateScreen();
-  }, [boardId, boardType, createdPostId, datePickerOpen, hasUnsavedChanges, leaveCreateScreen, params.returnTo, selectionSheet]);
+  }, [boardId, boardType, createdPostId, datePickerOpen, hasUnsavedChanges, leaveCreateScreen, params.returnTo, selectionSheet, router]);
 
   // iOS 가장자리 스와이프는 UIKit이 직접 pop 해서 위 핸들러들을 타지 않는다.
   // usePreventRemove가 native-stack의 preventNativeDismiss를 켜 그 제스처까지
@@ -1612,11 +1587,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         />
       ) : null}
 
-      {board?.slug === "club-promo" ? (
+      {isAdminParticipationPost ? (
         <Controller
           control={control}
           name="operationStatus"
-          render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} />}
+          render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} activityName={isNetworkingProgram ? "네트워킹 행사" : "동아리"} />}
         />
       ) : null}
 
@@ -1864,27 +1839,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 placeholderTextColor="#A6ACB7"
                 style={[styles.input, styles.contactInput]}
                 textAlignVertical="top"
-                value={field.value}
-              />
-            </FormField>
-          )}
-        />
-      ) : null}
-
-      {isAdminParticipationPost ? (
-        <Controller
-          control={control}
-          name="applicationUrl"
-          render={({ field }) => (
-            <FormField label="참여 버튼 링크" required helper={`상세 화면의 ${isNetworkingProgram ? "참가 신청" : "가입 신청"} 버튼이 이 주소를 엽니다.`}>
-              <FormTextInput
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                onChangeText={field.onChange}
-                placeholder="https://forms.gle/..."
-                placeholderTextColor="#A6ACB7"
-                style={styles.input}
                 value={field.value}
               />
             </FormField>

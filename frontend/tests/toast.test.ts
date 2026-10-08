@@ -54,9 +54,6 @@ test("증빙 링크 오류는 팝업 대신 토스트로 알린다", () => {
   // 증빙서류 첨부의 옛 팝업이 남아 있으면 안 된다.
   assert.doesNotMatch(createSource, /createFormNotice\("증빙서류 첨부"/);
   assert.doesNotMatch(createSource, /청첩장·부고장 링크를 입력하세요/);
-  // 참여 버튼 링크(관리자 전용)는 전환 대상이 아니라 문구·확인창 그대로다.
-  assert.match(createSource, /title: "참여 버튼 링크"/);
-  assert.match(createSource, /http:\/\/ 또는 https:\/\/로 시작하는 올바른 주소를 입력하세요/);
   assert.doesNotMatch(createSource, /createFormNotice/);
 });
 

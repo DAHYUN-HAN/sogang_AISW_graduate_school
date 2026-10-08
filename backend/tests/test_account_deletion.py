@@ -15,6 +15,7 @@ from app.account_deletion import (
 )
 from app.config import settings
 from app.database import Base
+from app.errors import AppException
 from app.models.auth import EmailVerificationToken, PasswordResetToken, RefreshToken
 from app.models.audit import AccountDeletionReceipt
 from app.models.bookmark import Bookmark
@@ -31,7 +32,7 @@ from app.models.user import User
 from app.models.user_block import UserBlock
 from app.rate_limit import subject_rate_limit_hash
 from app.routers import auth as auth_router
-from app.security import hash_token, utc_now
+from app.security import hash_token, utc_now, verify_password
 
 from conftest import TEST_PASSWORD
 
@@ -51,6 +52,33 @@ def _set_media_directories(
 
 def _count(db, model) -> int:
     return int(db.scalar(select(func.count()).select_from(model)) or 0)
+
+
+def test_account_deletion_rejects_password_cached_before_admin_reset(api) -> None:
+    new_password = "ResetPassword2!"
+    with api.session() as deletion_request:
+        cached_user = deletion_request.get(User, 1)
+        assert verify_password(TEST_PASSWORD, cached_user.password_hash)
+        reset = api.client.put(
+            "/api/users/admin/users/1/password",
+            headers=api.headers["admin"],
+            json={"new_password": new_password},
+        )
+        assert reset.status_code == 200
+        assert reset.json()["data"]["changed"] is True
+
+        with pytest.raises(AppException) as rejected:
+            delete_user_account(deletion_request, user_id=1, current_password=TEST_PASSWORD)
+        assert rejected.value.status_code == 403
+        assert rejected.value.code == "FORBIDDEN"
+
+    with api.session() as db:
+        retained_user = db.get(User, 1)
+        assert retained_user is not None
+        assert verify_password(new_password, retained_user.password_hash)
+        assert not verify_password(TEST_PASSWORD, retained_user.password_hash)
+        assert _count(db, AccountDeletionReceipt) == 0
+        assert db.get(Post, 1).author_id == 1
 
 
 def test_authenticated_account_deletion_removes_pii_and_preserves_all_authored_content(
@@ -349,15 +377,15 @@ def test_authenticated_account_deletion_removes_pii_and_preserves_all_authored_c
     assert comments.json()["data"][0]["author_id"] is None
     assert comments.json()["data"][0]["author_nickname"] == "Owner"
 
-    # 상조회 증빙(첨부·링크)은 게시글을 읽을 수 있는 원우 모두에게 공개한다.
+    # Account deletion retains evidence for administrators only.
     member_mutual_aid = api.client.get("/api/posts/1", headers=api.headers["other"])
     assert member_mutual_aid.status_code == 200
-    assert member_mutual_aid.json()["data"]["attachments"][0]["id"] == private_media_id
-    assert member_mutual_aid.json()["data"]["metadata"]["proof_url"] == "https://example.com/private-proof"
+    assert member_mutual_aid.json()["data"]["attachments"] == []
+    assert "proof_url" not in member_mutual_aid.json()["data"]["metadata"]
     assert api.client.get(
         f"/api/media/{private_media_id}/access-url",
         headers=api.headers["other"],
-    ).status_code == 200
+    ).status_code == 404
 
     admin_mutual_aid = api.client.get("/api/posts/1", headers=api.headers["admin"])
     assert admin_mutual_aid.status_code == 200

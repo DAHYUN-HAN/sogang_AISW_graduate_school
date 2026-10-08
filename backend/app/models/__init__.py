@@ -19,3 +19,5 @@ from app.models.rate_limit import RateLimitBucket
 from app.models.registration import MajorOption, PrivacyPolicyVersion
 from app.models.student_roster import StudentRosterMember
 from app.models.dues_payment import DuesPayment
+from app.models.usage import UsagePageView
+from app.models.poll import PostPoll, PollQuestion, PollOption, PollBallot, PollSelection

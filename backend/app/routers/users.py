@@ -11,7 +11,7 @@ from app.media_service import media_access_reference, profile_image_media_id, va
 from app.models.board import Board
 from app.models.bookmark import Bookmark
 from app.models.comment import Comment
-from app.models.auth import RefreshToken
+from app.models.auth import PasswordResetToken, RefreshToken
 from app.models.post import Post
 from app.models.notification import PushToken
 from app.models.registration import MajorOption
@@ -20,7 +20,7 @@ from app.models.user_block import UserBlock
 from app.post_access import post_read_filter
 from app.rate_limit import enforce_rate_limit
 from app.response import success_response
-from app.schemas.user import AdminUserUpdate, UserBlockCreate, UserDeleteRequest, UserMeUpdate, UserPasswordUpdate, UserPasswordVerify
+from app.schemas.user import AdminUserPasswordReset, AdminUserUpdate, UserBlockCreate, UserDeleteRequest, UserMeUpdate, UserPasswordUpdate, UserPasswordVerify
 from app.security import ensure_password_policy, hash_password, utc_now, verify_password
 from app.user_validation import normalize_nickname
 from app.audit import log_admin_action
@@ -114,8 +114,8 @@ def get_admin_users(
     _: User = Depends(require_admin),
 ):
     filters = []
-    if q:
-        keyword = f"%{q}%"
+    if q and q.strip():
+        keyword = f"%{q.strip()}%"
         filters.append(User.email.ilike(keyword) | User.nickname.ilike(keyword) | User.cohort.ilike(keyword))
     if role:
         filters.append(User.role == role)
@@ -175,17 +175,28 @@ def update_admin_user(
     if "is_active" in data and target_user.id == admin.id and data["is_active"] is False:
         raise AppException(status_code=400, message="You cannot deactivate your own account here.", code="BAD_REQUEST")
 
+    data = {key: value for key, value in data.items() if getattr(target_user, key) != value}
+    if "major" in data:
+        active_major = db.scalar(
+            select(MajorOption.name).where(MajorOption.name == data["major"], MajorOption.is_active.is_(True))
+        )
+        if active_major is None:
+            raise AppException(status_code=422, message="Active major option is required.", code="VALIDATION_ERROR")
+
     for key, value in data.items():
         setattr(target_user, key, value)
 
-    log_admin_action(
-        db,
-        actor_id=admin.id,
-        action="user.update",
-        target_type="user",
-        target_id=target_user.id,
-        details=data,
-    )
+    if data:
+        log_admin_action(
+            db,
+            actor_id=admin.id,
+            action="user.update",
+            target_type="user",
+            target_id=target_user.id,
+            details={"changed_fields": sorted(data), **{
+                key: value for key, value in data.items() if key in {"role", "is_active", "enrollment_status"}
+            }},
+        )
 
     db.commit()
     db.refresh(target_user)
@@ -197,6 +208,55 @@ def update_admin_user(
             "is_active": target_user.is_active,
         }
     )
+
+
+@router.put("/admin/users/{user_id}/password")
+def reset_admin_user_password(
+    user_id: int,
+    payload: AdminUserPasswordReset,
+    request: Request,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_admin),
+):
+    enforce_rate_limit(
+        request,
+        action="admin.password_reset",
+        subject=f"{admin.id}:{user_id}",
+        limit=10,
+        ip_limit=30,
+        window_seconds=900,
+    )
+    target_user = db.scalar(select(User).where(User.id == user_id).with_for_update().execution_options(populate_existing=True))
+    if target_user is None:
+        raise AppException(status_code=404, message="User not found.", code="NOT_FOUND")
+    ensure_password_policy(payload.new_password)
+    target_user.password_hash = hash_password(payload.new_password)
+    now = utc_now()
+    refresh_tokens = db.scalars(
+        select(RefreshToken).where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))
+    ).all()
+    for token in refresh_tokens:
+        token.revoked_at = now
+    push_tokens = db.scalars(
+        select(PushToken).where(PushToken.user_id == user_id, PushToken.is_active.is_(True))
+    ).all()
+    for token in push_tokens:
+        token.is_active = False
+    reset_tokens = db.scalars(
+        select(PasswordResetToken).where(PasswordResetToken.user_id == user_id, PasswordResetToken.consumed_at.is_(None))
+    ).all()
+    for token in reset_tokens:
+        token.consumed_at = now
+    counts = {
+        "sessions_revoked": len(refresh_tokens),
+        "push_tokens_deactivated": len(push_tokens),
+        "reset_tokens_invalidated": len(reset_tokens),
+    }
+    log_admin_action(
+        db, actor_id=admin.id, action="user.password_reset", target_type="user", target_id=user_id, details=counts,
+    )
+    db.commit()
+    return success_response({"id": user_id, "changed": True, **counts})
 
 
 @router.put('/me')
@@ -435,6 +495,9 @@ def verify_current_password(payload: UserPasswordVerify, user: User = Depends(ge
 
 @router.put('/me/password')
 def update_password(payload: UserPasswordUpdate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    user = db.scalar(select(User).where(User.id == user.id).with_for_update().execution_options(populate_existing=True))
+    if user is None or not user.is_active:
+        raise AppException(status_code=401, message="Invalid account.", code="UNAUTHORIZED")
     if not verify_password(payload.current_password, user.password_hash):
         raise AppException(status_code=403, message="Current password is invalid.", code="FORBIDDEN")
     ensure_password_policy(payload.new_password)

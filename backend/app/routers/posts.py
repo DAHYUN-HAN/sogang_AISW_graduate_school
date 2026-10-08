@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, aliased
 from app.author_snapshots import resolve_author_display
 from app.board_policies import ANONYMOUS_BOARD_SLUGS, canonical_post_category, hides_author_identity
 from app.deps import can_read_board, can_write_board, get_current_user, get_db, require_admin
+from app.polls import admin_poll_summaries, apply_poll_settings, get_poll, serialize_poll
 from app.errors import AppException
 from app.models.board import Board
 from app.models.bookmark import Bookmark
@@ -60,6 +61,8 @@ def _safe_metadata(
     if not normalized:
         return None
     metadata = dict(normalized)
+    if board.board_type == "mutual_aid" and not include_sensitive:
+        metadata.pop("proof_url", None)
     if board.board_type == "activity_certification" and not (include_sensitive or include_bank_account):
         metadata.pop("bank_account", None)
     if board.slug == "study-activity" and not include_sensitive:
@@ -391,8 +394,8 @@ def _metadata_for_update(
 ) -> dict | None:
     metadata = dict(incoming_metadata or {})
     existing_metadata = dict(post.metadata_json or {})
-    # 스터디·네트워킹 운영 상태는 관리자가 DB에서 직접 넣는다. 클라이언트가
-    # 보내지 않아도 일반 게시글 수정으로 지워지지 않도록 유지한다.
+    # 운영 상태를 보내지 않는 기존 클라이언트의 수정에서도 저장된 상태를
+    # 유지한다. 관리자는 동아리·네트워킹 등록/수정 화면에서 명시적으로 바꾼다.
     if board is not None and board.slug in OPERATION_STATUS_BOARD_SLUGS:
         if OPERATION_STATUS_KEY not in metadata:
             stored = existing_metadata.get(OPERATION_STATUS_KEY)
@@ -643,6 +646,10 @@ def _serialize_post_list_item(
     activity_source_title: str | None = None,
 ) -> dict:
     content_preview = post_content_preview(_visible_post_content(post, board), board.slug)
+    if board.board_type == "mutual_aid" and current_user.role != "admin":
+        attachment_count = 0
+        thumbnail_media_id = None
+        thumbnail_url = None
     return {
         "id": post.id,
         "board_id": post.board_id,
@@ -916,6 +923,8 @@ def _post_attachments(
     *,
     include_evidence: bool = False,
 ) -> list[dict]:
+    if board.board_type == "mutual_aid" and not (include_evidence or current_user.role == "admin"):
+        return []
     rows = db.execute(
         select(PostAttachment, MediaAsset)
         .join(MediaAsset, MediaAsset.id == PostAttachment.media_id)
@@ -934,7 +943,6 @@ def _post_attachments(
         for _, media in rows
         if include_evidence
         or not media.is_private
-        or board.board_type == "mutual_aid"
         or media.owner_id == current_user.id
         or current_user.role == "admin"
     ]
@@ -1044,9 +1052,9 @@ def _validate_admin_participation_post(board: Board, metadata: dict | None, curr
         raise AppException(status_code=403, message="Only admins can manage participation guide posts.", code="FORBIDDEN")
 
     application_url = str((metadata or {}).get("application_url") or "").strip()
-    parsed = urlparse(application_url)
     if not application_url:
-        raise AppException(status_code=422, message="Participation guide posts require an application URL.", code="APPLICATION_URL_REQUIRED")
+        return
+    parsed = urlparse(application_url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise AppException(status_code=422, message="Application URL must use http or https.", code="INVALID_APPLICATION_URL")
 
@@ -1251,6 +1259,8 @@ def get_admin_posts(
     board_id: int | None = None,
     board_category: str | None = None,
     board_type: str | None = None,
+    board_ids: str | None = Query(None, max_length=1100),
+    notice_category: str | None = Query(None, pattern="^(academic|event|other)$"),
     status: str | None = Query(None, pattern="^(draft|published|hidden|deleted)$"),
     is_pinned: bool | None = None,
     is_notice: bool | None = None,
@@ -1260,6 +1270,13 @@ def get_admin_posts(
     filters = [Post.deleted_at.is_(None)]
     if board_id:
         filters.append(Post.board_id == board_id)
+    if board_ids is not None:
+        values = board_ids.split(",")
+        if len(values) > 100 or any(not value.isdecimal() or int(value) <= 0 for value in values):
+            raise AppException(status_code=422, message="Invalid board selection.", code="VALIDATION_ERROR")
+        filters.append(Post.board_id.in_([int(value) for value in values]))
+    if notice_category is not None:
+        filters.extend([Board.board_type == "notice", _post_feed_notice_category_expression() == notice_category])
     if board_category:
         filters.append(Board.category == board_category)
     if board_type:
@@ -1345,10 +1362,12 @@ def get_admin_posts(
         .limit(size)
     ).all()
 
+    poll_summaries = admin_poll_summaries(db, [row[0].id for row in rows if row.board_type == "notice"])
     data = [
         {
             "id": post.id,
             "board_id": post.board_id,
+            "poll_summary": poll_summaries.get(post.id),
             "board_name": board_name,
             "board_category": board_category,
             "board_type": board_type,
@@ -1460,6 +1479,7 @@ def get_post_detail(
             "category": post.category,
             "activity_source_title": activity_source_titles.get(_activity_source_post_id(post.metadata_json)),
             "activity_participants": _activity_participant_details(db, board, post),
+            "poll": serialize_poll(db, get_poll(db, post.id), current_user),
             "metadata": _safe_metadata(
                 post,
                 board,
@@ -1526,6 +1546,7 @@ def create_post(
     )
     db.add(post)
     db.flush()
+    apply_poll_settings(db, post, board, current_user, payload.poll, "poll" in payload.model_fields_set, payload.poll_revision)
     _upsert_suggestion_extension(db, post, board, payload.category)
     _upsert_mutual_aid_extension(db, post, board, payload.category, normalized_metadata)
     _replace_attachments(db, post.id, payload.attachment_ids or [], current_user, _evidence_link(normalized_metadata))
@@ -1542,8 +1563,8 @@ def create_post(
                 setting_field="notify_notice",
                 dedupe_key=f"notice:{post.id}:{user_id}",
             )
-        if current_user.role == "admin":
-            log_admin_action(db, actor_id=current_user.id, action="notice.create", target_type="post", target_id=post.id)
+    if current_user.role == "admin":
+        log_admin_action(db, actor_id=current_user.id, action="notice.create" if post.is_notice else "post.create", target_type="post", target_id=post.id, details={"title": post.title})
     db.commit()
     db.refresh(post)
 
@@ -1557,10 +1578,13 @@ def update_post(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    post = db.get(Post, post_id)
+    post = db.scalar(select(Post).where(Post.id == post_id).with_for_update())
     if post is None or post.deleted_at is not None:
         raise AppException(status_code=404, message="Post not found.", code="NOT_FOUND")
     board = require_post_read(db, post, current_user)
+    audit_fields = ("board_id", "title", "content", "is_anonymous", "category", "metadata_json", "deadline_at")
+    before_values = {key: getattr(post, key) for key in audit_fields}
+    before_attachments = list(db.scalars(select(PostAttachment.media_id).where(PostAttachment.post_id == post.id).order_by(PostAttachment.sort_order, PostAttachment.id)))
     normalized_content, normalized_metadata = normalize_participation_guide(
         board.slug,
         payload.content,
@@ -1580,7 +1604,9 @@ def update_post(
             )
     target_board = board
     if payload.board_id is not None and payload.board_id != post.board_id:
-        if board.category != "resources" or board.board_type != "resource":
+        notice_move = board.board_type == "notice" and current_user.role == "admin" and get_poll(db, post.id) is not None
+        resource_move = board.category == "resources" and board.board_type == "resource"
+        if not (resource_move or notice_move):
             raise AppException(
                 status_code=400,
                 message="Posts can only be moved between resource boards.",
@@ -1589,7 +1615,8 @@ def update_post(
         target_board = db.get(Board, payload.board_id)
         if target_board is None or not target_board.is_active:
             raise AppException(status_code=404, message="Board not found.", code="NOT_FOUND")
-        if target_board.category != "resources" or target_board.board_type != "resource":
+        if not ((resource_move and target_board.category == "resources" and target_board.board_type == "resource")
+                or (notice_move and target_board.board_type == "notice")):
             raise AppException(
                 status_code=400,
                 message="Posts can only be moved between resource boards.",
@@ -1646,6 +1673,7 @@ def update_post(
     post.category = activity_source_title or canonical_post_category(target_board, payload.category)
     post.metadata_json = canonical_metadata
     post.deadline_at = payload.deadline_at if target_board is not None and target_board.board_type == "notice" else None
+    apply_poll_settings(db, post, target_board, current_user, payload.poll, "poll" in payload.model_fields_set, payload.poll_revision)
     if target_board is not None:
         _upsert_suggestion_extension(db, post, target_board, payload.category)
         _upsert_mutual_aid_extension(db, post, target_board, payload.category, normalized_metadata)
@@ -1669,6 +1697,13 @@ def update_post(
         db.flush()
     if target_board is not None:
         _ensure_admin_participation_image(db, post, target_board)
+    if current_user.role == "admin":
+        changed_fields = [key for key in audit_fields if before_values[key] != getattr(post, key)]
+        after_attachments = list(db.scalars(select(PostAttachment.media_id).where(PostAttachment.post_id == post.id).order_by(PostAttachment.sort_order, PostAttachment.id)))
+        if before_attachments != after_attachments:
+            changed_fields.append("attachments")
+        if changed_fields:
+            log_admin_action(db, actor_id=current_user.id, action="notice.update" if post.is_notice else "post.update", target_type="post", target_id=post.id, details={"title": post.title, "changed_fields": changed_fields})
     db.commit()
     db.refresh(post)
 
@@ -1757,7 +1792,7 @@ def delete_post(post_id: int, db: Session = Depends(get_db), current_user: User 
 
     post.deleted_at = utc_now()
     if current_user.role == "admin":
-        log_admin_action(db, actor_id=current_user.id, action="post.delete", target_type="post", target_id=post.id)
+        log_admin_action(db, actor_id=current_user.id, action="post.delete", target_type="post", target_id=post.id, details={"title": post.title})
     db.commit()
 
     return success_response({"id": post_id})
@@ -1864,6 +1899,7 @@ def update_suggestion(
         db.add(suggestion)
 
     previous_reply = suggestion.admin_reply
+    previous_status = suggestion.status
     next_reply = payload.admin_reply.strip() if payload.admin_reply else None
     if payload.status == "answered" and not next_reply:
         raise AppException(
@@ -1871,11 +1907,17 @@ def update_suggestion(
             message="An official reply is required to complete a suggestion.",
             code="ADMIN_REPLY_REQUIRED",
         )
+    next_status = "answered" if next_reply else payload.status
+    if previous_reply == next_reply and previous_status == next_status:
+        return success_response({"post_id": post.id, "status": suggestion.status, "suggestion": _suggestion_payload(db, post.id)})
     suggestion.admin_reply = next_reply
     suggestion.status = "answered" if next_reply else payload.status
     if next_reply:
         suggestion.replied_by = current_user.id
         suggestion.replied_at = utc_now()
+    else:
+        suggestion.replied_by = None
+        suggestion.replied_at = None
 
     if next_reply and next_reply != previous_reply:
         create_notification(
@@ -1894,7 +1936,7 @@ def update_suggestion(
         action="suggestion.update",
         target_type="post",
         target_id=post.id,
-        details={"status": suggestion.status, "has_reply": bool(next_reply)},
+        details={"title": post.title, "previous_status": previous_status, "status": suggestion.status, "has_reply": bool(next_reply)},
     )
 
     db.commit()
@@ -1932,6 +1974,9 @@ def update_mutual_aid(
         raise AppException(status_code=422, message="Rejection reason is required.", code="VALIDATION_ERROR")
 
     previous_status = mutual_aid.status
+    next_reason = rejection_reason if payload.status == "rejected" else None
+    if previous_status == payload.status and mutual_aid.rejection_reason == next_reason:
+        return success_response({"post_id": post.id, "mutual_aid": _mutual_aid_payload(db, post.id)})
     mutual_aid.status = payload.status
     mutual_aid.rejection_reason = rejection_reason if payload.status == "rejected" else None
     mutual_aid.reviewed_by = current_user.id
@@ -1955,7 +2000,7 @@ def update_mutual_aid(
         action="mutual_aid.update",
         target_type="post",
         target_id=post.id,
-        details={"status": payload.status},
+        details={"title": post.title, "previous_status": previous_status, "status": payload.status},
     )
 
     db.commit()

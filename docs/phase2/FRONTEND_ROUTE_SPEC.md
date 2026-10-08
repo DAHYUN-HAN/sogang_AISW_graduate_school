@@ -1,5 +1,73 @@
 # Phase 2 Frontend Route and Screen Spec
 
+2026-10-08 WP8/WP9 hardening: web notice create/edit links, including legacy generic-composer admin routes, dispatch to the dedicated notice editor so inline image anchors, deadlines and poll state are managed together. Non-notice post editing retains the generic composer. Administrator dialogs cannot survive authentication-session replacement or accept stale callbacks from an unmounted host.
+
+2026-10-08 WP6/WP8/WP9 P0 poll usability: existing admin notice forms explain
+first-response field locking and separate notice deadlines from manual poll
+closure. New cards show 작성 중; close confirmation names the saved question,
+loaded participation count and immediate irreversible effects. A read-only draft
+preview renders notice body/images and card labels without saving or voting.
+Save conflicts show the API message and offer explicitly confirmed poll-only
+reload; unsaved notice fields/images survive, while the poll draft is replaced.
+Editor identity/operation guards prevent late recovery from affecting another
+draft. Admin table rows show open/closed/card/unique-respondent counts, refresh
+every 30 seconds and open poll editing directly. Members see saved-response
+receipts and progress excluding closed/legacy cards; pending selection changes
+do not count as saved responses. Existing routes, permissions and poll policies
+remain. Evidence: `docs/qa/POLL_USABILITY_2026-10-08.md`.
+
+2026-10-08 WP6/WP8/WP9 P0 poll visual alignment: retain the existing notice
+detail route and white/blue branding while using compact flat option rows,
+2px result bars, subdued horizontal action buttons and plain named participant
+rows with circular cohort badges. `PersonListCard` defaults to its existing
+Council style; only poll lists opt into `variant="plain"`. Participant status
+is full-screen below 600px with safe-area padding, a close/title/refresh header,
+and the existing three tabs; larger screens use a bounded centered dialog.
+Total participants remain visible and are announced in the status action's
+accessible label. Queries, permissions, independent choices/closure, pagination
+and keyboard behavior remain. Verification: `docs/qa/POLL_VISUAL_DESIGN_2026-10-08.md`.
+
+2026-10-07 WP6/WP8/WP9 notice editor: the administrator notice form uses calendar
+and clock controls for 신청·접수 마감, with KST save/re-edit conversion. Each
+attached image exposes 본문에 넣기 at the last body cursor; the editor shows the
+image between editable text areas. 본문에서 빼기 retains its attachment; attachment
+replacement/removal also updates body references. Notice detail interleaves text
+and protected images, preserves image-viewer access and displays unused
+attachments below. Linked council notices with inline images use this body layout
+once instead of duplicating the hero gallery; older linked notices keep their
+gallery. Existing routes, permissions and poll actions remain.
+
+2026-10-07 WP6/WP8/WP9 P0 attendance polls: `/admin/boards` notice create/edit
+uses a controlled editor with independent cards: title, two editable text labels,
+own participant count/status, and persisted-card manual close. Default labels are
+YES / NO. No date/photo/multiple-selection/poll-deadline controls; the notice's
+application calendar remains separate. Voted/closed card fields are disabled;
+other cards may be appended. Closing restores only the saved target card and
+preserves other unsaved cards; the confirmation explains the target edit discard.
+No new route is added. Existing shared post composers omit poll and
+preserve backend settings. The existing `/board/post/[postId]` notice detail adds
+one white/blue card per poll, single selection, independent submit/revote,
+result bars and paginated named participant modal scoped to that card/option.
+Legacy formats retain readable results and images.
+Council list rows and participants share `PersonListCard`, preserving existing
+Council navigation. Poll caches include current account and post; save/vote/close
+invalidate detail/results. Admin async completions check editor session/post
+identity so switched or unmounted drafts cannot be overwritten. See
+`docs/qa/ATTENDANCE_POLLS_2026-10-07.md` for verification.
+
+Kakao parity follow-up: option rows always expose a separate count button, including
+before voting; opening people does not change the local selection. Whole-card
+status has 항목별 / 회원별 / 미참여 tabs, using the shared Council person cards.
+The nonparticipant hint defines the current readable-notice active-member audience.
+Each card has refresh; status lists refresh every 10 seconds and offer manual
+refresh. Positive ended results show 1위 / 공동 1위; zero votes have no winner.
+Administrator copy retains title/two labels only and appends an independently
+editable unsaved card. Stable card keys exclude unrelated parent revisions while
+including the current card's structure and closure; adding another card retains a
+pending choice. Web radio Space and explicit checked/selected ARIA states support
+keyboard and assistive technology. White/blue branding and approved binary rules
+remain; no route change. Evidence: `docs/qa/KAKAO_POLL_PARITY_2026-10-07.md`.
+
 2026-07-05 override: the AISW policy definition makes the app member-only. `/auth/login`, `/auth/register`, `/auth/password-reset`, `/legal/terms`, `/legal/privacy`, `/legal/support`, and `/legal/account-deletion` are guest-visible screens. Signup/email-verification, password recovery, public account-deletion request/verify, refresh, and registration-option API calls support those screens. All tab, board, post, search, event, FAQ, guide, notification, settings, and admin routes require an authenticated session.
 
 Status: implemented baseline, checked 2026-07-27
@@ -297,6 +365,62 @@ My Page drawer return and avatar:
 
 ## 9. Design Gate
 
+2026-10-07 dashboard simplification (WP8/WP9): the user requested removal of the lower dashboard area beginning with operating shortcuts. `/admin/dashboard` now ends after the daily post/comment tables; the duplicate cumulative statistics, recent operations and recent-post cards are no longer rendered there. Daily metrics, date controls, seven-day traffic and table pagination remain. Management is reachable through the existing dedicated tabs, and the native administrator screen retains its existing operations.
+
+2026-10-07 WP8/WP9 member management: `/admin/accounts` is labeled `회원 관리`
+and uses the main console's white table, compact buttons and underline filters.
+Name/email/cohort search and active/inactive filtering use server pagination (20
+per page). A right-side editor updates name, cohort, active registration major,
+contact and existing enrollment/account status together. Per the follow-up,
+company/affiliation, job and position inputs are absent from the web editor;
+their existing stored values and backend fields remain intact.
+Email is read-only; role-switching is removed from this web screen. Consent and
+recent-login records remain readable. Failed saves retain drafts; close/sidebar/
+reload protect unsaved changes, and pending saves lock sidebar navigation. The
+editor lives in the persistent admin layout, so browser Back between admin pages
+keeps the drawer and draft open even when the background route changes. Native
+legacy administration remains available. Defaults and evidence are recorded in
+`docs/qa/ADMIN_MEMBERS_WEB_2026-10-07.md`.
+
+2026-10-07 dues theme continuation (WP8/WP9 P0): web `/admin/dues` follows the
+white main/member/roster theme. Search/upload share a wrapping toolbar; ordinary
+payment management and existing individual one-time registration are underline
+tabs. A 100-row paginated table exposes name/student number/major, payment scope,
+linked activity board and the existing setting/registration action. Neutral
+guidance and the styled confirmation retain the complete current-term replacement
+warning; original import, validation, save and feedback handlers remain. The
+white payment editor keeps read-only identity and all three payment scopes plus
+the activity-board picker; its footer remains visible while web content scrolls.
+Native presentation and backend contracts remain. Evidence:
+`docs/qa/ADMIN_DUES_WEB_2026-10-07.md`.
+
+2026-10-07 roster theme continuation (WP8/WP9 P0): web `/admin/roster` follows the
+main/member-management white theme. Search and workbook upload share a wrapping
+toolbar, neutral two-line guidance retains headerless XLSX column order and
+upsert/omission behavior, and the existing shared table uses name/student-number/
+major columns with 100-row server pagination. Empty/loading/error states appear
+inside the table; errors offer retry and search offers reset. The existing import,
+cache invalidation and success/error dialogs are retained. No inline identity or
+payment editor is added. Native retains its original view. Evidence:
+`docs/qa/ADMIN_ROSTER_WEB_2026-10-07.md`.
+
+2026-10-07 member-password continuation (WP8/WP9 P0): the same white member drawer
+adds an on-demand `비밀번호 관리` section with masked new-password and confirmation
+inputs. `비밀번호 변경` validates the existing policy/matching values, then confirms
+the named member before calling the separate protected reset API. Profile saving
+remains separate. Password drafts participate in unsaved close/reload protection;
+confirmation and mutation block competing leave actions. A self-reset requires
+pending profile changes to be saved first and routes to login after clearing the
+session. Failures retain input; success clears password inputs and refreshes
+member/operating-record/main queries. Passwords are never placed in query caches
+or persisted as drafts. No new screen or native changes.
+
+2026-10-07 banner refinement (WP8/WP9 P0): `/admin/banners` retains its controller/form and protected APIs. Web exposure bounds use date/time pickers in KST with minute precision; empty start/end retain unlimited bounds and invalid/reversed intervals block save. Editing converts API UTC timestamps into KST; saves convert KST to UTC. Destination selection now searches published posts across boards with board filter and 10-row pagination; the existing direct-link field remains under an expandable control. White section/list styling follows the admin main, and device-specific images, uploads/URLs, hide, order, active state and preview remain.
+
+2026-10-07 WP8/WP9 continuation: the user authorized implementing all existing admin tabs immediately with provisional defaults. A protected `/admin/_layout` owns the persistent controller and white sidebar/header. Canonical pages: `/admin`, `/admin/dashboard`, `/admin/banners`, `/admin/boards`, `/admin/accounts`, `/admin/roster`, `/admin/dues`, `/admin/reports`, `/admin/registration`, `/admin/audit-logs`, `/admin/migration-review`. Root section aliases, scope and event-edit links stay valid; automatic resolution retains event parameters and explicit navigation cancels deferred intents. Admin post detail/create/edit reuse current workflows at `/admin/boards/post/:id`, `/admin/boards/create`, `/admin/boards/post/:id/edit`, with Back/completion inside administration. Sidebar/member exit honor the write-leave guard. Member frames/routes and native behavior remain available. Dashboard day/trend/drilldown now use a protected API; old cumulative statistics and commands remain. Defaults/evidence: `docs/qa/ADMIN_PAGES_DECISIONS_2026-10-07.md`. This supersedes the pending dashboard/editor scope in the initial main note below.
+
+2026-10-07 admin main (WP8/WP9): web `/admin` defaults to `main`; existing sections use `/admin?section=...` and the current Expo route rather than introducing a separate web app. The white desktop sidebar and header reuse Pretendard/shared colors. Only authorized `/admin` web paths escape the root 405px member frame; member routes and native layouts retain their current behavior. Main shows seven statistics, pending summaries, independently paginated mutual-aid/suggestion queues and five recent audit records. Request details/processing open in a right panel; full lists, existing dashboard and other editors remain reachable. KST midnight, focus and periodic refetch update daily data; cached handled rows are also removed locally at midnight when the refresh fails. Main numbers currently open the existing dashboard; seven-day trends and metric/date drilldown remain the next dashboard slice. Full operational records paginate through the existing audit API. The requested main guidance, bottom quick actions and utilization button are absent. Clear legacy event-edit/scope parameters on explicit sidebar navigation to avoid replaying an old edit intent. Evidence: `docs/qa/ADMIN_MAIN_WEB_2026-10-07.md`.
+
 2026-10-01 typography compatibility (WP9 P0): app-owned text and inputs use `AppText` / `AppTextInput` from `components/AppTypography.tsx`. Each logical weight selects a static Pretendard face (400, 500, 600, 700, 800, 900) with native/web `fontWeight: normal`; 100-300 fall back to Regular. Nested text inherits the logical weight and can override it, explicit custom font families remain usable, and input refs expose the native instance. The root loads six assets with `useFonts` before showing navigation. Header/tab labels set the same family explicitly, and web smoothing remains enabled. Do not patch React Native component internals: RN 0.81 Text/TextInput have no `.render` property. Runtime and verification evidence: `docs/qa/TYPOGRAPHY_WEB_ANDROID_2026-10-01.md`.
 
 Before frontend expansion, Figma should provide:
@@ -320,3 +444,52 @@ Before frontend expansion, Figma should provide:
 - 2026-09-17 notice wording correction (WP6/WP9): the notice tab and Home notice summaries share deadline formatting. Upcoming notices display `마감 D-N`, same-day notices display `마감 D-day`, and past/invalid/missing deadlines add no suffix. Expired notices show only their publication date, without a standalone `마감` label or empty separator. Schedule-card status labels keep their separate existing policy.
 
 - 2026-09-17 WP5/WP9 club operation setting: administrator club create/edit forms expose `운영 중 / 운영 종료` independently of recruitment state. Missing legacy state defaults to `운영 중`. A recruitment-closed club remains selectable while operating. Operation-ended clubs disappear from new certification source choices, including source changes during edit, while an existing historical selection stays readable/editable. All source pages are loaded before filtering; an ended-only page cannot hide active clubs on later pages. Saving a guide invalidates the source-option cache along with its board posts.
+
+2026-10-07 WP8/WP9 board console: `/admin/boards` on web uses a white left
+taxonomy rail (원우회, 참여활동, 커뮤니티, 공지사항) and a right content area.
+Current resource/participation/notice tags filter a 10-row post table; no
+board finder is displayed. Settings, board creation and the existing notice
+editor open on demand. Actual notice boards/custom children remain selectable
+under collapsed settings; older boards stay under additional management,
+uncategorized boards under other boards, inactive boards under hidden boards.
+Create selects group, section and optional parent, supporting nested children.
+Deletion is recoverable branch hiding; restore is individual, parent first.
+Existing intro, FAQ, external-link, suggestion, mutual-aid and calendar
+controls remain reachable. Newly created intro/FAQ children default to normal
+post boards because the existing dedicated editors target canonical content.
+Unsaved create/notice/settings drafts confirm navigation; pending operations
+lock navigation. Native uses the existing view and existing admin post
+detail/create/edit routes are preserved. Evidence:
+`docs/qa/ADMIN_BOARDS_WEB_2026-10-07.md`.
+
+2026-10-07 board theme continuation (WP8/WP9 P0): the web board workspace
+scopes `AdminBoardWebTheme` around its subcategory filters and existing
+editors. Filters use a white row with a selected blue underline; section
+titles, policy rows, request/FAQ rows and compact actions follow the main
+console. Context defaults preserve the existing shared-control presentation
+outside this web workspace, including native. No routes, fields, mutations
+or authorization contracts change.
+
+2026-10-07 participation management continuation (WP8/WP9 P0): club and
+networking sections always show their canonical, active guide registration
+action (`동아리 등록` / `네트워킹 행사 등록`) separately from `활동 인증 보기`.
+Selecting a section without a sub-board prefers its guide board for settings,
+regardless of certification sort order. The guide filters read `동아리 목록` /
+`행사 목록`. Selecting the certification board retains `활동 인증 작성`, and
+custom children retain their existing create actions. Hidden/missing guide
+boards never fall back to registering on the certification board. Both guide
+create/edit forms now expose the existing operation status: active targets
+are selectable for new certifications, ended targets are excluded and existing
+certifications remain editable. Legacy missing status defaults to active;
+recruitment closure remains independent. Existing URL data, media requirements,
+paired source validation and admin-only guide authorization are preserved.
+Evidence: `docs/qa/ADMIN_PARTICIPATION_WEB_2026-10-07.md`.
+
+2026-10-07 participation link deferral (WP8/WP9 P0): per “참여버튼링크는
+없어도돼 그건 차후”, club/networking guide create/edit forms omit the
+application URL input, required checks and URL-entry guidance. New guides
+save only operation status and other existing metadata; edits preserve
+stored URL metadata without resubmitting an empty URL. The API accepts
+link-free guides while validating non-empty URLs from existing clients.
+Title/content/image requirements, operation status, certification links,
+historical records and backend administrator permissions remain.

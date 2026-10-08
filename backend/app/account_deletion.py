@@ -24,15 +24,18 @@ from app.models.like import Like
 from app.models.media import MediaAsset, PostAttachment
 from app.models.notification import Notification, NotificationSetting, PushDelivery, PushToken
 from app.models.post import Post
+from app.models.poll import PollBallot, PollOption
 from app.models.post_extension import PostMutualAid, PostSuggestion
 from app.models.rate_limit import RateLimitBucket
 from app.models.registration import PrivacyPolicyVersion
 from app.models.report import Report
 from app.models.search import SearchHistory
 from app.models.user import User
+from app.models.usage import UsagePageView
 from app.models.user_block import UserBlock
 from app.rate_limit import subject_rate_limit_hash
 from app.security import generate_token_urlsafe, utc_now, verify_password
+from app.usage_identity import usage_visitor_key
 
 
 logger = logging.getLogger(__name__)
@@ -209,7 +212,12 @@ def delete_user_account(
     orphaning the only privileged operator or official content.
     """
 
-    user = db.scalar(select(User).where(User.id == user_id).with_for_update())
+    user = db.scalar(
+        select(User)
+        .where(User.id == user_id)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
     if user is None:
         raise AppException(
             status_code=401,
@@ -257,6 +265,8 @@ def delete_user_account(
             .where(MediaAsset.owner_id == user.id)
         ).all()
     )
+    retained_media_ids.update(db.scalars(select(PollOption.media_id).join(MediaAsset, MediaAsset.id == PollOption.media_id)
+                                       .where(MediaAsset.owner_id == user.id)).all())
     deleted_media = [
         media
         for media in owned_media
@@ -292,9 +302,11 @@ def delete_user_account(
             post.author_id = None
 
         db.execute(delete(Like).where(Like.user_id == user.id))
+        db.execute(delete(PollBallot).where(PollBallot.user_id == user.id))
         db.execute(delete(Bookmark).where(Bookmark.user_id == user.id))
         db.execute(delete(Report).where(Report.reporter_id == user.id))
         db.execute(delete(SearchHistory).where(SearchHistory.user_id == user.id))
+        db.execute(delete(UsagePageView).where(UsagePageView.visitor_key == usage_visitor_key(user.id)))
         db.execute(
             delete(UserBlock).where(
                 or_(

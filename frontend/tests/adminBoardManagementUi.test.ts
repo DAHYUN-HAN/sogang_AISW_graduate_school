@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { createRequire } from "node:module";
 import test from "node:test";
 import ts from "typescript";
+import { readAdminImplementation } from "./helpers/adminImplementation";
 
 import type { Board, MediaAsset } from "../types";
 import type { AdminBoardCapability } from "../utils/adminContentManagement";
@@ -16,7 +17,7 @@ const settingsSource = readFileSync(
   join(process.cwd(), "components", "admin", "AdminBoardSettingsPanel.tsx"),
   "utf8",
 );
-const adminSource = readFileSync(join(process.cwd(), "app", "admin", "index.tsx"), "utf8");
+const adminSource = readAdminImplementation();
 const contentPanelSource = readFileSync(
   join(process.cwd(), "components", "admin", "AdminBoardContentPanel.tsx"),
   "utf8",
@@ -91,6 +92,7 @@ function loadSettingsPanelModule() {
   }).outputText;
   const module = { exports: {} as Record<string, unknown> };
   const mockRequire = (id: string) => {
+    if (id === "./AdminBoardTheme") return { useAdminBoardWebTheme: () => false };
     if (id.endsWith("/AppTypography")) return { AppText: "Text", AppTextInput: "TextInput" };
     if (id === "react-native") return { Pressable: "Pressable", Text: "Text", TextInput: "TextInput", View: "View" };
     return nodeRequire(id);
@@ -101,7 +103,7 @@ function loadSettingsPanelModule() {
 
 function loadExternalLinkDraftTransitions() {
   const start = adminSource.indexOf("export type ExternalLinkDraftState");
-  const end = adminSource.indexOf("function Panel", start);
+  const end = adminSource.indexOf("export function Panel", start);
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
   const transitionSource = adminSource.slice(start, end);
@@ -176,7 +178,8 @@ test("게시판 관련 사이드 메뉴는 게시판 관리 하나만 남는다"
     assert.doesNotMatch(sectionsSource, new RegExp(`label: "${label}"`));
   }
   for (const [key, label] of [
-    ["dashboard", "콘솔"],
+    ["main", "메인"],
+    ["dashboard", "대시보드"],
     ["banners", "배너"],
     ["boardManagement", "게시판 관리"],
     ["accounts", "계정"],
@@ -233,7 +236,7 @@ test("이벤트 로드와 누락 후속 effect는 명시적 이동 취소 게이
   );
   assert.match(loadedEventEffect, /adminDeferredEventGateTransition/);
   assert.match(loadedEventEffect, /type: "apply"/);
-  assert.ok(loadedEventEffect.indexOf("shouldApply") < loadedEventEffect.indexOf('setSection("boardManagement")'));
+  assert.ok(loadedEventEffect.indexOf("shouldApply") < loadedEventEffect.indexOf('setSectionState("boardManagement")'));
 });
 
 test("대시보드 게시판 카드는 실제 slug를 통합 선택 함수에 전달한다", () => {

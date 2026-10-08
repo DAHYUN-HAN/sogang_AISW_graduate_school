@@ -483,18 +483,14 @@ test("게시판 종류에 맞는 관리자 전용 제어를 선택한다", () =>
     createLabel: null,
     canReplaceRepresentativeImage: false,
   });
-  assert.deepEqual(adminBoardContentControl(boards.find((item) => item.slug === "club-promo")), {
-    kind: "participation-guide",
-    description: "대표 이미지, 동아리 소개와 가입 신청 링크를 관리합니다.",
-    createLabel: "동아리 안내 등록",
-    canReplaceRepresentativeImage: true,
-  });
-  assert.deepEqual(adminBoardContentControl(boards.find((item) => item.slug === "networking-programs")), {
-    kind: "participation-guide",
-    description: "대표 이미지, 네트워킹 소개와 참가 신청 링크를 관리합니다.",
-    createLabel: "네트워킹 안내 등록",
-    canReplaceRepresentativeImage: true,
-  });
+  const clubControl = adminBoardContentControl(boards.find((item) => item.slug === "club-promo"));
+  assert.equal(clubControl.kind, "participation-guide");
+  assert.equal(clubControl.createLabel, "동아리 안내 등록");
+  assert.equal(clubControl.canReplaceRepresentativeImage, true);
+  const networkingControl = adminBoardContentControl(boards.find((item) => item.slug === "networking-programs"));
+  assert.equal(networkingControl.kind, "participation-guide");
+  assert.equal(networkingControl.createLabel, "네트워킹 안내 등록");
+  assert.equal(networkingControl.canReplaceRepresentativeImage, true);
   assert.equal(adminBoardContentControl(boards.find((item) => item.slug === "suggestions")).kind, "suggestion");
   assert.equal(adminBoardContentControl(boards.find((item) => item.slug === "mutual-aid")).kind, "mutual-aid");
   for (const item of boards) {

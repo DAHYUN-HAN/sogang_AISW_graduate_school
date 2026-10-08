@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+import { readAdminImplementation } from "./helpers/adminImplementation";
 
 import * as appRoutes from "../utils/appRoutes";
 import type { EventItem } from "../types";
@@ -142,5 +143,5 @@ test("일정 전용 화면은 코드에 남아 있지 않다", () => {
   for (const name of ["eventDayRoute", "eventDetailRoute", "eventRootRoute"]) {
     assert.doesNotMatch(routes, new RegExp(name));
   }
-  assert.doesNotMatch(readFileSync("app/admin/index.tsx", "utf8"), /\/events\/\$\{event\.id\}/);
+  assert.doesNotMatch(readAdminImplementation(), /\/events\/\$\{event\.id\}/);
 });

@@ -5,6 +5,7 @@ import { runInNewContext } from "node:vm";
 import ts from "typescript";
 
 import { MINIMUM_SPLASH_DURATION_MS, shouldShowSplash } from "../utils/splash";
+import { useMemberWebFrame } from "../utils/adminMain";
 
 type Element = { type: unknown; props: Record<string, unknown> };
 
@@ -49,7 +50,7 @@ function layoutHarness(platform: "android" | "ios" | "web") {
     "react-native": { Platform: { OS: platform }, View: "View", Image: "Image",
       StyleSheet: { create: (styles: unknown) => styles }, useWindowDimensions: () => ({ width: 400 }) },
     "expo-font": { useFonts: () => [state.fontsLoaded] },
-    "expo-router": { Stack: Object.assign("Stack", { Protected: "Protected", Screen: "Screen" }) },
+    "expo-router": { Stack: Object.assign("Stack", { Protected: "Protected", Screen: "Screen" }), usePathname: () => "/home" },
     "expo-status-bar": { StatusBar: "StatusBar" },
     "expo-splash-screen": {
       preventAutoHideAsync: () => { calls.push("prevent"); return Promise.resolve(true); },
@@ -57,6 +58,8 @@ function layoutHarness(platform: "android" | "ios" | "web") {
     },
     "@tanstack/react-query": { QueryClient: class { clear() {} }, QueryClientProvider: "QueryClientProvider" },
     "../components/NotificationBootstrap": { default: "NotificationBootstrap" },
+    "../components/UsageTracking": { default: "UsageTracking" },
+    "../utils/adminMain": { useMemberWebFrame },
     "../components/StatusBarScrim": { default: "StatusBarScrim" },
     "../components/KeyboardViewport": { default: "KeyboardViewport" },
     "../stores/userStore": { useUserStore: (select: (store: typeof state) => unknown) => select(state) },

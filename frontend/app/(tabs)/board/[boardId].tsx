@@ -11,6 +11,7 @@ import MediaImage, { MediaImageBackground } from "../../../components/MediaImage
 import { BackIcon, EmptyCalendarIcon, LedgerIcon, SearchBackIcon, SearchIcon } from "../../../components/icons";
 import LoadingState from "../../../components/LoadingState";
 import PostCard from "../../../components/PostCard";
+import PersonListCard from "../../../components/PersonListCard";
 import { useBoardsQuery } from "../../../hooks/useApi";
 import { useAggregatePosts, useBoardPosts } from "../../../hooks/usePosts";
 import { API_ORIGIN } from "../../../services/api";
@@ -449,15 +450,9 @@ function CohortLeaderScreen({
             )
           }
           renderItem={({ item }) => (
-            <Pressable onPress={() => setSelected(item)} style={styles.cohortCard}>
-              <View style={styles.cohortBadge}>
-                <Text style={styles.cohortBadgeText}>{item.cohort}</Text>
-              </View>
-              <View style={styles.executiveText}>
-                <Text style={styles.executiveRole}>{item.members[0]?.role || "임원진"}</Text>
-                <Text style={styles.executiveName}>{item.members[0]?.name || "등록된 임원 없음"}{item.members.length > 1 ? ` 외 ${item.members.length - 1}명` : ""}</Text>
-              </View>
-            </Pressable>
+            <PersonListCard onPress={() => setSelected(item)} badge={item.cohort} captionFirst
+              caption={item.members[0]?.role || "임원진"}
+              name={`${item.members[0]?.name || "등록된 임원 없음"}${item.members.length > 1 ? ` 외 ${item.members.length - 1}명` : ""}`} />
           )}
         />
       )}
@@ -610,13 +605,9 @@ function PastCouncilScreen({
           contentContainerStyle={[styles.executiveContent, councils.length === 0 ? styles.emptyContent : null]}
           ListEmptyComponent={<View style={styles.emptyBox}><Text style={styles.emptyText}>등록된 역대 원우회가 없습니다.</Text></View>}
           renderItem={({ item }) => (
-            <Pressable onPress={() => setSelected(item)} style={styles.cohortCard}>
-              <View style={styles.cohortBadge}><Text style={styles.cohortBadgeText}>{item.cohort}</Text></View>
-              <View style={styles.executiveText}>
-                <Text style={styles.executiveRole}>{item.members[0]?.role || "임원진"}</Text>
-                <Text style={styles.executiveName}>{item.members[0]?.name || "등록된 임원 없음"}{item.members.length > 1 ? ` 외 ${item.members.length - 1}명` : ""}</Text>
-              </View>
-            </Pressable>
+            <PersonListCard onPress={() => setSelected(item)} badge={item.cohort} captionFirst
+              caption={item.members[0]?.role || "임원진"}
+              name={`${item.members[0]?.name || "등록된 임원 없음"}${item.members.length > 1 ? ` 외 ${item.members.length - 1}명` : ""}`} />
           )}
         />
       )}

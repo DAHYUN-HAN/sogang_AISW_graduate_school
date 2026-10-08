@@ -1,12 +1,14 @@
 import { useFonts } from "expo-font";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, usePathname } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useMemo, useState } from "react";
 import { Image, Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 
 import NotificationBootstrap from "../components/NotificationBootstrap";
+import UsageTracking from "../components/UsageTracking";
+import { useMemberWebFrame } from "../utils/adminMain";
 import StatusBarScrim from "../components/StatusBarScrim";
 import KeyboardViewport from "../components/KeyboardViewport";
 import { useUserStore } from "../stores/userStore";
@@ -39,7 +41,8 @@ export default function RootLayout() {
   const queryClient = useMemo(() => new QueryClient(), [sessionKey]);
   const isAdmin = isAdminUser(user);
   const isWeb = Platform.OS === "web";
-  const useWebFrame = isWeb && width > 430;
+  const pathname = usePathname();
+  const useWebFrame = useMemberWebFrame(Platform.OS, width, pathname, isAdmin);
 
   useEffect(() => () => queryClient.clear(), [queryClient]);
 
@@ -81,6 +84,7 @@ export default function RootLayout() {
         <KeyboardViewport style={[styles.appShell, useWebFrame ? styles.webAppShell : null]}>
           <StatusBar style="dark" />
           <NotificationBootstrap />
+          <UsageTracking />
           <Stack
             screenOptions={{
               headerStyle: { backgroundColor: "#ffffff" },
@@ -99,7 +103,7 @@ export default function RootLayout() {
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             </Stack.Protected>
             <Stack.Protected guard={isAdmin}>
-              <Stack.Screen name="admin/index" options={{ title: "관리자" }} />
+              <Stack.Screen name="admin" options={{ title: "관리자", headerShown: !isWeb }} />
             </Stack.Protected>
             <Stack.Screen name="legal/terms" options={{ headerShown: false }} />
             <Stack.Screen name="legal/privacy" options={{ headerShown: false }} />

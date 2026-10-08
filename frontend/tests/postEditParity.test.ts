@@ -55,7 +55,7 @@ test("수정 화면도 비어 있는 필수 칸을 한 번에 모아 테두리�
   assert.doesNotMatch(editSource, /styles\.errorText\}>\{fieldState\.error\.message\}/);
   // 값을 고치면 바로 풀린다.
   assert.match(editSource, /const clearOnChange = \(name: keyof FormValues/);
-  for (const name of ["title", "content", "professor", "contact", "applicationUrl"]) {
+  for (const name of ["title", "content", "professor", "contact"]) {
     assert.ok(editSource.includes(`clearOnChange("${name}"`), `${name} 해제 누락`);
   }
 });

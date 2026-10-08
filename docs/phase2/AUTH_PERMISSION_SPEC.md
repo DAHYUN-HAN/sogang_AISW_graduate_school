@@ -1,5 +1,33 @@
 # Phase 2 Auth and Permission Spec
 
+2026-10-08 WP5/WP8/WP9 hardening: irreversible account deletion reloads the user after acquiring its row lock, so an administrator password reset invalidates a credential cached earlier in that request. Mutual-aid evidence serialization and media access enforce the existing processing-author/admin policy, including legacy public assets. Administrator web confirmation queues and delayed alert callbacks belong to one authenticated session and are discarded on session replacement/logout without executing their actions.
+
+2026-10-07 WP6/WP8/WP9 notice polls: settings (including removal) and immediate
+close require explicit backend administrator checks. Poll participation uses
+only the authenticated account ID; request payloads cannot impersonate voters.
+All readable-notice members may inspect named results/participants. Participant
+responses exclude email, telephone, company and dues/roster fields. Read access
+follows the parent notice; votes require published post/active board and an open
+poll. Poll images use authenticated parent-post media authorization and existing
+signed URLs. Account-specific React Query keys isolate poll/participant state.
+P0 attendance correction: only one choice per card, independent revoting until
+that card's administrator closure. First vote permanently freezes that card's
+structure, including after all voters delete their accounts; other cards remain
+editable/addable. Legacy date/multiple/photo/nonbinary cards are results-only.
+Question-scoped participant queries expose only that card's answers and validate
+option ownership. Stale setting/removal revisions are rejected by the server.
+
+Kakao parity follow-up: `participation=not_voted` requires an owned question and
+no option filter. Its audience excludes inactive accounts and that card's voters;
+admin-only/inactive boards and unpublished notice visibility also restrict the
+audience. Caller access still goes through the parent notice authorization.
+Only user_id, nickname, cohort and empty answers are returned. No contact details
+or general member-directory endpoint is added. Participant cache keys additionally
+isolate question, option, participation mode and page. Administrator duplication
+creates an unsaved new card and uses the existing protected post save; it cannot
+copy ballot identities or reopen the source. Verification:
+`docs/qa/KAKAO_POLL_PARITY_2026-10-07.md`.
+
 2026-07-05 override: `정책_정의서_260705.pdf` changes the launch access model to a member-only app. `guest` users may use login, signup/email verification, password reset, public account-deletion request/verify, token refresh, registration options, legal/support screens, and health/docs only. Board, post, comment, search, event, FAQ, media, banner, notification, settings, and admin APIs require an authenticated user unless a later policy document explicitly re-opens a public route. A signed media file URL is a short-lived capability issued only after an authenticated authorization check.
 
 Status: implemented baseline, checked 2026-07-27
@@ -195,3 +223,35 @@ Rules:
 - The completion receipt is deliberately non-identifying. There is no fixed application-level legal retention claim; any receipt or backup interval requires explicit privacy-owner approval.
 
 2026-09-17 client isolation (WP5/WP9): the root query cache and mounted form state are replaced when the authenticated principal (ID/role) changes; retired caches are cleared. Private edit responses and signed media URLs cannot carry over to the next account. Edit forms wait for a fresh mount fetch before their one-time hydration.
+
+2026-10-07 admin main (WP8/WP9): `GET /api/admin/main` uses `require_admin`, including queue summaries and daily metrics. Its suggestion author labels/cohorts remain anonymous even to administrators. Detail/evidence uses the existing object-authorized post/media endpoints. New `POST /api/usage/page-views` uses `get_current_user`; guests are rejected, administrators are ignored, and server-derived HMAC pseudonyms represent ordinary members. Clients supply only bounded screen categories and UUID retry/device identifiers, not another member's identity. The collector is best-effort and cannot block navigation. `USAGE_TRACKING_ENABLED=false` disables writes. Account deletion removes current-key member usage records in the same deletion transaction, preserving other members' records. The request panel waits for fresh authorized detail, keeps failed drafts, confirms unsaved close/navigation and registers the browser's reload/close warning.
+
+2026-10-07 board console (WP8/WP9): board create/update and the new recoverable
+`DELETE /api/boards/admin/{id}` use explicit `require_admin`; ordinary-member
+deletion is rejected by the API. Board-set and notice-category filters on
+`GET /api/posts/admin/all` retain the same administrator dependency. Hiding
+a board also hides descendants, and activating a child requires active
+ancestors. Existing post/media authorization, private evidence protection,
+anonymous suggestion presentation and native administration remain in force.
+
+2026-10-07 WP8/WP9 member management: existing `PUT /users/admin/users/{id}`
+now accepts bounded profile corrections through `require_admin`. Email/account
+identity, password, consent records and legacy dues status remain outside the
+accepted payload. The web UI removes role conversion and presents member search
+and profile/status editing. Existing backend self-deactivation/self-demotion
+protection and older role clients remain. Profile corrections preserve historical
+author snapshots, and operational records include changed field names rather than
+profile/contact values.
+
+2026-10-07 WP8/WP9 administrator password reset: dedicated
+`PUT /api/users/admin/users/{id}/password` requires `require_admin` and the existing
+password policy (8–1024 characters on this endpoint). Admins specify a new password
+without retrieving or verifying the member's old password. Argon2 storage, target
+refresh revocation, active push deactivation, previous reset-token consumption and
+a secret-free `user.password_reset` audit commit together. Login, refresh, public
+reset confirmation and authenticated password changes share the user row lock;
+cached users/tokens are reloaded before validation so an in-flight old credential
+cannot bypass the reset. Existing access JWTs are not immediately revoked and may
+remain valid for up to their default 15-minute lifetime. Self-reset in the web
+editor clears local session/push storage and returns to login. No schema change,
+email-provider requirement or changes to the ordinary recovery route.

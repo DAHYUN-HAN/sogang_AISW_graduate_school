@@ -11,11 +11,12 @@ type StoredSession = {
 };
 
 type UserState = StoredSession & {
+  sessionGeneration: number;
   userId: number | null;
   isAuthenticated: boolean;
   hasHydrated: boolean;
   hydrateSession: () => Promise<void>;
-  setSession: (session: { access_token: string; refresh_token: string; user: AuthUser }) => void;
+  setSession: (session: { access_token: string; refresh_token: string; user: AuthUser }, options?: { preserveSession?: boolean }) => void;
   clearSession: () => void;
 };
 
@@ -73,6 +74,7 @@ const initialSession = readWebSession();
 
 export const useUserStore = create<UserState>((set, get) => ({
   ...initialSession,
+  sessionGeneration: initialSession.accessToken && initialSession.refreshToken && initialSession.user ? 1 : 0,
   userId: initialSession.user?.id ?? null,
   isAuthenticated: Boolean(initialSession.accessToken && initialSession.refreshToken && initialSession.user),
   hasHydrated: Platform.OS === "web",
@@ -81,22 +83,26 @@ export const useUserStore = create<UserState>((set, get) => ({
     const stored = await readStoredSession();
     set({
       ...stored,
+      sessionGeneration: get().sessionGeneration + 1,
       userId: stored.user?.id ?? null,
       isAuthenticated: Boolean(stored.accessToken && stored.refreshToken && stored.user),
       hasHydrated: true,
     });
   },
-  setSession: (session) => {
+  setSession: (session, options) => {
+    const current = get();
+    const preserveSession = options?.preserveSession && current.isAuthenticated
+      && current.user?.id === session.user.id && current.user.role === session.user.role;
     const next = {
       accessToken: session.access_token,
       refreshToken: session.refresh_token,
       user: session.user,
     };
     void writeStoredSession(next);
-    set({ ...next, userId: session.user.id, isAuthenticated: true, hasHydrated: true });
+    set({ ...next, sessionGeneration: current.sessionGeneration + (preserveSession ? 0 : 1), userId: session.user.id, isAuthenticated: true, hasHydrated: true });
   },
   clearSession: () => {
     void clearStoredSession();
-    set({ ...EMPTY_SESSION, userId: null, isAuthenticated: false, hasHydrated: true });
+    set({ ...EMPTY_SESSION, sessionGeneration: get().sessionGeneration + 1, userId: null, isAuthenticated: false, hasHydrated: true });
   },
 }));

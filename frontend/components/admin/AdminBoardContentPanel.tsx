@@ -64,7 +64,7 @@ export function adminBoardContentQueryPolicy({
 
 export type NoticeEditorOperation = {
   id: number;
-  kind: "upload" | "save";
+  kind: "upload" | "save" | "reload";
   boardId: number;
   editingNoticeId: number | null;
   generation: number;

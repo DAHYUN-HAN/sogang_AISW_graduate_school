@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.poll import PollDraft
 
 POST_TITLE_MAX_LENGTH = 100
 POST_CONTENT_MAX_LENGTH = 10_000
@@ -18,6 +19,8 @@ class PostMutationBase(BaseModel):
     is_anonymous: bool = False
     category: str | None = None
     metadata: dict | None = None
+    poll: PollDraft | None = None
+    poll_revision: int | None = Field(default=None, ge=1, strict=True)
 
 
 class PostCreate(PostMutationBase):

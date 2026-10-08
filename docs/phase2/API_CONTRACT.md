@@ -1,5 +1,68 @@
 # Phase 2 API Contract
 
+2026-10-08 WP6/WP8/WP9 P0 poll usability: `GET /posts/admin/all` additionally
+returns nullable `poll_summary` for each selected-page notice:
+`{question_count, open_count, closed_count, participant_count}`. Counts are batched
+for the current page; participants are distinct ballot owners across all cards,
+not the sum of each card's responses. Absent polls return null. Explicit admin
+authorization and existing filtering/pagination remain; ordinary member feeds
+do not expose this admin summary. No schema migration.
+
+2026-10-07 WP6/WP8/WP9 notice editor: existing post create/update payloads may
+store `metadata.notice_body = {version: 1, images: [{media_id, offset}]}`. Text
+stays in `content`; offsets count JavaScript UTF-16 code units from its start.
+The editor adjusts offsets when text changes or is trimmed, synchronizes image
+replacement/removal, and retains all media in `attachment_ids`. Readers render
+only valid offsets referencing image IDs in the authorized attachment response;
+missing/unknown versions and malformed/detached references fall back to ordinary
+text/attachments. No signed URL or duplicated body text is persisted. Existing
+post/admin and object-level media authorization is unchanged. `deadline_at` is
+sent as timezone-aware UTC and displayed/edited in Asia/Seoul time.
+
+2026-10-07 WP6/WP8/WP9 P0 attendance polls (supersedes generic P2 settings):
+- Kakao parity follow-up authorized without additional approval: participant
+  queries accept `participation=voted|not_voted` (default voted). `not_voted`
+  requires `question_id` and disallows `option_id`; returns currently active
+  accounts eligible to read that notice but without a selection on that card.
+  Board admin-only/inactive policy and hidden/draft authorship are applied to
+  audience selection as well as caller access. Only name/cohort/user_id and
+  empty answers are returned; never contact/roster fields. No schema migration.
+- Existing post create/update accepts optional `poll` with 1–20 independent cards
+  in `questions`. New/changed cards require exactly two text labels, single choice,
+  `kind=text`, `allow_multiple=false`, no option media. Titles/labels are trimmed
+  and limited to 100 characters; duplicate labels are rejected. `ends_at` must be
+  omitted/null; no automatic closure exists. Admin and notice-only rules apply.
+- Omitted `poll` preserves stored settings/ballots. Non-null edits carry the
+  loaded `poll.revision`; `poll:null` removal carries `poll_revision` on the post
+  request. Stale edits/removals return `409 POLL_CHANGED`. First vote freezes only
+  that card (`409 POLL_HAS_VOTES`); manually closed cards cannot be changed, removed
+  or reopened (`409 POLL_CLOSED`). Other cards may be added/edited/removed while
+  unvoted and open. Unchanged legacy records are accepted to preserve results.
+- `GET /posts/{id}/poll` returns revision, closed/locked state, participant count,
+  questions/options/counts and authenticated account's answers. Every card has
+  `closed_at`, `is_closed`, `locked`, `has_voted`, `participant_count`, `legacy`.
+  Parent closure means all cards are closed; `ends_at` is always null. Post detail
+  includes optional `poll` for rendering in the existing notice detail.
+- `PUT /posts/{id}/poll/vote` accepts `{revision,answers:[{question_id,option_ids}]}`;
+  a nonempty subset of cards may be answered, each with exactly one option.
+  Replace only that account's submitted card choices atomically, preserving all
+  other cards. Legacy nonbinary/date/multiple/photo votes are read-only and return
+  `409 POLL_LEGACY_READ_ONLY`. Closed votes return `409 POLL_CLOSED`; foreign/invalid choices
+  return `422 INVALID_POLL_OPTIONS`. Guests receive 401.
+- `GET /posts/{id}/poll/participants?page=1&size=20&question_id=...&option_id=...` uses the shared
+  pagination envelope, size at most 100. Each row exposes only `user_id`, current
+  `nickname`, `cohort` and chosen question/option IDs/titles/labels. Question scope
+  filters people and answers; an option must belong to the selected card/post.
+- `POST /posts/{id}/poll/close?question_id=...` closes only that card; omitted ID
+  retains the legacy close-all operation. Explicit administrator dependency and
+  idempotency apply. Current notice read/visibility rules apply to every poll endpoint;
+  voting additionally requires an active board and published post.
+- New invalid card config: 422; incompatible board type:
+  `422 POLL_NOTICE_ONLY`. Notice moves retain the same poll and ballots; converting
+  its board to another type is rejected. Poll and post saves share one transaction.
+- Poll create/update/remove/close adds administrator audit actions; individual
+  member choices are not duplicated in audit logs. Verification: `docs/qa/ATTENDANCE_POLLS_2026-10-07.md`.
+
 2026-07-05 override: `정책_정의서_260705.pdf` supersedes Phase 2 guest-read assumptions for launch. Auth endpoints remain guest-capable, but content APIs now require a Bearer access token: boards, posts, comments, search, media, events, FAQs, banners, notifications, settings, reports, and admin APIs.
 
 Status: implemented baseline, checked against the current code on 2026-07-27
@@ -685,6 +748,7 @@ Auth: admin
 Query:
 
 - `q`: optional email, nickname, or cohort keyword
+- Leading/trailing whitespace in `q` is ignored; filtering happens before pagination.
 - `role`: optional `user` or `admin`
 - `is_active`: optional boolean
 - `page`, `size`
@@ -720,7 +784,37 @@ Request:
 Rules:
 
 - Admins cannot remove their own admin role or deactivate themselves through this endpoint.
+- Partial member profile updates accept `nickname` (real display name, 1–50 characters), `cohort` (20), `major` (100), `phone` (20), `company`, `job_title`, and `position` (100 each), plus existing `enrollment_status` (`active`, `leave`, `graduated`) and `is_active` controls. Names normalize whitespace; optional text trims and blank values become null. Explicit null names, roles and status values are rejected. A changed major must be an active registration option; an unchanged legacy major is retained.
+- `email`, `username`, passwords and consent records cannot be changed here. The web member-management screen has no role-switching control; the existing role API remains compatible with older administration clients.
+- Profile edits do not rewrite post/comment author snapshots. Actual changes produce one `user.update` audit record with changed field names and non-sensitive state values, without storing contact/profile values. Unchanged saves create no audit record.
 - `dues_status` is not an accepted field; extra fields are rejected. The legacy database column is not a roster-management API.
+
+### PUT `/users/admin/users/{user_id}/password`
+
+Auth: admin (`require_admin`)
+
+Request: `{ "new_password": "NewPassword1!" }`. The password is required, 8–1024
+characters, and follows the existing letter/digit/special-character policy.
+Unknown fields and null are rejected. The current password is not required.
+
+Response data: `{ "id": 1, "changed": true, "sessions_revoked": 1,
+"push_tokens_deactivated": 1, "reset_tokens_invalidated": 1 }`.
+
+Rules:
+
+- A missing member returns 404; guests/non-admins return 401/403. An inactive
+  member may be reset without activation; roles and profile fields are unchanged.
+- Hash with Argon2, revoke all unrevoked target refresh tokens, deactivate active
+  target push tokens, and consume all unconsumed target password-reset tokens in
+  one transaction. Other members' credentials are untouched.
+- Login/session issuance and password writers serialize on the target user row;
+  refresh/reset confirmation reload credentials after acquiring the row lock.
+- Existing access JWTs remain valid until their configured expiry (default 15
+  minutes). The web editor clears its own session after a successful self-reset.
+- Rate limit: 10 requests per admin/member pair and 30 per IP over 15 minutes.
+- One `user.password_reset` audit record contains only the three affected counts,
+  actor and target IDs. Passwords, hashes and token values are never returned or
+  copied into operational records.
 
 ## 4. Boards and IA
 
@@ -832,6 +926,39 @@ cannot be read use the 400px default frame. Other board metadata keys remain
 unrestricted. PUT retains its existing whole-metadata replacement semantics:
 when `metadata` is present, callers must include every metadata key they intend
 to preserve.
+
+2026-10-07 WP8/WP9: an optional `metadata.admin_navigation` object places a
+board in the administrator tree without changing its ID or moving content:
+`{"section":"resources","parent_board_id":12}`. `section` is one of
+`executives`, `accounting`, `mutual-aid`, `cohort-leaders`, `past-councils`,
+`suggestions`, `faq`, `club`, `study`, `networking`, `album`, `resources`,
+`notices`; `parent_board_id` is omitted/null or a positive integer.
+The section must match the board category. A parent must exist in the same
+section, and an active board must have active ancestors. Self-parenting,
+cycles and invalid placement return `422 INVALID_BOARD_PARENT`. Updates
+also validate descendants. Setting `is_active: false` deactivates all
+descendants in the same transaction. Other metadata must still be retained
+by the caller under the existing whole-object replacement contract.
+
+### DELETE `/boards/admin/{board_id}`
+
+Auth: admin (`require_admin`). Recoverable removal deactivates the selected
+board and all descendants, preserving posts, comments and media. Unknown
+boards return `404 NOT_FOUND`. Success data is
+`{"id":12,"is_active":false,"board_ids":[12,13]}` and appends a
+`board.archive` audit record with affected board IDs. Restore through the
+existing PUT with `is_active: true`, parent first. Restoring a parent does
+not automatically restore children that may have been hidden independently.
+
+### GET `/posts/admin/all` board-console filters
+
+Auth: admin. In addition to existing filters, `board_ids` accepts at most
+100 comma-separated positive integer IDs (maximum 1100 characters);
+malformed selections return `422 VALIDATION_ERROR`. `notice_category` is
+`academic`, `event` or `other`, using the member feed's category resolution
+including legacy webinar/special-lecture notices under `event`. Filters
+combine with existing filters and apply in SQL before totals and pagination.
+Responses retain the existing normalized pagination contract.
 
 ## 5. Posts
 
@@ -977,10 +1104,10 @@ Rules:
 - Anonymous writing is allowed only when `boards.allow_anonymous = true`.
 - For anonymous or forced-anonymous posts, non-admin readers other than the author receive `author_id: null`, `author_nickname: "Anonymous"`, and no cohort. Author-name search and block-based filtering do not act as identity side channels; anonymous content remains reportable.
 - `club-promo` and `networking-programs` posts are admin-only even if a stale board configuration says otherwise.
-- Activity source guides (`club-promo`, `study-recruit`, `networking-programs`) expose only `metadata.operation_status`: `active` (운영 중) or `ended` (운영 종료). Omitted values default to active, and only the exact string `ended` counts as ended. Explicit null, unsupported strings, non-string values, or the removed `metadata.club_operation_status` key return `422 INVALID_CLUB_OPERATION_STATUS`. Migration `0031_operation_status_only` moves stored old-key values once and removes that key; when both keys were present, the new key wins. Omitting the key on update preserves the stored status on all three boards, so a status written directly in the database survives an ordinary edit by the post author. Only `club-promo` exposes a form control today; study and networking statuses are set by an administrator in the database. The guide remains readable after operation ends; an unchanged existing certification link remains editable, but new selections are rejected. Admins can explicitly resume operations by saving `active`.
+- Activity source guides (`club-promo`, `study-recruit`, `networking-programs`) expose only `metadata.operation_status`: `active` (운영 중) or `ended` (운영 종료). Omitted values default to active, and only the exact string `ended` counts as ended. Explicit null, unsupported strings, non-string values, or the removed `metadata.club_operation_status` key return `422 INVALID_CLUB_OPERATION_STATUS`. Migration `0031_operation_status_only` moves stored old-key values once and removes that key; when both keys were present, the new key wins. Omitting the key on update preserves the stored status on all three boards, so a status written directly in the database survives an ordinary edit by the post author. As of 2026-10-07, administrator create/edit forms expose the control for both `club-promo` and `networking-programs`; study status retains its existing administration path. The guide remains readable after operation ends; an unchanged existing certification link remains editable, but new selections are rejected. Admins can explicitly resume operations by saving `active`.
 - `GET /api/boards/{board_id}/posts` accepts `operation_status=active|ended`, which filters on `operation_status` alone; a missing value means `active`. Any other value returns `422`. Omitting the parameter returns every post, so guide lists still show retired entries while the activity-source picker asks for `active` only. Filtering on the server keeps retired entries from consuming list pages.
 - These administrator-managed participation guide posts require at least one ready image attachment. The first image is the list-only representative thumbnail; later images are ordered detail images returned in `attachments` for display below the body. Create/update preserves the submitted attachment order.
-- Their metadata requires an HTTP(S) `application_url`; the mobile detail CTA opens this administrator-managed URL. A legacy body line formatted as `참여 링크`, `가입 링크`, or `신청 링크` followed by an HTTP(S) URL is exposed only through `metadata.application_url` and is omitted from member-facing content. Create/edit canonicalizes the same duplicate line out of stored content, so the URL is rendered only by the CTA.
+- Per the 2026-10-07 user deferral, `application_url` is optional and its input is absent from administrator create/edit forms. Link-free guides can be created and edited; a non-empty URL supplied by an existing API client must still use HTTP(S). Existing stored URL metadata is preserved by the editors, and the mobile detail CTA retains its existing behavior. A legacy body line formatted as `참여 링크`, `가입 링크`, or `신청 링크` followed by an HTTP(S) URL is exposed only through `metadata.application_url` and is omitted from member-facing content. Create/edit canonicalizes the same duplicate line out of stored content, so the URL is rendered only by the CTA.
 - `study-recruit` remains user-writable, so every authenticated member may create and manage their own study recruitment post.
 - Club, study, and networking activity certification boards keep `write_permission = user`, so every authenticated member may submit an activity certification.
 - Activity certifications require at least one ready image and reject non-image attachments.
@@ -1087,7 +1214,7 @@ Rules:
 
 - `rejection_reason` is required when status is `rejected`.
 - A status change creates a council notification for the applicant.
-- Activity-certification bank-account metadata is omitted from member-facing post list/detail responses. It is available only through the protected admin post list and admin detail reads; the admin UI renders it only in the selected activity-certification board's content-management list.
+- Activity-certification bank-account metadata is omitted from member-facing post list/detail responses. It is available through the protected admin post list and admin detail reads; administrators can inspect it in the existing post detail (and the retained native content-management list).
 
 ### DELETE `/posts/{post_id}`
 
@@ -1467,6 +1594,8 @@ Synchronizes Expo delivery receipts, records failures, and disables tokens rejec
 
 ## 11.1 Admin Operations
 
+2026-10-07 WP8/WP9 dashboard: `GET /api/admin/dashboard` requires `require_admin` and uses `{status, data}`. Query: optional KST `date=YYYY-MM-DD` (defaults to today, future dates rejected), positive `post_page=1`/`comment_page=1`, `size=20` (1–50). Data: `date`, `as_of`, the seven `/admin/main` metric keys, `traffic`, seven ascending `{date,visits,visitors,page_views}` days ending on the selected date, and independently paginated `posts`/`comments` `{items,total,page,size,total_pages}`. `*_today` means the selected date and `*_yesterday` its previous day; today ends at now and historical days use the complete KST day. Uncollected/disabled traffic is null. Published nondeleted posts and retained comments match main counts. Anonymous/forced-anonymous parent posts also mask commenter labels/cohorts. Drilldown excludes author IDs, account data, attachments and proofs. Out-of-range pages keep totals with empty items. Defaults/verification: `docs/qa/ADMIN_PAGES_DECISIONS_2026-10-07.md`.
+
 - `GET /admin/stats`: active users, posts, comments, notices, events, reports, and push-delivery metrics.
 - `GET /admin/audit-logs?page=1&size=30`: recent protected administrator actions.
 - `GET /admin/legacy-import/summary`: grouped legacy-import counts by entity type, status, and action.
@@ -1573,3 +1702,19 @@ Rules:
 - Explicit removal is allowed only when at least one evidence file or a valid HTTP(S) proof link remains. Files/link switching clears the replaced representation. Validation failure preserves the stored record and relations.
 - New evidence must be a ready private upload owned by the requester (or submitted by an administrator). Existing linked evidence, including old admin-uploaded or non-private evidence, may be retained. Removal changes attachment relations only.
 - Legacy clients omitting/setting false on `replace_evidence` retain the existing behavior for empty hidden evidence lists. There is no database migration. Signed URLs keep their existing expiration semantics.
+
+### 2026-10-07 web admin main (WP8/WP9)
+
+`GET /api/admin/main` requires `require_admin`. Query: `mutual_page=1`, `suggestion_page=1` (positive integers), `size=5` (1–50). Success uses `{status, data}` with:
+
+- `date` (current KST date), `as_of` (UTC timestamp).
+- `metrics`: `visits_today`, `visitors_today`, `page_views_today`, `posts_today`, `posts_yesterday`, `comments_today`, `comments_yesterday`.
+- `traffic`: `status` = `not_started`, `collecting`, or `disabled`; `started_at` = earliest accepted navigation event or null. Traffic metrics are null before collection or when disabled; collected zero remains zero.
+- `pending`: global `mutual_aid`, `suggestions`, and `reports` (open/reviewing).
+- `mutual_aid` / `suggestions`: `{items, pending_count, today_handled_count, total, page, size, total_pages}`. Each item contains `id`, `board_id`, `kind`, `title`, `status`, `author_label`, `author_cohort`, `received_at`, `handled_at`. Suggestion labels are always anonymous.
+
+Published, nondeleted requests on active matching-type boards are filtered in SQL before pagination. Include all pending requests, plus completed/rejected mutual-aid or answered suggestions whose review/reply time is in the current KST day. Null handling times are excluded from handled items. Pending precedes handled; each group sorts newest relevant timestamp then descending ID. Counts cover all eligible rows. Out-of-range pages clamp after mutation. Daily posts count published, nondeleted posts across all boards; daily comments include retained replies. Today ends at `as_of`, yesterday is the complete preceding KST day.
+
+`POST /api/usage/page-views` requires an authenticated member. Request: UUID `event_id`, UUID `device_id`, and one `screen` category (`home`, `notices`, `community`, `participation`, `council`, `board`, `post`, `settings`, `search`, `notifications`, `faq`). Extra fields are rejected. Administrator use or `USAGE_TRACKING_ENABLED=false` returns `{accepted:false}` without storing a row. Successful member events return `{accepted:true}`. A repeated event ID for the same visitor/device is idempotent; ownership conflict returns `409 EVENT_CONFLICT`. Server derives a pseudonymous visitor key and resumes the same visitor/device session only within 30 minutes of its previous event. Rate limit: 120 per member / 360 per source IP in 300 seconds; source IP is not part of the usage row. Raw URLs, query strings, IPs, user agents and content are not stored.
+
+Existing post/comment endpoints now append administrator create/update/delete actions in the mutation transaction, with safe title/changed-field metadata. Regular-member changes do not append administrator records. Identical post/comment edits and identical mutual-aid/suggestion processing saves do not append a log; identical processing preserves `reviewed_at` / `replied_at`.

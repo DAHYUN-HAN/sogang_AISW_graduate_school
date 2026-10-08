@@ -1,5 +1,36 @@
 # Phase 2 DB Schema Decisions
 
+2026-10-08 WP8/WP9 hierarchy concurrency: all administrator board create/update/archive transactions acquire `pg_advisory_xact_lock(hashtext('aisw-board-navigation-mutations'))` before reading or locking board rows. This serializes cycle validation and descendant archival, preventing active children beneath concurrently archived parents. The SQLite path has no PostgreSQL advisory lock; runtime concurrency is verified against isolated PostgreSQL. No schema migration is added for this lock.
+
+2026-10-07 WP6/WP8/WP9 notice body images reuse `posts.metadata.notice_body`
+version 1: ordered `{media_id, offset}` placements in the existing plain content.
+Offsets use JavaScript UTF-16 code units. PostAttachment remains the canonical
+media relationship and access/lifecycle authority. No text snapshots, file URLs,
+new tables/columns or migration are added for this editor follow-up.
+
+2026-10-07 WP6/WP8/WP9 P0 attendance polls, revision `0034_attendance_polls`:
+each existing `poll_questions` row represents an independent card with nullable
+UTC `closed_at` and `first_voted_at`. Backfill both from the old parent values;
+retain every question/option/ballot/selection ID. Parent unique post FK and unique
+`(poll_id,user_id)` ballot remain; single-card votes replace only selections for
+requested question IDs. Counts aggregate distinct ballots per card. Old kind,
+multi/media/ends fields remain for historical storage; old automatic ends no
+longer control voting. No name/count snapshots or duplicated records are added.
+SQLite migration round trip and local backup/row counts are verified; PostgreSQL
+runtime concurrency and deployment remain Phase 5 QA/operator work.
+
+Historical schema baseline (WP6/WP8/WP9), revision `0033_notice_polls`:
+`post_polls` has unique post FK, independent UTC ends/closed/first-voted times and
+settings revision; `poll_questions` stores ordered text/date questions and
+multiple-choice flag; `poll_options` stores ordered labels and optional image FK;
+`poll_ballots` has unique `(poll_id,user_id)`; `poll_selections` has unique
+`(ballot_id,option_id)`. Child poll FKs cascade. Do not duplicate names, profiles
+or counts; results aggregate current selections and profiles. Account deletion
+removes ballots/selections and keeps `first_voted_at`; poll-linked images retain
+their file while ownership is removed. Settings/votes/close serialize on post
+locks, with board shared locks to coordinate conversion/archival. Alembic round
+trip is checked on a disposable database; no production migration is performed.
+
 Status: implemented baseline through `0029_roster_dues_separation`, checked 2026-09-23
 
 ## 1. Core Decisions
@@ -646,3 +677,28 @@ was unavailable; the exact environmental limitation is recorded in the roster/pa
 - 2026-09-29: `events.notice_post_id` (nullable integer, FK to `posts.id` with `ON DELETE SET NULL`, indexed) links an event to the notice that explains it. Migration `0030_event_notice_link` adds the column only; every existing event starts empty. Administrators fill it directly in the database because the event write schema deliberately omits the field, which also means an app-side event edit cannot wipe it. Deleting the linked post nulls the column rather than blocking the delete, and reads additionally hide links whose target is no longer openable.
 - 2026-09-28: the operational lifecycle now covers `study-recruit` and `networking-programs` as well, and the key is renamed to `metadata.operation_status`. Still JSONB only — no table, column, or Alembic migration. `club_operation_status` remains readable so unmigrated rows keep working, and any update through the API rewrites the row to the new key, so a bulk backfill is optional rather than required. Study and networking statuses are written directly in the database by an administrator; because the app never sends the key for those boards, the update path explicitly carries the stored value over, otherwise an ordinary edit by the post author would erase it.
 - 2026-09-30 WP5/WP9 override: migration `0031_operation_status_only` moves any stored `club_operation_status` into `operation_status` and removes the old key. When both keys exist, the new key wins; only the exact `ended` value remains ended. Missing status still means active. The API and mobile app now read only `operation_status`, and source-guide writes reject the old key. Omitted status on update still preserves a stored new-key value.
+
+### 2026-10-07 member traffic (WP8/WP9 P1)
+
+Migration `0032_admin_usage` follows `0031_operation_status_only` and adds `usage_page_views`:
+
+- `event_id VARCHAR(36)` primary key for retry deduplication.
+- `visitor_key VARCHAR(64)` non-null HMAC of the authenticated member ID using the server auth secret; no raw member ID or user FK.
+- `device_id VARCHAR(36)`, `session_id VARCHAR(36)`, `screen VARCHAR(30)`, and UTC `created_at DATETIME`, all non-null.
+- Indexes on `created_at` and `(visitor_key, device_id, created_at)` support daily aggregation and session continuation.
+
+This is first-party ordinary-member app/web navigation, with no provider, raw URL, query string, IP, user agent or content column. Administrators and guests do not create rows. Count sessions/visitors distinctly for a KST day and count accepted event rows for page views; a session continues only within 30 minutes on the same visitor/device. PostgreSQL member row locks serialize event/session assignment. Account deletion removes that member's current-key usage rows in the existing deletion transaction and leaves other members' rows. Rotating the auth secret changes future visitor pseudonyms and unlinks previous-key events from the current derivation. No history is backfilled and no retention duration is invented in this change.
+
+Apply `alembic upgrade head` before running the changed API, including when collection is disabled, because admin overview reads the table. Downgrade drops these usage events and its two indexes. Isolated SQLite upgrade/downgrade/re-upgrade is verified; PostgreSQL/Docker execution is blocked locally as recorded in `docs/qa/ADMIN_MAIN_WEB_2026-10-07.md`.
+
+### 2026-10-07 administrator board tree (WP8/WP9 P0)
+
+Use the existing board JSON metadata for optional `admin_navigation.section`
+and `admin_navigation.parent_board_id`. Existing canonical boards resolve
+their section from their slug/type when metadata is absent; no backfill,
+column, table or migration is needed. The API validates parent existence,
+section/category consistency, active ancestors and cycles on create/update.
+Recoverable removal sets `is_active=false` for the branch in one transaction
+and writes the existing audit log; posts/comments/media are retained.
+Restoration is individual, parent before child. This placement describes the
+administrator tree; it does not rewrite the member app's fixed navigation.

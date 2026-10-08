@@ -141,6 +141,7 @@ export type BannerPayload = {
 };
 
 export type PostListItem = {
+  poll_summary?: {question_count: number; open_count: number; closed_count: number; participant_count: number} | null;
   id: number;
   board_id: number;
   board_name?: string;
@@ -182,6 +183,7 @@ export type ActivityCertificationParticipantDetail = {
 };
 
 export type PostDetail = {
+  poll?: NoticePoll | null;
   id: number;
   board_id: number;
   title: string;
@@ -211,6 +213,29 @@ export type PostDetail = {
 };
 
 export type MutualAidStatus = "processing" | "completed" | "rejected";
+
+export type NoticePollQuestion = {
+  id: number; title: string; kind: "text" | "date"; allow_multiple: boolean;
+  closed_at?: string | null; is_closed?: boolean; locked?: boolean;
+  participant_count?: number; has_voted?: boolean; legacy?: boolean;
+  options: {id: number; label: string; media_id: number | null; vote_count: number}[];
+};
+export type NoticePoll = {
+  id: number; post_id: number; revision: number; ends_at: string | null; closed_at: string | null;
+  locked: boolean; is_closed: boolean; participant_count: number; has_voted: boolean;
+  questions: NoticePollQuestion[]; my_answers: {question_id: number; option_ids: number[]}[];
+};
+export type NoticePollDraft = {
+  revision?: number; ends_at: string; locked?: boolean; is_closed?: boolean; participant_count?: number;
+  questions: {id?: number; title: string; kind: "text" | "date"; allow_multiple: boolean;
+    locked?: boolean; is_closed?: boolean; participant_count?: number; legacy?: boolean; saved_title?: string;
+    options: {id?: number; label: string; media_id?: number | null}[]}[];
+};
+export type NoticePollPayload = {revision?: number; ends_at: string | null; questions: NoticePollDraft["questions"]};
+export type NoticePollParticipant = {
+  user_id: number; nickname: string; cohort: string | null;
+  answers: {question_id: number; question_title: string; option_id: number; label: string}[];
+};
 
 export type SuggestionDetail = {
   category?: string;
@@ -440,6 +465,44 @@ export type AdminStats = {
   open_reports: number;
   active_push_tokens: number;
   push_failed: number;
+};
+
+export type AdminMainRequest = {
+  id: number; board_id: number; kind: "mutual_aid" | "suggestion"; title: string;
+  status: "processing" | "completed" | "rejected" | "received" | "answered";
+  author_label: string; author_cohort?: string | null; received_at: string; handled_at: string | null;
+};
+export type AdminMainQueue = {
+  items: AdminMainRequest[]; pending_count: number; today_handled_count: number;
+  total: number; page: number; size: number; total_pages: number;
+};
+export type AdminMainOverview = {
+  date: string; as_of: string;
+  metrics: { visits_today: number | null; visitors_today: number | null; page_views_today: number | null;
+    posts_today: number; posts_yesterday: number; comments_today: number; comments_yesterday: number };
+  traffic: { status: "collecting" | "disabled" | "not_started"; started_at: string | null };
+  pending: { mutual_aid: number; suggestions: number; reports: number };
+  mutual_aid: AdminMainQueue; suggestions: AdminMainQueue;
+};
+
+export type AdminDashboardPageData<T> = {
+  items: T[]; total: number; page: number; size: number; total_pages: number;
+};
+export type AdminDashboardPost = {
+  id: number; board_id: number; board_name: string; title: string;
+  author_label: string; author_cohort: string | null; created_at: string;
+};
+export type AdminDashboardComment = {
+  id: number; post_id: number; board_id: number; post_title: string; content: string;
+  author_label: string; author_cohort: string | null; created_at: string;
+};
+export type AdminDashboardOverview = {
+  date: string; as_of: string;
+  metrics: AdminMainOverview["metrics"];
+  traffic: AdminMainOverview["traffic"];
+  trend: { date: string; visits: number | null; visitors: number | null; page_views: number | null }[];
+  posts: AdminDashboardPageData<AdminDashboardPost>;
+  comments: AdminDashboardPageData<AdminDashboardComment>;
 };
 
 export type AdminAuditLog = {

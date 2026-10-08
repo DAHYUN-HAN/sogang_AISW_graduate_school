@@ -1,9 +1,8 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
+import { readAdminImplementation } from "./helpers/adminImplementation";
 
-const source = (path: string) => readFileSync(path, "utf8");
-const admin = source("app/admin/index.tsx");
+const admin = readAdminImplementation();
 
 // 일정 전용 화면(일정 상세·날짜별 일정)은 없앴다. 사용자에게 일정 분류가 보이는 곳은
 // 홈 달력뿐이고, 거기 검사는 eventCalendar.test.ts가 한다.

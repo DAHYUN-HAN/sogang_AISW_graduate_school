@@ -241,3 +241,39 @@ def test_representative_image_endpoint_is_admin_and_participation_only(api) -> N
     assert ordinary_response.status_code == 400
     assert document_response.status_code == 400
     assert document_response.json()["code"] == "IMAGE_ONLY"
+
+
+@pytest.mark.parametrize("slug", ["club-promo", "networking-programs"])
+def test_admin_can_create_and_edit_participation_without_an_application_url(api, slug: str) -> None:
+    fixture = _setup_participation_post(api, slug=slug)
+    payload = {
+        "title": "신규 참여활동", "content": "소개 내용", "attachment_ids": [fixture["old_hero_id"]],
+        "metadata": {"operation_status": "ended"},
+    }
+    denied = api.client.post(f"/api/boards/{fixture['board_id']}/posts", headers=api.headers["owner"], json=payload)
+    assert denied.status_code == 403
+    created = api.client.post(f"/api/boards/{fixture['board_id']}/posts", headers=api.headers["admin"], json=payload)
+    assert created.status_code == 200, created.json()
+    post_id = created.json()["data"]["id"]
+    with api.session() as db:
+        assert db.get(Post, post_id).metadata_json == {"operation_status": "ended"}
+
+    edited = api.client.put(
+        f"/api/posts/{post_id}", headers=api.headers["admin"],
+        json={**payload, "title": "수정한 참여활동", "metadata": {"operation_status": "active"}},
+    )
+    assert edited.status_code == 200, edited.json()
+    with api.session() as db:
+        assert db.get(Post, post_id).metadata_json == {"operation_status": "active"}
+
+
+@pytest.mark.parametrize("slug", ["club-promo", "networking-programs"])
+def test_optional_participation_url_still_requires_http_or_https(api, slug: str) -> None:
+    fixture = _setup_participation_post(api, slug=slug)
+    response = api.client.post(
+        f"/api/boards/{fixture['board_id']}/posts", headers=api.headers["admin"],
+        json={"title": "참여활동", "content": "소개", "attachment_ids": [fixture["old_hero_id"]],
+              "metadata": {"application_url": "javascript:alert(1)"}},
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "INVALID_APPLICATION_URL"

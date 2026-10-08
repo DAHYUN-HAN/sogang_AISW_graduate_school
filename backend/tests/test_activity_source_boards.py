@@ -289,3 +289,34 @@ def test_a_post_cannot_be_moved_into_an_activity_board(api, activity_slug, sourc
     )
     assert moved.status_code == 400
     assert "resource boards" in moved.json()["message"]
+
+
+def test_admin_networking_operation_changes_control_new_certifications(api) -> None:
+    ids = _setup(api, "networking-activity", "networking-programs", "admin")
+    guide_payload = {
+        "title": "네트워킹 행사", "content": "행사 안내", "attachment_ids": [1],
+        "metadata": {"application_url": "https://example.com/join", "operation_status": "active"},
+    }
+    saved = api.client.put(f"/api/posts/{ids['live']}", headers=api.headers["admin"], json=guide_payload)
+    assert saved.status_code == 200
+    created = _create(api, ids, "live")
+    assert created.status_code == 200
+    certification_id = created.json()["data"]["id"]
+
+    ended_payload = {**guide_payload, "metadata": {**guide_payload["metadata"], "operation_status": "ended"}}
+    denied = api.client.put(f"/api/posts/{ids['live']}", headers=api.headers["owner"], json=ended_payload)
+    assert denied.status_code == 403
+    ended = api.client.put(f"/api/posts/{ids['live']}", headers=api.headers["admin"], json=ended_payload)
+    assert ended.status_code == 200
+    rejected = _create(api, ids, "live")
+    assert rejected.status_code == 422
+    assert rejected.json()["code"] == "INVALID_ACTIVITY_SOURCE"
+
+    historical_edit = api.client.put(
+        f"/api/posts/{certification_id}", headers=api.headers["owner"],
+        json={**_payload(ids["payer"], str(ids["live"])), "content": "기존 인증 수정"},
+    )
+    assert historical_edit.status_code == 200
+    resumed = api.client.put(f"/api/posts/{ids['live']}", headers=api.headers["admin"], json=guide_payload)
+    assert resumed.status_code == 200
+    assert _create(api, ids, "live").status_code == 200

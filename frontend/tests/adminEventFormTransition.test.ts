@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import test from "node:test";
+import { readAdminImplementation } from "./helpers/adminImplementation";
 
 import { eventCategoryValueForSubmit } from "../utils/eventCategoryPresentation";
 import { adminEventFormRouteTransition } from "../utils/adminEventForm";
 
-const adminSource = readFileSync("app/admin/index.tsx", "utf8");
+const adminSource = readAdminImplementation();
 
 test("일정 편집에서 새 일정 폼으로 이동하면 폼을 초기화하고 선택한 3종 category를 그대로 저장한다", () => {
   const transition = adminEventFormRouteTransition({

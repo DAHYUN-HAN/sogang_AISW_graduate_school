@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@db:5432/sogang_app"
     app_name: str = "AI·SW CAMPUS API"
     app_version: str = "0.1.0"
+    usage_tracking_enabled: bool = True
     auth_secret_key: str = "change-me-in-production"
     access_token_expire_minutes: int = 15
     refresh_token_expire_days: int = 30

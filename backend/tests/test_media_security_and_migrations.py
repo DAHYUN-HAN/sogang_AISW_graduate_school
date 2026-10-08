@@ -14,7 +14,7 @@ from app import migrate
 from app.config import settings
 from app.errors import AppException
 from app.main import app
-from app.media_service import media_file_signature, normalize_original_filename
+from app.media_service import media_file_signature, normalize_original_filename, require_media_access
 from app.models.banner import Banner
 from app.models.board import Board
 from app.models.media import MediaAsset, PostAttachment
@@ -561,7 +561,7 @@ def test_post_media_reuses_post_read_policy_and_any_readable_link_allows(api, me
     assert _signed_file_response(api, access).status_code == 200
 
 
-def test_private_mutual_aid_media_is_readable_by_members_after_attachment(api, media_storage) -> None:
+def test_private_mutual_aid_media_is_processing_owner_or_admin_only(api, media_storage) -> None:
     _, private_directory = media_storage
     uploaded = _upload(api, filename="evidence.pdf", body=PDF_BYTES, content_type="application/pdf", private=True)
     assert uploaded.status_code == 200
@@ -573,10 +573,10 @@ def test_private_mutual_aid_media_is_readable_by_members_after_attachment(api, m
         db.add(PostAttachment(post_id=1, media_id=media_id, sort_order=0))
         db.commit()
 
-    # 증빙은 신청 글을 읽을 수 있는 원우라면 누구나 열 수 있다.
+    # Reading the request does not authorize another member to read evidence.
     other_access = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["other"])
-    assert other_access.status_code == 200
-    assert _signed_file_response(api, other_access).content == PDF_BYTES
+    assert other_access.status_code == 404
+    assert other_access.json()["code"] == "NOT_FOUND"
 
     owner_access = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"])
     assert owner_access.status_code == 200
@@ -587,7 +587,7 @@ def test_private_mutual_aid_media_is_readable_by_members_after_attachment(api, m
     assert _signed_file_response(api, admin_access).content == PDF_BYTES
 
 
-def test_mutual_aid_evidence_is_visible_to_everyone_and_editable_by_the_owner(api, media_storage) -> None:
+def test_mutual_aid_evidence_is_redacted_for_members_and_editable_by_the_owner(api, media_storage) -> None:
     uploaded = _upload(
         api,
         filename="evidence.pdf",
@@ -609,8 +609,12 @@ def test_mutual_aid_evidence_is_visible_to_everyone_and_editable_by_the_owner(ap
     for actor in ("owner", "other", "admin"):
         detail = api.client.get("/api/posts/1", headers=api.headers[actor])
         assert detail.status_code == 200
-        assert [item["id"] for item in detail.json()["data"]["attachments"]] == [media_id]
-        assert detail.json()["data"]["metadata"]["proof_url"] == "https://example.com/private-proof"
+        if actor == "admin":
+            assert [item["id"] for item in detail.json()["data"]["attachments"]] == [media_id]
+            assert detail.json()["data"]["metadata"]["proof_url"] == "https://example.com/private-proof"
+        else:
+            assert detail.json()["data"]["attachments"] == []
+            assert "proof_url" not in detail.json()["data"]["metadata"]
         assert detail.json()["data"]["mutual_aid"]["has_evidence"] is True
 
     updated = api.client.put(
@@ -666,16 +670,70 @@ def _evidence_edit_payload(attachment_ids, proof_url=""):
     }
 
 
-def test_evidence_is_visible_in_read_detail_but_edit_detail_still_requires_authorization(api, media_storage) -> None:
+@pytest.mark.parametrize("private", [True, False])
+@pytest.mark.parametrize("state", ["processing", "completed", "rejected", "missing_extension"])
+def test_evidence_direct_access_requires_processing_request_author_or_admin(api, media_storage, private, state) -> None:
+    # Upload ownership must not replace request authorship, including legacy media.
+    media_id = _attach_evidence(api, actor="admin", private=private)
+    with api.session() as db:
+        extension = db.scalar(select(PostMutualAid).where(PostMutualAid.post_id == 1))
+        if state == "missing_extension":
+            db.delete(extension)
+        else:
+            extension.status = state
+        db.commit()
+        media = db.get(MediaAsset, media_id)
+        for user_id, allowed in ((1, state == "processing"), (2, False), (3, True)):
+            user = db.get(User, user_id)
+            if allowed:
+                assert require_media_access(db, media, user).id == media_id
+            else:
+                with pytest.raises(AppException) as rejected:
+                    require_media_access(db, media, user)
+                assert rejected.value.status_code == 404
+                assert rejected.value.code == "NOT_FOUND"
+
+    for actor, expected in (("owner", 200 if state == "processing" else 404), ("other", 404), ("admin", 200)):
+        for path in (f"/api/media/{media_id}", f"/api/media/{media_id}/access-url", f"/api/media/{media_id}/download-link"):
+            assert api.client.get(path, headers=api.headers[actor]).status_code == expected
+
+
+@pytest.mark.parametrize("private", [True, False])
+def test_mutual_aid_image_lists_hide_evidence_thumbnail_and_link_from_members(api, media_storage, private) -> None:
+    upload = _upload(api, filename="proof.png", private=private)
+    media_id = upload.json()["data"]["id"]
+    with api.session() as db:
+        db.get(Post, 1).metadata_json = {"proof_url": "https://example.com/private-proof", "relation": "self"}
+        db.add(PostAttachment(post_id=1, media_id=media_id, sort_order=0))
+        db.commit()
+    for actor in ("owner", "other"):
+        detail = api.client.get("/api/posts/1", headers=api.headers[actor]).json()["data"]
+        assert detail["attachments"] == []
+        assert "proof_url" not in detail["metadata"]
+        listed = api.client.get("/api/boards/1/posts", headers=api.headers[actor]).json()["data"]
+        post = next(item for item in listed if item["id"] == 1)
+        assert "proof_url" not in post["metadata"]
+        assert post["attachment_count"] == 0
+        assert post["thumbnail_media_id"] is None
+        assert post["thumbnail_url"] is None
+    admin_detail = api.client.get("/api/posts/1", headers=api.headers["admin"]).json()["data"]
+    assert [item["id"] for item in admin_detail["attachments"]] == [media_id]
+    assert admin_detail["metadata"]["proof_url"] == "https://example.com/private-proof"
+    edit = api.client.get("/api/posts/1?for_edit=true", headers=api.headers["owner"]).json()["data"]
+    assert [item["id"] for item in edit["attachments"]] == [media_id]
+    assert edit["metadata"]["proof_url"] == "https://example.com/private-proof"
+
+
+def test_evidence_is_redacted_in_member_read_detail_and_exposed_in_authorized_edit(api, media_storage) -> None:
     media_id = _attach_evidence(api, actor="admin")
     for actor in ("owner", "other"):
         detail = api.client.get("/api/posts/1", headers=api.headers[actor]).json()["data"]
-        assert [item["id"] for item in detail["attachments"]] == [media_id]
-        assert detail["metadata"]["proof_url"] == "https://example.com/private-proof"
+        assert detail["attachments"] == []
+        assert "proof_url" not in detail["metadata"]
         listed = api.client.get("/api/boards/1/posts", headers=api.headers[actor]).json()["data"]
         listed_post = next(post for post in listed if post["id"] == 1)
-        assert listed_post["metadata"]["proof_url"] == "https://example.com/private-proof"
-        assert listed_post["attachment_count"] == 1
+        assert "proof_url" not in listed_post["metadata"]
+        assert listed_post["attachment_count"] == 0
     for actor in ("owner", "admin"):
         response = api.client.get("/api/posts/1?for_edit=true", headers=api.headers[actor])
         assert response.status_code == 200
@@ -695,7 +753,7 @@ def test_regular_post_edit_detail_requires_owner_or_admin(api) -> None:
 
 @pytest.mark.parametrize("state", ["completed", "rejected", "deleted", "inactive_board", "restricted_board", "missing_extension"])
 @pytest.mark.parametrize("private", [True, False])
-def test_evidence_access_follows_post_readability_after_request_becomes_uneditable(api, media_storage, state, private) -> None:
+def test_evidence_access_is_hidden_after_request_becomes_uneditable(api, media_storage, state, private) -> None:
     media_id = _attach_evidence(api, private=private)
     initial = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"])
     assert initial.status_code == 200
@@ -717,7 +775,7 @@ def test_evidence_access_follows_post_readability_after_request_becomes_uneditab
         media = db.get(MediaAsset, media_id)
         legacy_path = f"/uploads/{media.stored_filename}"
         db.commit()
-    expected_read_status = 404 if state in {"deleted", "inactive_board", "restricted_board"} else 200
+    expected_read_status = 404
     for actor in ("owner", "other"):
         assert api.client.get(f"/api/media/{media_id}", headers=api.headers[actor]).status_code == expected_read_status
         assert api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers[actor]).status_code == expected_read_status
@@ -735,7 +793,7 @@ def test_evidence_access_follows_post_readability_after_request_becomes_uneditab
     assert _signed_file_response(api, admin).content == PDF_BYTES
 
 
-def test_legacy_public_evidence_remains_readable_when_referenced_elsewhere(api, media_storage) -> None:
+def test_legacy_public_evidence_stays_protected_when_referenced_elsewhere(api, media_storage) -> None:
     media_id = _attach_evidence(api, private=False)
     with api.session() as db:
         media = db.get(MediaAsset, media_id)
@@ -744,8 +802,8 @@ def test_legacy_public_evidence_remains_readable_when_referenced_elsewhere(api, 
         legacy_path = f"/uploads/{media.stored_filename}"
         db.commit()
     for path in (f"/api/media/{media_id}", f"/api/media/{media_id}/access-url", f"/api/media/{media_id}/download-link"):
-        assert api.client.get(path, headers=api.headers["other"]).status_code == 200
-    assert api.client.get("/api/media/access-url", params={"path": legacy_path}, headers=api.headers["other"]).status_code == 200
+        assert api.client.get(path, headers=api.headers["other"]).status_code == 404
+    assert api.client.get("/api/media/access-url", params={"path": legacy_path}, headers=api.headers["other"]).status_code == 404
     access = api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"])
     assert access.status_code == 200
     assert _signed_file_response(api, access).content == PDF_BYTES
@@ -1025,8 +1083,9 @@ def test_active_readable_board_metadata_grants_member_media_access(api, media_st
     )
 
 
-def test_unattached_media_is_owner_or_admin_only(api, media_storage) -> None:
-    uploaded = _upload(api)
+@pytest.mark.parametrize("private", [True, False])
+def test_unattached_media_is_owner_or_admin_only(api, media_storage, private) -> None:
+    uploaded = _upload(api, private=private)
     media_id = uploaded.json()["data"]["id"]
     assert api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["other"]).status_code == 404
     assert api.client.get(f"/api/media/{media_id}/access-url", headers=api.headers["owner"]).status_code == 200

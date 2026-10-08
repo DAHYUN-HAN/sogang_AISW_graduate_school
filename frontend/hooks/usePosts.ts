@@ -120,6 +120,10 @@ export async function invalidatePostMutationCaches(
   { boardIds, feedScopes = [], refreshHomeNotices = false }: PostMutationCacheTargets,
 ): Promise<void> {
   await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ["admin-main"] }),
+    queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
+    queryClient.invalidateQueries({ queryKey: ["admin-audit-logs"] }),
+    queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
     ...[...new Set(boardIds)].map((boardId) =>
       queryClient.invalidateQueries({ queryKey: ["posts", boardId] })),
     ...[...new Set(feedScopes)].map((scope) =>
@@ -569,6 +573,9 @@ async function invalidateCommentMutationCaches(queryClient: QueryClient, postId:
     queryClient.invalidateQueries({ queryKey: ["activity"] }),
     queryClient.invalidateQueries({ queryKey: ["admin-posts"] }),
     queryClient.invalidateQueries({ queryKey: ["admin-stats"] }),
+    queryClient.invalidateQueries({ queryKey: ["admin-main"] }),
+    queryClient.invalidateQueries({ queryKey: ["admin-dashboard"] }),
+    queryClient.invalidateQueries({ queryKey: ["admin-audit-logs"] }),
   ]);
 }
 
@@ -586,9 +593,7 @@ export function useUpdateComment(postId: number) {
   return useMutation({
     mutationFn: ({ commentId, content }: { commentId: number; content: string }) =>
       commentApi.updateComment(commentId, { content }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["comments", postId] });
-    },
+    onSuccess: () => invalidateCommentMutationCaches(queryClient, postId),
   });
 }
 

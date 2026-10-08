@@ -1,16 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router as expoRouter, usePathname, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, BackHandler, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
+import { Alert as NativeAlert, BackHandler, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CommentItem from "../../../../components/CommentItem";
+import NoticePollCard from "../../../../components/NoticePollCard";
+import { noticeBodyBlocks } from "../../../../utils/noticeBody";
 import ActivityCertificationMediaImage from "../../../../components/ActivityCertificationMediaImage";
 import LoadingState from "../../../../components/LoadingState";
 import ImageViewerModal from "../../../../components/ImageViewerModal";
-import MediaImage from "../../../../components/MediaImage";
+import MediaImage, { MediaImageBackground } from "../../../../components/MediaImage";
 import PhotoPager from "../../../../components/PhotoPager";
 import NaturalAspectMediaImage from "../../../../components/NaturalAspectMediaImage";
 import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../components/icons";
@@ -41,7 +43,6 @@ import {
 import { commentKeyAction, commentSubmissionValue } from "../../../../utils/commentKeyboard";
 import { formatBoardDate } from "../../../../utils/dateFormat";
 import { openMediaUrl } from "../../../../utils/mediaOpener";
-import { MediaImageBackground } from "../../../../components/MediaImage";
 import { canDeleteMutualAidRequest, canEditMutualAidRequest } from "../../../../utils/mutualAid";
 import { isAdminUser } from "../../../../utils/permissions";
 import { formatCohortName } from "../../../../utils/userLabel";
@@ -68,6 +69,8 @@ import { REPORT_REASONS, getReportEntryState, getReportSubmission, type ReportRe
 import { createReplyTarget, getReplyComposerState, type ReplyTarget } from "../../../../utils/replyComposer";
 import { resourceCategoryLabel, resourceDetailMeta } from "../../../../utils/resourceBoards";
 import { RESOURCE_SUBJECT_SEPARATOR, resourceSubjectSegments, type ResourceSubjectTone } from "../../../../utils/resourcePostFields";
+import { adminPostRouter } from "../../../../utils/adminPostRouter";
+import { useAdminAlert } from "../../../../utils/adminAlert";
 
 const COLORS = {
   primary: "#2761FF",
@@ -238,6 +241,11 @@ function NoticeAttachmentImage({ media }: { media: MediaReference }) {
 }
 
 export default function PostDetailScreen() {
+  const adminAlert = useAdminAlert();
+  const adminPathname = usePathname();
+  const Alert = adminPathname.startsWith("/admin/") ? adminAlert : NativeAlert;
+  const adminWorkspace = adminPathname.startsWith("/admin/");
+  const router = useMemo(() => adminPostRouter(expoRouter, adminWorkspace), [adminWorkspace]);
   const params = useLocalSearchParams<{ postId: string; fromBoardId?: string; returnTo?: string }>();
   const insets = useSafeAreaInsets();
   const postId = Number(params.postId);
@@ -373,7 +381,7 @@ export default function PostDetailScreen() {
       navigate: (route) => router.navigate(route as never),
       replace: (route) => router.replace(route as never),
     });
-  }, [board, deleteCommentMutation.isPending, deletePostMutation.isPending, params.fromBoardId, params.returnTo, pendingDeleteCommentId, reportTarget, showDeleteConfirm, showPostMenu]);
+  }, [board, deleteCommentMutation.isPending, deletePostMutation.isPending, params.fromBoardId, params.returnTo, pendingDeleteCommentId, reportTarget, showDeleteConfirm, showPostMenu, router]);
 
   useFocusEffect(
     useCallback(() => {
@@ -508,6 +516,10 @@ export default function PostDetailScreen() {
   // Figma 상세(링크 버전): 증빙서류 항목에 첨부 링크 행을 정보목록 마지막에 표시한다.
   const mutualAidProofUrl = isMutualAidRequest && typeof metadata.proof_url === "string" && metadata.proof_url.trim() ? metadata.proof_url.trim() : null;
   const imageAttachments = post.attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
+  const noticeBody = isNotice ? noticeBodyBlocks(post.content, metadata.notice_body, post.attachments) : null;
+  const inlineNoticeImageIds = new Set(noticeBody?.flatMap(block => block.type === "image" ? [block.media_id] : []) ?? []);
+  // Linked notices with inline images use the body layout once; legacy notices retain their hero gallery.
+  const hasCouncilGallery = isCouncilActivityEntry && inlineNoticeImageIds.size === 0;
   const normalizedGalleryIndex = Math.min(galleryIndex, Math.max(imageAttachments.length - 1, 0));
   const isActivityCertification = board?.board_type === "activity_certification";
   const activityParticipants = isActivityCertification
@@ -520,12 +532,12 @@ export default function PostDetailScreen() {
     : null;
   const isCouncilActivity = board?.board_type === "activity_history";
   const heroAttachment =
-    board?.board_type === "album" || isActivityCertification || isCouncilActivityEntry
+    board?.board_type === "album" || isActivityCertification || hasCouncilGallery
       ? imageAttachments[normalizedGalleryIndex]
       : imageAttachments[0];
   const galleryTotal = Math.max(imageAttachments.length, 1);
   const isPhotoAlbum = board?.board_type === "album";
-  const hasVisualHero = board?.board_type === "album" || isActivityCertification || isCouncilActivityEntry;
+  const hasVisualHero = board?.board_type === "album" || isActivityCertification || hasCouncilGallery;
   // 사진첩·활동인증은 PhotoPager가 네이티브 스크롤로 처리하므로 여기서는 끈다.
   // 원우회 활동만 사진 원래 비율로 보여 주는 디자인이라 아직 PanResponder를 쓴다.
   const usesPhotoPager = isPhotoAlbum || isActivityCertification;
@@ -548,7 +560,7 @@ export default function PostDetailScreen() {
       ? post.attachments.filter((attachment) => !attachment.content_type.startsWith("image/"))
     : hasVisualHero
       ? post.attachments.filter((attachment) => !attachment.content_type.startsWith("image/"))
-      : post.attachments;
+      : post.attachments.filter(attachment => !inlineNoticeImageIds.has(attachment.id));
   // 상조회 증빙 파일은 원본을 펼치지 않고 96×96 플레이스홀더 타일로만 보여 준다(Figma MutualAidDetail-V2).
   const hasMutualAidEvidenceFiles = isMutualAidRequest && visibleAttachments.length > 0;
   const appBarTitle =
@@ -853,7 +865,7 @@ export default function PostDetailScreen() {
             ]}
           />
         )}
-        {board?.board_type === "album" || isActivityCertification || isCouncilActivityEntry ? (
+        {hasVisualHero ? (
           <>
             {imageAttachments.length > 1 ? (
               <>
@@ -995,7 +1007,14 @@ export default function PostDetailScreen() {
             ) : null}
           </>
         ) : null}
-        {!isPhotoAlbum && !isMutualAidRequest && post.content.trim() ? <Text style={[styles.body, isActivityCertification ? styles.bodyTopGapCert : isAdminParticipationGuide ? styles.bodyTopGap : null]}>{post.content}</Text> : null}
+        {noticeBody ? <View style={{gap: 16}}>{noticeBody.map((block, index) => block.type === "text"
+          ? block.text.trim() ? <Text key={`text-${index}`} style={styles.body}>{block.text}</Text> : null
+          : <Pressable key={`inline-${block.media_id}`} accessibilityRole="button"
+              accessibilityLabel={`${viewerImages.findIndex(image => image.id === block.media_id) + 1}번째 사진 크게 보기`}
+              onPress={() => setViewerIndex(viewerImages.findIndex(image => image.id === block.media_id))}>
+              <NoticeAttachmentImage media={post.attachments.find(a => a.id === block.media_id)!} />
+            </Pressable>
+        )}</View> : !isPhotoAlbum && !isMutualAidRequest && post.content.trim() ? <Text style={[styles.body, isActivityCertification ? styles.bodyTopGapCert : isAdminParticipationGuide ? styles.bodyTopGap : null]}>{post.content}</Text> : null}
 
 
         {isActivityCertification ? (
@@ -1180,6 +1199,8 @@ export default function PostDetailScreen() {
             </Pressable>
           </View>
         ) : null}
+
+                {post.poll && isNotice ? <NoticePollCard key={`${userId}:${post.id}`} postId={post.id} /> : null}
 
         {isAdminParticipationGuide ? (
           isRecruitmentClosed ? (

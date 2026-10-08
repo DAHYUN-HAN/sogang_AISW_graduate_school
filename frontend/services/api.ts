@@ -14,6 +14,7 @@ import type {
   AdminRosterItem,
   AdminReportItem,
   AdminAuditLog,
+  AdminDashboardOverview,
   AdminStats,
   AdminUserItem,
   BannerItem,
@@ -32,6 +33,9 @@ import type {
   DuesRosterImportResult,
   NotificationItem,
   NotificationSettings,
+  NoticePoll,
+  NoticePollPayload,
+  NoticePollParticipant,
   MediaAsset,
   MajorOption,
   LegacyImportRecordItem,
@@ -89,6 +93,7 @@ const publicApi = createAxiosClient({
 });
 
 const refreshSession = createKeyedSingleFlight(async (refreshToken: string) => {
+  const sessionGeneration = useUserStore.getState().sessionGeneration;
   const response = await publicApi.post<
     ApiSuccess<Omit<AuthSession, "user">>
   >("/auth/refresh", {
@@ -97,7 +102,8 @@ const refreshSession = createKeyedSingleFlight(async (refreshToken: string) => {
   const currentSession = useUserStore.getState();
   if (
     !currentSession.user ||
-    currentSession.refreshToken !== refreshToken
+    currentSession.refreshToken !== refreshToken ||
+    currentSession.sessionGeneration !== sessionGeneration
   ) {
     throw new Error("Session changed while the refresh request was in flight.");
   }
@@ -106,7 +112,7 @@ const refreshSession = createKeyedSingleFlight(async (refreshToken: string) => {
     access_token: response.data.data.access_token,
     refresh_token: response.data.data.refresh_token,
     user: currentSession.user,
-  });
+  }, { preserveSession: true });
   return response.data.data.access_token;
 });
 
@@ -284,6 +290,10 @@ export const registrationApi = {
 };
 
 export const boardApi = {
+  removeAdminBoard: async (boardId: number) => {
+    const response = await api.delete<ApiSuccess<{id:number; is_active:boolean; board_ids:number[]}>>(`/boards/admin/${boardId}`);
+    return response.data;
+  },
   getBoards: async () => {
     const response = await api.get<ApiSuccess<BoardGroup[]>>("/boards");
     return response.data;
@@ -347,7 +357,17 @@ export const bannerApi = {
   },
 };
 
+export const pollApi = {
+  get: async (postId: number) => (await api.get<ApiSuccess<NoticePoll>>(`/posts/${postId}/poll`)).data,
+  vote: async (postId: number, revision: number, answers: NoticePoll["my_answers"]) =>
+    (await api.put<ApiSuccess<NoticePoll>>(`/posts/${postId}/poll/vote`, {revision, answers})).data,
+  participants: async (postId: number, page: number, optionId?: number, questionId?: number, participation: "voted" | "not_voted" = "voted") =>
+    (await api.get<ApiSuccess<NoticePollParticipant[]>>(`/posts/${postId}/poll/participants`, {params: {page, size: 20, option_id: optionId, question_id: questionId, participation}})).data,
+  close: async (postId: number, questionId?: number) => (await api.post<ApiSuccess<NoticePoll>>(`/posts/${postId}/poll/close`, null, {params: {question_id: questionId}})).data,
+};
+
 export const postApi = {
+  // Existing post mutations include optional poll settings in the same save.
   getAdminPosts: async (params?: {
     page?: number;
     size?: number;
@@ -355,6 +375,8 @@ export const postApi = {
     board_id?: number;
     board_category?: string;
     board_type?: string;
+    board_ids?: string;
+    notice_category?: "academic" | "event" | "other";
     status?: "draft" | "published" | "hidden" | "deleted";
     is_pinned?: boolean;
     is_notice?: boolean;
@@ -392,6 +414,8 @@ export const postApi = {
   createPost: async (
     boardId: number,
     payload: {
+      poll?: NoticePollPayload | null;
+      poll_revision?: number;
       title: string;
       content: string;
       is_anonymous?: boolean;
@@ -407,6 +431,8 @@ export const postApi = {
   updatePost: async (
     postId: number,
     payload: {
+      poll?: NoticePollPayload | null;
+      poll_revision?: number;
       replace_evidence?: boolean;
       board_id?: number;
       title: string;
@@ -722,6 +748,14 @@ export const reportApi = {
 };
 
 export const adminApi = {
+  getDashboard: async (params?: { date?: string; post_page?: number; comment_page?: number; size?: number }) => {
+    const response = await api.get<ApiSuccess<AdminDashboardOverview>>("/admin/dashboard", { params });
+    return response.data;
+  },
+  getMain: async (params?: { mutual_page?: number; suggestion_page?: number; size?: number }) => {
+    const response = await api.get<import("../types").ApiSuccess<import("../types").AdminMainOverview>>("/admin/main", { params });
+    return response.data;
+  },
   getStats: async () => {
     const response = await api.get<ApiSuccess<AdminStats>>("/admin/stats");
     return response.data;
@@ -768,12 +802,32 @@ export const adminApi = {
       role?: "user" | "admin";
       is_active?: boolean;
       enrollment_status?: "active" | "leave" | "graduated";
+      nickname?: string;
+      cohort?: string | null;
+      major?: string | null;
+      phone?: string | null;
+      company?: string | null;
+      job_title?: string | null;
+      position?: string | null;
     }
   ) => {
     const response = await api.put<ApiSuccess<{ id: number; role: "user" | "admin"; is_active: boolean }>>(
       `/users/admin/users/${userId}`,
       payload
     );
+    return response.data;
+  },
+  resetUserPassword: async (userId: number, payload: { new_password: string }) => {
+    const response = await api.put<ApiSuccess<{ id: number; changed: boolean; sessions_revoked: number; push_tokens_deactivated: number; reset_tokens_invalidated: number }>>(
+      `/users/admin/users/${userId}/password`, payload
+    );
+    return response.data;
+  },
+};
+
+export const usageApi = {
+  recordPageView: async (payload: { event_id: string; device_id: string; screen: import("../utils/usageTracking").UsageScreen }) => {
+    const response = await api.post<ApiSuccess<{ accepted: boolean }>>("/usage/page-views", payload);
     return response.data;
   },
 };

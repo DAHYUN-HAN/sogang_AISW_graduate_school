@@ -14,6 +14,7 @@ from app.models.user_block import UserBlock
 from app.notifications import comment_message, create_notification
 from app.post_access import require_comment_read, require_post_read
 from app.response import success_response
+from app.audit import log_admin_action
 from app.rate_limit import enforce_rate_limit
 from app.schemas.comment import CommentCreate, CommentUpdate
 
@@ -144,6 +145,9 @@ def create_comment(
         post_id=post.id,
         setting_field="notify_comment",
     )
+    if current_user.role == "admin":
+        db.flush()
+        log_admin_action(db, actor_id=current_user.id, action="comment.create", target_type="comment", target_id=comment.id, details={"title": post.title, "post_id": post.id})
     db.commit()
     db.refresh(comment)
 
@@ -157,10 +161,12 @@ def update_comment(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    comment, _, _ = require_comment_read(db, db.get(Comment, comment_id), current_user)
+    comment, post, _ = require_comment_read(db, db.get(Comment, comment_id), current_user)
     if comment.author_id != current_user.id and current_user.role != "admin":
         raise AppException(status_code=403, message="Forbidden.", code="FORBIDDEN")
 
+    if current_user.role == "admin" and comment.content != payload.content:
+        log_admin_action(db, actor_id=current_user.id, action="comment.update", target_type="comment", target_id=comment.id, details={"title": post.title, "post_id": post.id})
     comment.content = payload.content
     db.commit()
     db.refresh(comment)
@@ -176,6 +182,8 @@ def delete_comment(comment_id: int, db: Session = Depends(get_db), current_user:
 
     all_comments = db.scalars(select(Comment).where(Comment.post_id == post.id)).all()
     deleted_count = _count_subtree(comment.id, all_comments)
+    if current_user.role == "admin":
+        log_admin_action(db, actor_id=current_user.id, action="comment.delete", target_type="comment", target_id=comment.id, details={"title": post.title, "post_id": post.id, "deleted_count": deleted_count})
 
     db.delete(comment)
     post.comment_count = max(0, post.comment_count - deleted_count)

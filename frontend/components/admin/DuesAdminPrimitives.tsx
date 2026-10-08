@@ -8,7 +8,7 @@ import { AppText as Text } from "../AppTypography";
 export const DUES_ADMIN_COLORS = {
   primary: "#2761FF",
   primary50: "#EDF2FE",
-  primary900: "#0B1F56",
+  primary900: "#111827",
   error: "#D94343",
   border: "#E1E4E9",
   borderStrong: "#C7CDD4",
@@ -16,6 +16,13 @@ export const DUES_ADMIN_COLORS = {
   surfaceAlt: "#F8FAFC",
   text: "#111827",
   muted: "#6B7280",
+};
+
+export const DUES_ADMIN_WEB_COLORS = {
+  ...DUES_ADMIN_COLORS,
+  primary900: "#15171C",
+  text: "#15171C",
+  error: "#D92D52",
 };
 
 const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -90,16 +97,19 @@ export function DuesAdminButton({
   disabled?: boolean;
   icon?: keyof typeof Ionicons.glyphMap;
 }) {
-  const colors = DUES_ADMIN_COLORS;
-  const backgroundColor = disabled
+  const web = Platform.OS === "web";
+  const colors = web ? DUES_ADMIN_WEB_COLORS : DUES_ADMIN_COLORS;
+  const backgroundColor = disabled && !web
     ? colors.borderStrong
     : tone === "outline"
       ? colors.surface
       : colors.primary;
-  const foreground = tone === "outline" ? colors.primary : colors.surface;
+  const foreground = tone === "outline" ? web ? colors.text : colors.primary : colors.surface;
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
       style={{
@@ -110,13 +120,14 @@ export function DuesAdminButton({
         gap: 7,
         borderRadius: 6,
         borderWidth: 1,
-        borderColor: disabled ? colors.borderStrong : colors.primary,
+        borderColor: web && tone === "outline" ? colors.border : disabled && !web ? colors.borderStrong : colors.primary,
         backgroundColor,
         paddingHorizontal: 14,
+        opacity: disabled && web ? 0.45 : 1,
       }}
     >
       {icon ? <Ionicons name={icon} size={17} color={foreground} /> : null}
-      <Text style={{ color: foreground, fontWeight: "900" }}>{label}</Text>
+      <Text style={{ color: foreground, fontWeight: web && tone === "outline" ? "400" : "600", ...(web ? { fontSize: 13 } : {}) }}>{label}</Text>
     </Pressable>
   );
 }

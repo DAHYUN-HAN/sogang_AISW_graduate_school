@@ -1,11 +1,11 @@
 import { useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Ionicons } from "@expo/vector-icons";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router as expoRouter, usePathname, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Controller, useForm } from "react-hook-form";
-import { Alert, BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert as NativeAlert, BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../../components/AppTypography";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
@@ -46,6 +46,8 @@ import {
 } from "../../../../../utils/appRoutes";
 
 import { CloseIcon } from "../../../../../components/icons";
+import { adminPostRouter } from "../../../../../utils/adminPostRouter";
+import { useAdminAlert } from "../../../../../utils/adminAlert";
 const COLORS = {
   primary: "#2761FF",
   text: "#15171C",
@@ -64,7 +66,6 @@ const schema = z.object({
   category: z.string().optional(),
   content: z.string().optional(),
   contact: z.string().optional(),
-  applicationUrl: z.string().optional(),
   professor: z.string().optional(),
   difficulty: z.string().optional(),
   satisfaction: z.string().optional(),
@@ -81,7 +82,6 @@ const EMPTY_FORM: FormValues = {
   category: "",
   content: "",
   contact: "",
-  applicationUrl: "",
   professor: "",
   difficulty: "",
   satisfaction: "",
@@ -89,6 +89,11 @@ const EMPTY_FORM: FormValues = {
 };
 
 export default function PostEditScreen() {
+  const adminAlert = useAdminAlert();
+  const adminPathname = usePathname();
+  const Alert = adminPathname.startsWith("/admin/") ? adminAlert : NativeAlert;
+  const adminWorkspace = adminPathname.startsWith("/admin/");
+  const router = useMemo(() => adminPostRouter(expoRouter, adminWorkspace), [adminWorkspace]);
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     postId: string;
@@ -166,7 +171,6 @@ export default function PostEditScreen() {
       category: post.category ?? "",
       content: post.content,
       contact: typeof post.metadata?.contact === "string" ? post.metadata.contact : "",
-      applicationUrl: typeof post.metadata?.application_url === "string" ? post.metadata.application_url : "",
       ...resourcePostFieldValues(resourcePostFields(board?.slug), post.metadata),
       operationStatus: operationStatus(post.metadata),
     });
@@ -187,7 +191,7 @@ export default function PostEditScreen() {
   useEffect(() => {
     if (!post || !isActivityCertification) return;
     router.replace(`/board/post/create?boardId=${post.board_id}&postId=${post.id}` as never);
-  }, [isActivityCertification, post]);
+  }, [isActivityCertification, post, router]);
 
   // 저장 후처럼 물어보지 않고 바로 나가는 경로. 사용자가 닫을 때는 requestClose를 쓴다.
   const leaveScreen = useCallback(() => {
@@ -208,7 +212,7 @@ export default function PostEditScreen() {
     }
     if (router.canGoBack()) router.back();
     else router.replace(postDetailRoute(postId));
-  }, [board?.board_type, params.editOrigin, params.fromBoardId, params.returnTo, post?.board_id, postId]);
+  }, [board?.board_type, params.editOrigin, params.fromBoardId, params.returnTo, post?.board_id, postId, router]);
 
   // 나갈 때 확인창을 띄울지. 내용·첨부뿐 아니라 게시판을 옮긴 것도 변경으로 센다.
   const hasUnsavedChanges =
@@ -353,7 +357,6 @@ export default function PostEditScreen() {
     requireField("title", values.title);
     if (!isAlbum && !isMutualAid) requireField("content", values.content);
     if (isStudyRecruit) requireField("contact", values.contact);
-    if (isAdminParticipationPost) requireField("applicationUrl", values.applicationUrl);
     if (resourceFields?.professor) requireField("professor", values.professor);
     if (resourceFields?.difficulty) requireField("difficulty", values.difficulty);
     if (resourceFields?.satisfaction) requireField("satisfaction", values.satisfaction);
@@ -367,17 +370,6 @@ export default function PostEditScreen() {
     }
 
     if (isAdminParticipationPost) {
-      const applicationUrl = values.applicationUrl?.trim() ?? "";
-      try {
-        const parsed = new URL(applicationUrl);
-        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error("INVALID_PROTOCOL");
-      } catch {
-        setNotice({
-          title: "참여 버튼 링크",
-          body: "http:// 또는 https://로 시작하는 올바른 주소를 입력하세요.",
-        });
-        return;
-      }
       if (!participationRepresentativeImage) {
         Alert.alert("대표 사진", "동아리 게시글에는 사진을 1장 이상 첨부해야 합니다.");
         return;
@@ -401,8 +393,7 @@ export default function PostEditScreen() {
           : isAdminParticipationPost
             ? {
                 ...(post.metadata ?? {}),
-                application_url: values.applicationUrl?.trim() ?? "",
-                ...(board?.slug === "club-promo" ? { operation_status: values.operationStatus } : {}),
+                operation_status: values.operationStatus,
               }
             : isResourceEdit
               ? withResourcePostMetadata(post.metadata, resourceFields, values)
@@ -638,11 +629,11 @@ export default function PostEditScreen() {
           />
         ))}
 
-        {board?.slug === "club-promo" ? (
+        {isAdminParticipationPost ? (
           <Controller
             control={control}
             name="operationStatus"
-            render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} />}
+            render={({ field }) => <ClubOperationStatusField value={field.value} onChange={field.onChange} activityName={board?.slug === "networking-programs" ? "네트워킹 행사" : "동아리"} />}
           />
         ) : null}
 
@@ -691,30 +682,6 @@ export default function PostEditScreen() {
 
         {isAdminParticipationPost || isAlbum ? (
           <>
-            {isAdminParticipationPost ? (
-              <Controller
-                control={control}
-                name="applicationUrl"
-                render={({ field, fieldState }) => (
-                  <View>
-                    <Text style={styles.fieldLabel}>참여 버튼 링크</Text>
-                    <TextInput
-                      accessibilityLabel="참여 버튼 링크"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      keyboardType="url"
-                      onBlur={field.onBlur}
-                      onChangeText={clearOnChange("applicationUrl", field.onChange)}
-                      placeholder="https://forms.gle/..."
-                      placeholderTextColor={COLORS.subtle}
-                      style={[styles.input, fieldState.error ? styles.inputError : null]}
-                      value={field.value}
-                    />
-                  </View>
-                )}
-              />
-            ) : null}
-
             {isAlbum ? (
               <View style={styles.photoBox}>
                 <View style={styles.photoHeader}>

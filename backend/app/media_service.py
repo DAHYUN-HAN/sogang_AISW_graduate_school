@@ -23,6 +23,7 @@ from app.models.banner import Banner
 from app.models.board import Board
 from app.models.faq import FAQ, FAQAttachment
 from app.models.media import MediaAsset, PostAttachment
+from app.models.poll import PollOption, PollQuestion, PostPoll
 from app.models.post import Post
 from app.models.post_extension import PostMutualAid
 from app.models.user import User
@@ -459,6 +460,11 @@ def _readable_linked_post_exists(db: Session, media: MediaAsset, user: User) -> 
         )
         .order_by(Post.id.asc())
     ).all()
+    poll_posts = db.scalars(select(Post).join(PostPoll, PostPoll.post_id == Post.id)
+                            .join(PollQuestion, PollQuestion.poll_id == PostPoll.id)
+                            .join(PollOption, PollOption.question_id == PollQuestion.id)
+                            .where(PollOption.media_id == media.id, Post.deleted_at.is_(None))).all()
+    posts.extend(poll_posts)
     for post in posts:
         try:
             require_post_read(db, post, user)
@@ -479,8 +485,8 @@ def _mutual_aid_evidence_access(db: Session, media: MediaAsset, user: User) -> t
             Board.board_type == "mutual_aid",
         )
     ).all()
-    for post, _status in rows:
-        if post.deleted_at is not None:
+    for post, status in rows:
+        if post.deleted_at is not None or post.author_id != user.id or status != "processing":
             continue
         try:
             require_post_read(db, post, user)
@@ -497,7 +503,7 @@ def require_media_access(db: Session, media: MediaAsset | None, user: User) -> M
         return media
     # Evidence policy takes precedence even for legacy non-private assets or
     # assets also referenced by an ordinary post/profile. Mutual-aid evidence
-    # follows the post's read policy; editability is checked separately.
+    # requires a readable processing request owned by the requester.
     is_evidence, can_read_evidence = _mutual_aid_evidence_access(db, media, user)
     if is_evidence:
         if can_read_evidence:

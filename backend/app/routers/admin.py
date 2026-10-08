@@ -15,9 +15,36 @@ from app.models.report import Report
 from app.models.user import User
 from app.response import success_response
 from app.security import utc_now
+from app.admin_main import main_overview
+from app.admin_dashboard import dashboard_overview
 
 
 router = APIRouter()
+
+
+@router.get("/dashboard")
+def get_admin_dashboard(
+    date: str | None = Query(None, pattern=r"^\d{4}-\d{2}-\d{2}$"),
+    post_page: int = Query(1, ge=1),
+    comment_page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return success_response(dashboard_overview(
+        db, now=utc_now(), selected_date=date, post_page=post_page, comment_page=comment_page, size=size,
+    ))
+
+
+@router.get("/main")
+def get_admin_main(
+    mutual_page: int = Query(1, ge=1),
+    suggestion_page: int = Query(1, ge=1),
+    size: int = Query(5, ge=1, le=50),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    return success_response(main_overview(db, now=utc_now(), mutual_page=mutual_page, suggestion_page=suggestion_page, size=size))
 
 
 def _count(db: Session, statement) -> int:

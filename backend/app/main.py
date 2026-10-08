@@ -23,6 +23,8 @@ from app.errors import (
 from app import models  # noqa: F401
 from app.routers import admin, auth, banners, users, boards, posts, comments, dues_payers, events, faqs, media, notifications, registration, reports, search
 from app.response import success_response
+from app.routers import usage
+from app.routers import polls
 from app.seed import seed_initial_data, seed_reference_data
 
 API_DESCRIPTION = """
@@ -112,6 +114,7 @@ app.include_router(dues_payers.router, prefix="/api/dues-payers", tags=["dues-pa
 app.include_router(boards.router, prefix="/api/boards", tags=["boards"])
 app.include_router(banners.router, prefix="/api/banners", tags=["banners"])
 app.include_router(posts.router, prefix="/api", tags=["posts"])
+app.include_router(polls.router, prefix="/api", tags=["posts"])
 app.include_router(comments.router, prefix="/api", tags=["comments"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
 app.include_router(events.router, prefix="/api/events", tags=["events"])
@@ -120,6 +123,7 @@ app.include_router(notifications.router, prefix="/api/notifications", tags=["not
 app.include_router(media.router, prefix="/api/media", tags=["media"])
 app.include_router(reports.router, prefix="/api", tags=["reports"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
+app.include_router(usage.router, prefix="/api/usage", tags=["usage"])
 
 
 @app.get("/health")

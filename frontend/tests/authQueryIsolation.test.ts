@@ -4,6 +4,7 @@ import { runInNewContext } from "node:vm";
 import test from "node:test";
 import { QueryClient } from "@tanstack/react-query";
 import ts from "typescript";
+import { useMemberWebFrame } from "../utils/adminMain";
 
 test("changing accounts discards private edit data, signed media URLs and mounted form state", () => {
   const source = ts.createSourceFile("root.tsx", readFileSync("app/_layout.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
@@ -16,14 +17,14 @@ test("changing accounts discards private edit data, signed media URLs and mounte
   let cursor = 0;
   const slots: any[] = [];
   const root = runInNewContext(code, {
-    QueryClient, QueryClientProvider: "QueryClientProvider", APP_FONTS: {}, styles: {},
+    QueryClient, QueryClientProvider: "QueryClientProvider", APP_FONTS: {}, styles: {}, usePathname: () => "/home", useMemberWebFrame,
     appFontStyle: () => ({ fontFamily: "Pretendard_900Black", fontWeight: "normal" }),
     useState: (initial: any) => { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === "function" ? initial() : initial; return [slots[i], () => {}]; },
     useMemo: (factory: () => unknown, deps: unknown[]) => { const i = cursor++; if (!slots[i] || deps.some((value, n) => value !== slots[i].deps[n])) slots[i] = { deps, value: factory() }; return slots[i].value; },
     useEffect: () => {}, useWindowDimensions: () => ({ width: 1280 }), useFonts: () => [true],
     useUserStore: (selector: (state: unknown) => unknown) => selector({ user, isAuthenticated: Boolean(user), hasHydrated: true, hydrateSession: () => {} }),
     isAdminUser: (value: typeof user) => value?.role === "admin", Platform: { OS: "web" }, shouldShowSplash: () => false,
-    View: "View", KeyboardViewport: "KeyboardViewport", StatusBar: "StatusBar", NotificationBootstrap: "NotificationBootstrap", StatusBarScrim: "StatusBarScrim",
+    View: "View", KeyboardViewport: "KeyboardViewport", StatusBar: "StatusBar", NotificationBootstrap: "NotificationBootstrap", UsageTracking: "UsageTracking", StatusBarScrim: "StatusBarScrim",
     Stack: { Protected: "Protected", Screen: "Screen" }, element: (type: unknown, props: any, ...children: unknown[]) => ({ type, props, children }),
   });
   const render = () => { cursor = 0; return root(); };

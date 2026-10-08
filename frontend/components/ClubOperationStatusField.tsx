@@ -8,13 +8,14 @@ const OPTIONS: { value: OperationStatus; label: string }[] = [
   { value: "ended", label: "운영 종료" },
 ];
 
-export default function ClubOperationStatusField({ value, onChange }: {
+export default function ClubOperationStatusField({ value, onChange, activityName = "동아리" }: {
   value: OperationStatus;
   onChange: (value: OperationStatus) => void;
+  activityName?: "동아리" | "네트워킹 행사";
 }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>동아리 운영 상태</Text>
+      <Text style={styles.label}>{activityName} 운영 상태</Text>
       <View style={styles.options}>
         {OPTIONS.map((option) => (
           <Pressable
@@ -28,7 +29,9 @@ export default function ClubOperationStatusField({ value, onChange }: {
           </Pressable>
         ))}
       </View>
-      <Text style={styles.hint}>모집 마감 후에도 운영 중이면 활동인증을 작성할 수 있어요. 운영 종료 시 새 활동인증의 동아리 선택 목록에서 제외돼요.</Text>
+      <Text style={styles.hint}>{activityName === "동아리"
+        ? "모집 마감 후에도 운영 중이면 활동인증을 작성할 수 있어요. 운영 종료 시 새 활동인증의 동아리 선택 목록에서 제외돼요."
+        : "운영 중인 행사는 활동 인증 대상으로 선택할 수 있어요. 운영 종료 시 새 활동 인증 대상에서 제외되며, 기존 인증 내역은 유지돼요."}</Text>
     </View>
   );
 }

@@ -380,7 +380,7 @@ export function adminBoardContentControl(board?: Board): AdminBoardContentContro
   if (board.slug === "club-promo") {
     return {
       kind: "participation-guide",
-      description: "대표 이미지, 동아리 소개와 가입 신청 링크를 관리합니다.",
+      description: "대표 이미지, 동아리 소개와 활동 인증을 위한 운영 상태를 관리합니다.",
       createLabel: "동아리 안내 등록",
       canReplaceRepresentativeImage: true,
     };
@@ -389,7 +389,7 @@ export function adminBoardContentControl(board?: Board): AdminBoardContentContro
   if (board.slug === "networking-programs") {
     return {
       kind: "participation-guide",
-      description: "대표 이미지, 네트워킹 소개와 참가 신청 링크를 관리합니다.",
+      description: "대표 이미지, 네트워킹 행사 소개와 활동 인증을 위한 운영 상태를 관리합니다.",
       createLabel: "네트워킹 안내 등록",
       canReplaceRepresentativeImage: true,
     };
