@@ -101,8 +101,12 @@ for (const client of [api, publicApi]) {
   });
 }
 
-const refreshSession = createKeyedSingleFlight(async (refreshToken: string) => {
-  const sessionGeneration = useUserStore.getState().sessionGeneration;
+const refreshSession = createKeyedSingleFlight(async (sessionKey: string) => {
+  const [sessionGeneration, refreshToken] = JSON.parse(sessionKey) as [number, string];
+  const origin = useUserStore.getState();
+  if (origin.sessionGeneration !== sessionGeneration || origin.refreshToken !== refreshToken) {
+    throw new Error("Session changed before the refresh request could be sent.");
+  }
   const response = await publicApi.post<
     ApiSuccess<Omit<AuthSession, "user">>
   >("/auth/refresh", {
@@ -155,7 +159,14 @@ function setRequestAuthorization(
 }
 
 api.interceptors.request.use((config) => {
-  const token = useUserStore.getState().accessToken;
+  const session = useUserStore.getState();
+  const request = config as typeof config & { _sessionGeneration?: number };
+  if (request._sessionGeneration !== undefined && request._sessionGeneration !== session.sessionGeneration) {
+    throw new Error("Session changed before the API request could be sent.");
+  }
+  // Axios retains this in-memory field on retries; never send it as a header.
+  request._sessionGeneration ??= session.sessionGeneration;
+  const token = session.accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -166,6 +177,11 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
+    const session = useUserStore.getState();
+    // An old login's 401 must neither retry with a new login nor clear it.
+    if (error.response?.status === 401 && originalRequest?._sessionGeneration !== session.sessionGeneration) {
+      return Promise.reject(error);
+    }
     const requestUrl = String(originalRequest?.url ?? "");
     const isRefreshRequest = requestUrl.includes("/auth/refresh");
 
@@ -174,7 +190,6 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    const session = useUserStore.getState();
     const refreshToken = session.refreshToken;
     if (error.response?.status === 401 && refreshToken && originalRequest && !originalRequest._retry) {
       originalRequest._retry = true;
@@ -190,7 +205,7 @@ api.interceptors.response.use(
 
       let accessToken: string;
       try {
-        accessToken = await refreshSession(refreshToken);
+        accessToken = await refreshSession(JSON.stringify([session.sessionGeneration, refreshToken]));
       } catch (refreshError) {
         const currentSession = useUserStore.getState();
         if (!isNetworkError(refreshError) && currentSession.refreshToken === refreshToken

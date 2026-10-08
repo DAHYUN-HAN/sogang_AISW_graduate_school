@@ -2,6 +2,8 @@
 
 2026-10-08 WP5/WP8/WP9 hardening: irreversible account deletion reloads the user after acquiring its row lock, so an administrator password reset invalidates a credential cached earlier in that request. Mutual-aid evidence serialization and media access enforce the existing processing-author/admin policy, including legacy public assets. Administrator web confirmation queues and delayed alert callbacks belong to one authenticated session and are discarded on session replacement/logout without executing their actions.
 
+API requests retain their originating login generation in memory. A late 401 from an earlier login cannot replay a mutation with replacement credentials or clear the replacement session. Re-dispatch checks the same generation; refresh single-flight keys include generation and token. Normal token rotation and same-principal profile updates preserve the login generation, while logout/new login changes it. This adds no HTTP header or backend API field.
+
 2026-10-07 WP6/WP8/WP9 notice polls: settings (including removal) and immediate
 close require explicit backend administrator checks. Poll participation uses
 only the authenticated account ID; request payloads cannot impersonate voters.
