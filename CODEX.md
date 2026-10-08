@@ -1,5 +1,7 @@
 # Codex Work Backlog
 
+2026-10-08 WP5/WP6/WP8/WP9 integration completed: administrator/poll development and latest main are committed/pushed; merged local5/remote3 branches removed with worktrees preserved. GCP runs the verified code with single database head `0034_attendance_polls` after coordinated backup and actual restore/migration rehearsal. Final frontend940 and PostgreSQL629 tests pass; typecheck/lint/web build and read-only live verification pass. Native device/store QA remains Phase5. Evidence: `docs/qa/INTEGRATION_GCP_2026-10-08.md`.
+
 2026-10-08 WP5/WP8/WP9 integration/deployment: harden credential deletion races and mutual-aid evidence policy, isolate administrator dialogs across sessions, preserve notice body anchors via dedicated editing, and serialize PostgreSQL board hierarchy writes. Consolidate current administrator/usage/poll work with latest main; preserve every named branch tip before deletion. Execute isolated PostgreSQL migration/API tests, full merged-tree checks and a verified production DB/media backup before GCP synchronization. Plan: `docs/superpowers/plans/2026-10-08-integrate-admin-polls-deploy.md`.
 
 This file turns the Notion Phase 1-4 planning into concrete work for coding agents.

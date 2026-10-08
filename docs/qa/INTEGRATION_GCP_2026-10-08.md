@@ -35,7 +35,15 @@ Scope: approved WP5/WP6/WP8/WP9 development, named-branch integration and GCP sy
 
 ## GCP synchronization
 
-Pending exact main revision deployment, coordinated PostgreSQL/public-media/private-media backup validation and live verification. Production test fixture resets are prohibited; runtime/migration tests use separate disposable databases.
+- Named branches integrated into main, pushed, and removed: **5 local / 3 remote**. The clean verification worktree was detached without deleting files. All other detached worktrees, including unpublished Android-build commits, remain intact.
+- Deployed code: `b68acec90556e597796ab28448491a6d945794bb` on `sogang-aisw-app` (`asia-northeast3-b`). Previous production checkout: `459504fba3ff2e6e4dc34fc540fcc21365ae2bcc`. Final documentation-only commit is fast-forwarded on the VM; backend/frontend/deployment trees remain identical to the verified code.
+- Final request-binding typecheck and complete ESLint: **exit 0**. GCP Docker builds/export of the final code: **exit 0**. GitHub backend and Docker jobs succeeded; the unsigned Android bundle/16 KB job was still running at this verification point. Physical-device/store release is not claimed.
+- Coordinated backup at `/srv/aisw-backups/integration-20261008`: custom PostgreSQL dump and both media archives validated by SHA-256, archive parsing and **actual DB restore** into a separate temporary PostgreSQL container. The restored real database upgraded **0031→0034**, with Alembic model parity. Original images and operator environment snapshots are retained privately on the VM. Production fixture resets were never run.
+- Deployment/read-only verification jobs: **exit 0**. Production has one Alembic head **`0034_attendance_polls`**, and `alembic check` reports no new operations.
+- Backend and notification-worker core runtime source hashes match the deployed checkout. Backend, worker, frontend, DB and ingress are running with restart count **0**; the existing domain wrapper reports all services healthy.
+- Canonical domain HTTPS, IP certificate/readiness, alias redirects and public deep links passed. Unauthenticated administrator/poll reads return normalized **401** errors. The required administrator/usage/poll OpenAPI routes are present.
+- Served `index.html` and JavaScript bytes match the frontend container. Bundle: `entry-fa4f239b6d70d20ec469289568b7a14c.js`; SHA-256 `78aa3d723d41289834560932e7a126bd41435879bc7d259c620201a3dc488f5c`.
+- No production users, votes, notices or notifications were created for verification. Detailed logs and hashes remain in ignored QA evidence; backups and private diagnostic files stay on the server.
 
 ## Remaining QA
 

@@ -33,5 +33,5 @@
 - [x] Credential/evidence fixes — focused 143 tests passed; cached credential and evidence regressions failed before fixes.
 - [x] Administrator session/edit fixes — stable login generation, dedicated notice routes and actual-source lifecycle regressions; focused23 tests passed.
 - [x] Hierarchy serialization — real PostgreSQL regressions: 2 failed before, 2 passed after shared transaction lock.
-- [ ] Merged-tree verification and Git cleanup
-- [ ] Backup, deployment and live verification
+- [x] Merged-tree verification and Git cleanup — PostgreSQL629, frontend940, typecheck/lint, web build and independent session review; main pushed, local5/remote3 integrated branches removed, worktree files preserved.
+- [x] Backup, deployment and live verification — real DB backup restore/upgrade rehearsed, codeb68acec deployed, production0034/model parity/HTTPS/source and bundle hashes verified. Documentation-only final revision is synchronized without changing runtime source.
