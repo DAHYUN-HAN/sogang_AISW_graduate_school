@@ -28,7 +28,8 @@ Scope: approved WP5/WP6/WP8/WP9 development, named-branch integration and GCP sy
 - Corrected full frontend suite: **934 passed**. Typecheck, complete ESLint and web export passed. Export's existing terminal color warnings do not indicate build failures.
 - Independent merged review: **64/64** focused tests; stable login-generation/refresh behavior and network/calendar/admin integration reviewed without an additional blocker.
 - New commit history secret scan: no leaks.
-- Isolated PostgreSQL migration/API validation is in progress. Its first run was interrupted by an SSH transport disconnect; the durable rerun records its result on the VM and does not touch production data.
+- Isolated PostgreSQL: **629 passed, zero skipped**; durable job exit **0**. This includes both real hierarchy races, complete runtime/API tests, seeded `0031`→`0034` upgrade, unstamped legacy recovery and Alembic model/schema parity. Its initial SSH transport disconnect was resolved with a detached runner and persisted result; production data was not used.
+- PostgreSQL verification archived commit `d8e8e43`; the subsequent Home/documentation changes leave its entire backend tree identical. Existing datetime/Starlette deprecations produced 12,464 warnings; no warning-free claim is made.
 
 ## GCP synchronization
 
