@@ -31,7 +31,7 @@
 ## Progress
 
 - [x] Credential/evidence fixes — focused 143 tests passed; cached credential and evidence regressions failed before fixes.
-- [ ] Administrator session/edit fixes
+- [x] Administrator session/edit fixes — stable login generation, dedicated notice routes and actual-source lifecycle regressions; focused23 tests passed.
 - [x] Hierarchy serialization — real PostgreSQL regressions: 2 failed before, 2 passed after shared transaction lock.
 - [ ] Merged-tree verification and Git cleanup
 - [ ] Backup, deployment and live verification

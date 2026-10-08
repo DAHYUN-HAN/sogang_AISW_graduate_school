@@ -848,12 +848,6 @@ export default function HomeScreen() {
   const displayName = user?.nickname || "서강인";
   const isHomeLoading = boardsLoading || bannersQuery.isLoading || noticesQuery.isLoading
     || eventsQuery.isLoading || albumQuery.isLoading;
-  const isRefreshing = boardsRefetching
-    || bannersQuery.isRefetching
-    || noticesQuery.isRefetching
-    || eventsQuery.isRefetching
-    || albumQuery.isRefetching
-    || notificationQuery.isRefetching;
   const hasHomeNetworkError = [
     boardsError ? boardsLoadError : null,
     bannersQuery.isError ? bannersQuery.error : null,

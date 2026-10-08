@@ -23,7 +23,12 @@ Scope: approved WP5/WP6/WP8/WP9 development, named-branch integration and GCP sy
 
 ## Merged-tree verification
 
-Pending final merge, full suites, typecheck/lint, web export and isolated PostgreSQL migration/API validation.
+- Latest main `015225a` merged into the administrator/poll work; merge commit `d8e8e43` preserves all six conflict resolutions and moves its shared calendar into the extracted administrator controls.
+- The initial merged runtime suite found two Home failures: an unused background-refresh aggregate referenced undeclared `boardsRefetching`. Removing that obsolete aggregate preserves explicit pull-to-refresh; focused Home/network tests passed **11/11**.
+- Corrected full frontend suite: **934 passed**. Typecheck, complete ESLint and web export passed. Export's existing terminal color warnings do not indicate build failures.
+- Independent merged review: **64/64** focused tests; stable login-generation/refresh behavior and network/calendar/admin integration reviewed without an additional blocker.
+- New commit history secret scan: no leaks.
+- Isolated PostgreSQL migration/API validation is in progress. Its first run was interrupted by an SSH transport disconnect; the durable rerun records its result on the VM and does not touch production data.
 
 ## GCP synchronization
 
