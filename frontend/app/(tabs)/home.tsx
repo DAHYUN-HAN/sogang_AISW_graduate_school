@@ -786,6 +786,7 @@ export default function HomeScreen() {
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const { openDrawer } = useMyPageDrawer();
   const [month, setMonth] = useState(() => currentKoreaMonth());
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   // 홈 탭은 떠나도 마운트가 유지돼서 보던 달이 그대로 남는다. 돌아올 때마다
   // 오늘이 있는 달로 되돌린다. 같은 달이면 상태를 건드리지 않아 다시 불러오지 않는다.
   useFocusEffect(useCallback(() => {
@@ -803,7 +804,6 @@ export default function HomeScreen() {
     isError: boardsError,
     error: boardsLoadError,
     isLoading: boardsLoading,
-    isRefetching: boardsRefetching,
     refetch: refetchBoards,
   } = useBoardsQuery();
   const boards = useMemo(() => flattenBoards(boardGroups?.data), [boardGroups?.data]);
@@ -862,7 +862,10 @@ export default function HomeScreen() {
     albumBoardId && albumQuery.isError ? albumQuery.error : null,
     isAuthenticated && notificationQuery.isError ? notificationQuery.error : null,
   ].some(isNetworkError);
+  // 달 변경의 백그라운드 조회로 RefreshControl을 켜면 iOS가 스크롤 위치를
+  // 움직인다. 사용자가 당겨서 시작한 새로고침에만 표시를 연결한다.
   const refreshHome = () => {
+    setPullRefreshing(true);
     void refreshQueries([
       refetchBoards,
       bannersQuery.refetch,
@@ -870,7 +873,7 @@ export default function HomeScreen() {
       enabledRefetch(isAuthenticated, notificationQuery.refetch),
       noticesQuery.refetch,
       albumBoardId ? albumQuery.refetch : undefined,
-    ]);
+    ]).finally(() => setPullRefreshing(false));
   };
   const openAlumniDirectory = () => {
     if (alumniDirectoryLink.status !== "ready") {
@@ -885,9 +888,19 @@ export default function HomeScreen() {
 
   return (
     <ScrollView
-      style={styles.screen}
-      contentContainerStyle={[styles.content, hasHomeNetworkError ? styles.networkErrorContent : null, { paddingTop: Math.max(insets.top + 12, 21) }]}
-      refreshControl={<RefreshControl refreshing={!isHomeLoading && isRefreshing} onRefresh={refreshHome} tintColor={COLORS.primary} />}
+            style={styles.screen}
+      contentContainerStyle={[
+        styles.content,
+        hasHomeNetworkError ? styles.networkErrorContent : null,
+        { paddingTop: Math.max(insets.top + 12, 21) },
+      ]}
+      refreshControl={
+        <RefreshControl
+          refreshing={!isHomeLoading && pullRefreshing}
+          onRefresh={refreshHome}
+          tintColor={COLORS.primary}
+        />
+      }
     >
       <View style={styles.header}>
         <View style={styles.greetingWrap}>
