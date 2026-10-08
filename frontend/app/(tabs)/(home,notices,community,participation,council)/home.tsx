@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, useNavigation } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ActivityIndicator, Alert, Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
@@ -506,7 +506,21 @@ function NoticeList({
   );
 }
 
-function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; month: Date; onChangeMonth: (delta: number) => void }) {
+type PickedCalendarDay = { monthKey: string; day: number };
+
+function CalendarCard({
+  events,
+  month,
+  picked,
+  onPick,
+  onChangeMonth,
+}: {
+  events: EventItem[];
+  month: Date;
+  picked: PickedCalendarDay | null;
+  onPick: (picked: PickedCalendarDay) => void;
+  onChangeMonth: (delta: number) => void;
+}) {
   // 달력을 좌우로 쓸어 달을 넘긴다. 사진첩·캐러셀과 같은 방향으로, 손가락을
   // 왼쪽으로 밀면 다음 달이 뒤에서 들어온다.
   const changeMonthRef = useRef(onChangeMonth);
@@ -528,8 +542,8 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
   // null이면 전체다. 칩은 점과 목록을 함께 걸러서 고른 분류만 남긴다.
   const [category, setCategory] = useState<EventDisplayCategory | null>(null);
   // 고른 날짜는 달과 함께 기억한다. 달을 넘기면 그 달의 기본 날짜로 돌아가야 하는데,
-  // 달만 비교하면 되므로 effect 없이 렌더에서 바로 판단한다.
-  const [picked, setPicked] = useState<{ monthKey: string; day: number } | null>(null);
+  // 달만 비교하면 되므로 effect 없이 렌더에서 바로 판단한다. 탭을 오갈 때 지우도록
+  // 상태는 홈 화면이 들고 있다.
   const { width: windowWidth } = useWindowDimensions();
   const scale = calendarScaleForWidth(windowWidth);
   const cal = useMemo(() => calendarStyles(scale), [scale]);
@@ -609,7 +623,7 @@ function CalendarCard({ events, month, onChangeMonth }: { events: EventItem[]; m
               disabled={!cell.day}
               onPress={() => {
                 if (!cell.day) return;
-                setPicked({ monthKey, day: cell.day });
+                onPick({ monthKey, day: cell.day });
               }}
               style={cal.dayCell}
             >
@@ -790,15 +804,43 @@ export default function HomeScreen() {
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const { openDrawer } = useMyPageDrawer();
   const [month, setMonth] = useState(() => currentKoreaMonth());
+  const [pickedDay, setPickedDay] = useState<PickedCalendarDay | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
-  // 홈 탭은 떠나도 마운트가 유지돼서 보던 달이 그대로 남는다. 돌아올 때마다
-  // 오늘이 있는 달로 되돌린다. 같은 달이면 상태를 건드리지 않아 다시 불러오지 않는다.
-  useFocusEffect(useCallback(() => {
+  // 홈 탭은 떠나도 마운트가 유지돼서 보던 달과 고른 날짜가 그대로 남는다.
+  // 다른 탭에 갔다 오거나 하단 홈 탭을 누르면 이번 달·오늘로 되돌리고, 달력에서
+  // 연 글을 보고 뒤로가기로 돌아오면 보던 달과 날짜를 그대로 둔다.
+  const navigation = useNavigation();
+  const resetCalendarOnFocus = useRef(false);
+  const resetCalendar = useCallback(() => {
+    // 같은 달이면 상태를 건드리지 않아 일정을 다시 불러오지 않는다.
     setMonth((current) => {
       const thisMonth = currentKoreaMonth();
       return current.getTime() === thisMonth.getTime() ? current : thisMonth;
     });
-  }, []));
+    setPickedDay(null);
+  }, []);
+  useEffect(() => {
+    // 이 화면이 든 탭 스택의 이벤트다. blur는 다른 탭으로 옮겨 갈 때만 온다.
+    const tabStack = navigation.getParent();
+    if (!tabStack) return;
+    const unsubscribeBlur = tabStack.addListener("blur", () => {
+      resetCalendarOnFocus.current = true;
+    });
+    const unsubscribeTabPress = tabStack.addListener("tabPress" as never, () => {
+      // 홈을 보고 있을 때 누르면 화면이 다시 포커스되지 않으니 바로 되돌린다.
+      if (navigation.isFocused()) resetCalendar();
+      else resetCalendarOnFocus.current = true;
+    });
+    return () => {
+      unsubscribeBlur();
+      unsubscribeTabPress();
+    };
+  }, [navigation, resetCalendar]);
+  useFocusEffect(useCallback(() => {
+    if (!resetCalendarOnFocus.current) return;
+    resetCalendarOnFocus.current = false;
+    resetCalendar();
+  }, [resetCalendar]));
   const compact = false;
   // 앞뒤 한 달까지 같이 받는다. 옆 달로 넘어가는 순간 들고 있는 응답 안에 그 달이
   // 이미 있어서 날짜 점이 끊기지 않는다.
@@ -963,6 +1005,8 @@ export default function HomeScreen() {
             <CalendarCard
               events={events}
               month={month}
+              picked={pickedDay}
+              onPick={setPickedDay}
               onChangeMonth={(delta) => setMonth((value) => shiftCalendarMonth(value, delta))}
             />
           )}

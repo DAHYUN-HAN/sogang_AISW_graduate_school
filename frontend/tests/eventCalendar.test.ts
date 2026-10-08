@@ -89,7 +89,7 @@ test("날짜 점과 선택한 날 목록은 같은 결과를 본다", () => {
 test("홈 달력은 날짜를 눌러도 화면을 옮기지 않고 카드 안에서 펼친다", () => {
   const homeSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/home.tsx", "utf8");
   // 날짜 탭은 선택만 바꾼다. 예전처럼 그날 일정 화면으로 보내면 안 된다.
-  assert.match(homeSource, /setPicked\(\{ monthKey, day: cell\.day \}\)/);
+  assert.match(homeSource, /onPick\(\{ monthKey, day: cell\.day \}\)/);
   assert.doesNotMatch(homeSource, /eventDayRoute/);
   // 일정 전용 화면은 없앴다. 짝이 되는 공지가 있을 때만 그 공지로 간다.
   assert.match(homeSource, /const noticePostId = event\.notice_post_id \?\? null;/);

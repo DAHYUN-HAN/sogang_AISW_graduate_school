@@ -22,7 +22,7 @@ function render(errors: Record<string, unknown>) {
     React: { Fragment: "Fragment", createElement: (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props: props ?? {}, children }) },
     useSafeAreaInsets: () => ({ top: 0 }), useUserStore: (selector: any) => selector({ user: { nickname: "테스트" }, isAuthenticated: true }),
     useMyPageDrawer: () => ({ openDrawer() {} }), useState: (initial: any) => [typeof initial === "function" ? initial() : initial, () => {}],
-    useFocusEffect() {}, useCallback: (fn: any) => fn, useMemo: (fn: any) => fn(),
+    useFocusEffect() {}, useCallback: (fn: any) => fn, useEffect() {}, useRef: (current: any) => ({ current }), useNavigation: () => ({}), useMemo: (fn: any) => fn(),
     currentKoreaMonth: () => new Date(2026, 9, 1), calendarMonthWindowRange: () => ({ start: "2026-10-01", end: "2026-10-31" }),
     useBoardsQuery: () => ({ ...board, isError: board.isError, error: board.error }), flattenBoards: () => [],
     isNoticeContentBoard: () => false, findBoardId: () => 7, POPULAR_BOARD_SLUGS: [], ALBUM_BOARD_SLUGS: [],

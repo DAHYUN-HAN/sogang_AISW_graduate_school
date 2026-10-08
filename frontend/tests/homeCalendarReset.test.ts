@@ -19,45 +19,121 @@ const screen = source.statements.find(
     ts.isFunctionDeclaration(node) && node.name?.text === "HomeScreen",
 )!;
 
-// 화면이 실제로 등록하는 포커스 콜백을 그대로 돌린다.
-const focusStatement = screen.body!.statements.find(
+// 화면이 실제로 등록하는 달력 되돌리기 코드(상태 선언 뒤 navigation부터 useFocusEffect까지)를 그대로 돌린다.
+const statements = screen.body!.statements;
+const firstIndex = statements.findIndex((node) => node.getText(source).startsWith("const navigation = useNavigation()"));
+const focusIndex = statements.findIndex(
   (node) =>
     ts.isExpressionStatement(node)
     && ts.isCallExpression(node.expression)
     && node.expression.expression.getText(source) === "useFocusEffect"
-    && node.getText(source).includes("setMonth"),
-)!;
-assert.ok(focusStatement, "홈은 포커스될 때 달을 되돌려야 한다");
+    && node.getText(source).includes("resetCalendar"),
+);
+assert.ok(firstIndex >= 0 && focusIndex > firstIndex, "홈은 탭을 오갈 때 달력을 되돌려야 한다");
+const resetCode = ts.transpileModule(statements.slice(firstIndex, focusIndex + 1).map((node) => node.getText(source)).join("\n"), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022 },
+}).outputText;
 
-function runFocus(startMonth: Date) {
-  let month = startMonth;
-  let updates = 0;
-  const code = ts.transpileModule(focusStatement.getText(source), {
-    compilerOptions: { target: ts.ScriptTarget.ES2022 },
-  }).outputText;
-  runInNewContext(code, {
+type Listener = () => void;
+
+function mountHome(startMonth: Date, startPicked: { monthKey: string; day: number } | null) {
+  const state = { month: startMonth, picked: startPicked, monthUpdates: 0, focused: true };
+  const listeners: Record<string, Listener[]> = {};
+  let focusCallback: Listener = () => {};
+  const tabStack = {
+    addListener: (event: string, listener: Listener) => {
+      (listeners[event] ??= []).push(listener);
+      return () => {};
+    },
+  };
+  runInNewContext(resetCode, {
     currentKoreaMonth,
+    useNavigation: () => ({ getParent: () => tabStack, isFocused: () => state.focused }),
+    useRef: (current: unknown) => ({ current }),
     useCallback: (fn: unknown) => fn,
-    useFocusEffect: (fn: () => void) => fn(),
+    useEffect: (fn: () => void) => fn(),
+    useFocusEffect: (fn: Listener) => {
+      focusCallback = fn;
+    },
     setMonth: (update: (current: Date) => Date) => {
-      const next = update(month);
-      if (next !== month) updates += 1;
-      month = next;
+      const next = update(state.month);
+      if (next !== state.month) state.monthUpdates += 1;
+      state.month = next;
+    },
+    setPickedDay: (value: { monthKey: string; day: number } | null) => {
+      state.picked = value;
     },
   });
-  return { month, updates };
+  const emit = (event: string) => listeners[event]?.forEach((listener) => listener());
+  return {
+    state,
+    // 다른 탭으로 갔다가 돌아온다.
+    leaveTabAndReturn() {
+      state.focused = false;
+      emit("blur");
+      state.focused = true;
+      focusCallback();
+    },
+    // 홈 스택에서 글을 열었다가 뒤로가기로 돌아온다. 탭 이벤트는 없다.
+    openPostAndGoBack() {
+      state.focused = false;
+      state.focused = true;
+      focusCallback();
+    },
+    // 홈 스택에서 글을 보다가 하단 홈 탭을 누른다.
+    openPostAndPressHomeTab() {
+      state.focused = false;
+      emit("tabPress");
+      state.focused = true;
+      focusCallback();
+    },
+    // 홈 첫 화면을 보고 있는 채로 하단 홈 탭을 누른다. 포커스는 다시 오지 않는다.
+    pressHomeTabOnHome() {
+      emit("tabPress");
+    },
+  };
 }
 
-test("다른 달을 보다가 홈으로 돌아오면 이번 달로 되돌아간다", () => {
-  const browsed = shiftCalendarMonth(currentKoreaMonth(), 3);
-  const result = runFocus(browsed);
-  assert.equal(result.month.getTime(), currentKoreaMonth().getTime());
-  assert.equal(result.updates, 1);
+const browsed = shiftCalendarMonth(currentKoreaMonth(), 1);
+const browsedPick = { monthKey: `${browsed.getFullYear()}-${browsed.getMonth()}`, day: 15 };
+
+test("다른 탭에 갔다 오면 이번 달·오늘로 되돌아간다", () => {
+  const home = mountHome(browsed, browsedPick);
+  home.leaveTabAndReturn();
+  assert.equal(home.state.month.getTime(), currentKoreaMonth().getTime());
+  assert.equal(home.state.picked, null);
 });
 
-test("이미 이번 달이면 상태를 건드리지 않아 다시 불러오지 않는다", () => {
-  const result = runFocus(currentKoreaMonth());
-  assert.equal(result.updates, 0, "같은 달인데 새 Date를 넣으면 쿼리 키가 바뀌어 재요청된다");
+test("달력에서 연 글을 보고 뒤로가기로 돌아오면 보던 달과 고른 날짜가 남는다", () => {
+  const home = mountHome(browsed, browsedPick);
+  home.openPostAndGoBack();
+  assert.equal(home.state.month.getTime(), browsed.getTime());
+  assert.deepEqual(home.state.picked, browsedPick);
+});
+
+test("글을 보다가 하단 홈 탭을 누르면 이번 달·오늘로 되돌아간다", () => {
+  const home = mountHome(browsed, browsedPick);
+  home.openPostAndPressHomeTab();
+  assert.equal(home.state.month.getTime(), currentKoreaMonth().getTime());
+  assert.equal(home.state.picked, null);
+});
+
+test("홈을 보면서 홈 탭을 누르면 바로 되돌리고, 다음 뒤로가기에는 다시 되돌리지 않는다", () => {
+  const home = mountHome(browsed, browsedPick);
+  home.pressHomeTabOnHome();
+  assert.equal(home.state.month.getTime(), currentKoreaMonth().getTime());
+  assert.equal(home.state.picked, null);
+  home.state.month = browsed;
+  home.state.picked = browsedPick;
+  home.openPostAndGoBack();
+  assert.equal(home.state.month.getTime(), browsed.getTime());
+  assert.deepEqual(home.state.picked, browsedPick);
+});
+
+test("이미 이번 달이면 달 상태를 건드리지 않아 다시 불러오지 않는다", () => {
+  const home = mountHome(currentKoreaMonth(), null);
+  home.leaveTabAndReturn();
+  assert.equal(home.state.monthUpdates, 0, "같은 달인데 새 Date를 넣으면 쿼리 키가 바뀌어 재요청된다");
 });
 
 test("달을 넘겨도 달력이 불러오는 중 화면으로 바뀌지 않는다", () => {
