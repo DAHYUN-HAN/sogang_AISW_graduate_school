@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../components/AppTypography";
+import { NetworkErrorFallback } from "../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../components/LoadingState";
@@ -85,7 +86,7 @@ function MenuRow({ item, board }: { item: MenuItem; board?: Board }) {
 
 export default function CouncilScreen() {
   const insets = useSafeAreaInsets();
-  const { data, isLoading, isError, refetch } = useBoardsQuery();
+  const { data, isLoading, isError, error, refetch } = useBoardsQuery();
   const boards = useMemo(() => flattenBoards(data?.data), [data?.data]);
 
   if (isLoading) {
@@ -102,12 +103,14 @@ export default function CouncilScreen() {
 
       <ScrollView style={styles.scroller} contentContainerStyle={styles.content}>
         {isError ? (
-          <View style={styles.messageBox}>
-            <Text style={styles.errorText}>원우회 정보를 불러오지 못했습니다.</Text>
-            <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
-              <Text style={styles.retryButtonText}>다시 시도</Text>
-            </Pressable>
-          </View>
+          <NetworkErrorFallback error={error} onRetry={() => void refetch()}>
+            <View style={styles.messageBox}>
+              <Text style={styles.errorText}>원우회 정보를 불러오지 못했습니다.</Text>
+              <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>다시 시도</Text>
+              </Pressable>
+            </View>
+          </NetworkErrorFallback>
         ) : null}
 
         <View style={styles.menuList}>

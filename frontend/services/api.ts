@@ -3,6 +3,8 @@ import Constants from "expo-constants";
 import { Platform } from "react-native";
 
 import { useUserStore } from "../stores/userStore";
+import { useNetworkStatusStore } from "../stores/networkStatusStore";
+import { isNetworkError } from "../utils/networkError";
 import type {
   AccountDeletionEmailRequest,
   AccountDeletionEmailRequestResult,
@@ -87,6 +89,13 @@ const publicApi = createAxiosClient({
   baseURL: API_BASE_URL,
   timeout: 10000,
 });
+
+for (const client of [api, publicApi]) {
+  client.interceptors.response.use(response => response, error => {
+    if (isNetworkError(error)) useNetworkStatusStore.getState().markDisconnected();
+    return Promise.reject(error);
+  });
+}
 
 const refreshSession = createKeyedSingleFlight(async (refreshToken: string) => {
   const response = await publicApi.post<
@@ -176,9 +185,9 @@ api.interceptors.response.use(
       let accessToken: string;
       try {
         accessToken = await refreshSession(refreshToken);
-      } catch {
+      } catch (refreshError) {
         const currentSession = useUserStore.getState();
-        if (currentSession.refreshToken === refreshToken) {
+        if (!isNetworkError(refreshError) && currentSession.refreshToken === refreshToken) {
           currentSession.clearSession();
         }
         return Promise.reject(error);

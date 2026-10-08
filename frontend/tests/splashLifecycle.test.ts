@@ -57,6 +57,7 @@ function layoutHarness(platform: "android" | "ios" | "web") {
     },
     "@tanstack/react-query": { QueryClient: class { clear() {} }, QueryClientProvider: "QueryClientProvider" },
     "../components/NotificationBootstrap": { default: "NotificationBootstrap" },
+    "../components/AppNetworkError": { default: "AppNetworkError" },
     "../components/StatusBarScrim": { default: "StatusBarScrim" },
     "../components/KeyboardViewport": { default: "KeyboardViewport" },
     "../stores/userStore": { useUserStore: (select: (store: typeof state) => unknown) => select(state) },

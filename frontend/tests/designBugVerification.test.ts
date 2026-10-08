@@ -12,6 +12,7 @@ const styleBlock = (fileSource: string, styleName: string) => {
 
 const tabLayoutSource = source("app/(tabs)/_layout.tsx");
 const homeSource = source("app/(tabs)/home.tsx");
+const calendarSource = source("components/CalendarMonth.tsx");
 const noticeListSource = source("app/(tabs)/notices.tsx");
 const boardSource = source("app/(tabs)/board/[boardId].tsx");
 const postDetailSource = source("app/(tabs)/board/post/[postId].tsx");
@@ -46,8 +47,8 @@ test("#66·67·68 홈과 하단 탭은 디자인 기준 아이콘과 정렬을 �
   assert.match(tabLayoutSource, /<NoticeTabIcon color=\{color\} size=\{22\} \/>/);
   assert.match(homeSource, /name="chatbubble-outline"/);
   assert.match(homeSource, /name="heart-outline"/);
-  assert.match(homeSource, /dayText:[\s\S]*lineHeight: 16/);
-  assert.match(homeSource, /dayText:[\s\S]*textAlign: "center"/);
+  assert.match(calendarSource, /dayText:[\s\S]*lineHeight: r\(16\)/);
+  assert.match(calendarSource, /dayText:[\s\S]*textAlign: "center"/);
   assert.match(homeSource, /name="chatbubble-outline" size=\{11\}/);
 });
 
@@ -144,11 +145,8 @@ test("#73 운영진 화면은 임의 기본 프로필 없이 실제 데이터만
   assert.doesNotMatch(boardSource, /윤OO/);
 });
 
-test("#187 홈 동문회 주소록은 클립보드 아이콘과 제목을 한 줄 텍스트로 표시한다", () => {
-  assert.match(
-    homeSource,
-    /<Image source=\{HOME_ICON_ALUMNI\} style=\{styles\.alumniDirectoryIcon\}[\s\S]*?\/>/,
-  );
+test("#187 홈 동문회 주소록은 이모지 없이 제목을 한 줄 텍스트로 표시한다", () => {
+  assert.doesNotMatch(homeSource, /HOME_ICON_ALUMNI/);
   assert.match(homeSource, /<Text style=\{styles\.alumniDirectoryTitle\}>동문회 주소록<\/Text>/);
   assert.doesNotMatch(homeSource, /📋 동문회 주소록/);
 });

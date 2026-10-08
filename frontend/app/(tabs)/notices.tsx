@@ -4,6 +4,8 @@ import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../components/AppTypography";
+import { isNetworkError } from "../../utils/networkError";
+import { NetworkErrorFallback } from "../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useBoardsQuery } from "../../hooks/useApi";
@@ -92,7 +94,7 @@ function NoticesContent() {
   // 탭 진입 시 자동으로 도는 백그라운드 refetch(isRefetching)에 연동하면
   // Android 기본 새로고침 아이콘(흰 원)이 탭을 바꿀 때마다 잠깐 떠 보인다.
   const [pullRefreshing, setPullRefreshing] = useState(false);
-  const { data: boardData, isLoading: boardsLoading, isError: boardsError, isRefetching: boardsRefetching, refetch: refetchBoards } = useBoardsQuery();
+  const { data: boardData, isLoading: boardsLoading, isError: boardsError, error: boardsLoadError, isRefetching: boardsRefetching, refetch: refetchBoards } = useBoardsQuery();
 
   const noticeBoards = useMemo(
     () =>
@@ -159,19 +161,21 @@ function NoticesContent() {
         })}
       </View>
 
-      {isOfflinePreview ? (
-        <Pressable
-          onPress={() => {
-            void refetchBoards();
-            void retryActions.retryInitial();
-          }}
-          style={styles.connectionStrip}
-        >
-          <Ionicons name="cloud-offline-outline" size={16} color={COLORS.danger} />
-          <Text numberOfLines={1} style={styles.connectionText}>
-            데이터 서버 연결 필요 · 탭하면 다시 시도
-          </Text>
-        </Pressable>
+      {isOfflinePreview && (visibleRows.length > 0 || !isNetworkError(boardsLoadError ?? postsQuery.error)) ? (
+        <NetworkErrorFallback error={boardsLoadError ?? postsQuery.error} onRetry={() => { void refetchBoards(); void retryActions.retryInitial(); }}>
+          <Pressable
+            onPress={() => {
+              void refetchBoards();
+              void retryActions.retryInitial();
+            }}
+            style={styles.connectionStrip}
+          >
+            <Ionicons name="cloud-offline-outline" size={16} color={COLORS.danger} />
+            <Text numberOfLines={1} style={styles.connectionText}>
+              데이터 서버 연결 필요 · 탭하면 다시 시도
+            </Text>
+          </Pressable>
+        </NetworkErrorFallback>
       ) : null}
 
       {feedFailures.refresh ? (
@@ -224,10 +228,12 @@ function NoticesContent() {
           isLoading ? (
             <LoadingRows />
           ) : (
-            <EmptyState
-              title={isOfflinePreview ? "공지사항을 불러오지 못했습니다." : "등록된 공지사항이 없어요"}
-              description={isOfflinePreview ? "잠시 후 다시 시도해주세요" : "새로운 공지가 등록되면 알려드릴게요"}
-            />
+            <NetworkErrorFallback error={boardsLoadError ?? postsQuery.error} onRetry={() => { void refetchBoards(); void retryActions.retryInitial(); }}>
+              <EmptyState
+                title={isOfflinePreview ? "공지사항을 불러오지 못했습니다." : "등록된 공지사항이 없어요"}
+                description={isOfflinePreview ? "잠시 후 다시 시도해주세요" : "새로운 공지가 등록되면 알려드릴게요"}
+              />
+            </NetworkErrorFallback>
           )
         }
       />
