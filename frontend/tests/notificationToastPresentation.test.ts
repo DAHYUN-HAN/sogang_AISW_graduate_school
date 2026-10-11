@@ -4,7 +4,8 @@ import test from "node:test";
 
 const notification = readFileSync("components/NotificationBootstrap.tsx", "utf8");
 
-test("토스트는 PR 원본처럼 화면 상단 8px에 고정된다", () => {
-  assert.match(notification, /position: "absolute",\s*top: 8,/);
-  assert.doesNotMatch(notification, /useSafeAreaInsets|notificationToastTop/);
+// 2026-10-11 사용자 요청: 상단바(시계·와이파이)와 겹치지 않게 그 아래 8에 띄운다.
+test("토스트는 상단바 아래 8px에 뜬다", () => {
+  assert.match(notification, /useSafeAreaInsets\(\)/);
+  assert.match(notification, /position: "absolute",[\s\S]{0,120}top: insets\.top \+ 8,/);
 });

@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "./AppTypography";
 
 import { notificationApi } from "../services/api";
@@ -120,6 +121,7 @@ export default function NotificationBootstrap() {
   const latestSeenIdRef = useRef(getStoredLatestId());
   const initializedRef = useRef(false);
   const [visibleNotification, setVisibleNotification] = useState<NotificationItem | null>(null);
+  const insets = useSafeAreaInsets();
 
   const openVisibleNotification = async () => {
     if (!visibleNotification) {
@@ -218,7 +220,8 @@ export default function NotificationBootstrap() {
       onPress={openVisibleNotification}
       style={{
         position: "absolute",
-        top: 8,
+        // Sit below the status bar (clock, Wi-Fi) instead of over it.
+        top: insets.top + 8,
         left: 12,
         right: 12,
         zIndex: 9999,

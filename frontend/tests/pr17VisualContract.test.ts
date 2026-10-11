@@ -6,10 +6,10 @@ const notification = readFileSync("components/NotificationBootstrap.tsx", "utf8"
 const board = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx", "utf8");
 const create = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
 
-test("모든 알림은 PR 원본 토스트 디자인과 고정 위치를 사용한다", () => {
+test("모든 알림은 PR 원본 토스트 디자인을 쓰고 상단바 아래에 뜬다", () => {
   assert.doesNotMatch(notification, /notificationToastKind\(visibleNotification\.notification_type\)/);
-  assert.match(notification, /position: "absolute",\s*top: 8,/);
-  assert.doesNotMatch(notification, /useSafeAreaInsets|notificationToastTop/);
+  assert.match(notification, /top: insets\.top \+ 8,/);
+  assert.doesNotMatch(notification, /notificationToastTop/);
   assert.match(notification, /<NoticeToastIcon size=\{32\}/);
   assert.match(notification, /<Pressable\s+accessibilityRole="button"\s+onPress=\{openVisibleNotification\}/);
   assert.doesNotMatch(notification, /accessibilityLabel="알림 닫기"|stopPropagation\(\)/);
