@@ -896,7 +896,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     { key: "marriage", label: "결혼" },
     { key: "bereavement", label: "상(喪)" },
   ];
-  const mutualAidRelationOptions: SelectionOption[] = ["본인", "배우자", "부모", "자녀", "형제/자매"].map((label) => ({ key: label, label }));
+  const mutualAidRelationOptions: SelectionOption[] = ["본인", "배우자", "부모", "자녀"].map((label) => ({ key: label, label }));
   const imageAttachments = attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
   const nonImageAttachments = attachments.filter((attachment) => !attachment.content_type.startsWith("image/"));
 
