@@ -11,7 +11,7 @@ import { useUserStore } from "../stores/userStore";
 import type { NoticePoll, NoticePollQuestion } from "../types";
 import { pollCacheKey, pollOptionLabel, validPollAnswers } from "../utils/noticePoll";
 import { pollQuestionAcceptsVote } from "../utils/noticePollUsability";
-import { formatMonthDayTime } from "../utils/dateFormat";
+import { formatMonthDayTime, parseApiDate } from "../utils/dateFormat";
 import { formatCohortName } from "../utils/userLabel";
 
 function Button({label, onPress, disabled = false}: {label: string; onPress: () => void | Promise<void>; disabled?: boolean}) {
@@ -47,13 +47,17 @@ export default function NoticePollCard({postId}: {postId: number; poll?: NoticeP
 
 function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postId: number; userId: number | null; poll: NoticePoll;
   question: NoticePollQuestion; onSaved: (poll: NoticePoll) => Promise<void>; refresh: () => Promise<void>}) {
-  const isClosed = question.is_closed ?? poll.is_closed;
-  const closedAt = question.closed_at ?? poll.closed_at;
+  const endsAt = question.ends_at ? parseApiDate(question.ends_at)?.getTime() ?? null : null;
+  const [now, setNow] = useState(() => Date.now());
+  const serverClosed = question.is_closed ?? poll.is_closed;
+  // Close the card the moment its deadline passes; the server rejects late votes either way.
+  const isClosed = serverClosed || (endsAt !== null && endsAt <= now);
+  const closedAt = question.closed_at ?? poll.closed_at ?? (isClosed ? question.ends_at : null);
   const savedChoice = poll.my_answers.find(a => a.question_id === question.id)?.option_ids ?? [];
   const savedId = savedChoice[0] ?? null;
   const hasVoted = question.has_voted ?? savedChoice.length > 0;
   const count = question.participant_count ?? poll.participant_count;
-  const canVote = pollQuestionAcceptsVote(poll, question);
+  const canVote = !isClosed && pollQuestionAcceptsVote(poll, question);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,7 +65,19 @@ function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postI
   const [people, setPeople] = useState(false);
   const sending = useRef(false);
   const mounted = useRef(true);
+  const latestRefresh = useRef(refresh);
+  latestRefresh.current = refresh;
   useEffect(() => {mounted.current = true; return () => {mounted.current = false;};}, []);
+  useEffect(() => {
+    if (serverClosed || endsAt === null || endsAt <= now) return;
+    // Timers cap near 24.8 days, so a far deadline re-arms instead of firing early.
+    const timer = setTimeout(() => {
+      const current = Date.now();
+      setNow(current);
+      if (current >= endsAt) void latestRefresh.current();
+    }, Math.min(endsAt - now + 250, 2_000_000_000));
+    return () => clearTimeout(timer);
+  }, [serverClosed, endsAt, now]);
   const selecting = canVote && (editing || !hasVoted);
   const shownChoice = selecting ? draft === null ? [] : [draft] : savedChoice;
   // An existing voter may submit no choice to withdraw; a first vote needs one.
@@ -94,7 +110,8 @@ function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postI
         <Text style={styles.questionTitle}>{question.title}</Text>
         {isClosed ? <View style={styles.closedBadge}><Text style={styles.closedBadgeText}>마감</Text></View> : null}
       </View>
-      {isClosed ? <Text style={styles.subtitle}>{closedAt ? `${formatMonthDayTime(closedAt)} 마감됨` : "마감됨"}</Text> : null}
+      {isClosed ? <Text style={styles.subtitle}>{closedAt ? `${formatMonthDayTime(closedAt)} 마감됨` : "마감됨"}</Text>
+        : question.ends_at ? <Text style={styles.subtitle}>{formatMonthDayTime(question.ends_at)} 마감</Text> : null}
     </View>
     {question.options.map(option => {
       const selected = shownChoice.includes(option.id);

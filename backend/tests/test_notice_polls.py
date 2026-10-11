@@ -40,7 +40,7 @@ def vote(api, post_id, poll, user="owner", options=None):
 def editable(poll):
     return {"revision": poll["revision"], "ends_at": poll["ends_at"],
             "questions": [{"id": q["id"], "title": q["title"], "kind": q["kind"],
-                           "allow_multiple": q["allow_multiple"],
+                           "allow_multiple": q["allow_multiple"], "ends_at": q.get("ends_at"),
                            "options": [{"id": o["id"], "label": o["label"], "media_id": o["media_id"]}
                                        for o in q["options"]]} for q in poll["questions"]]}
 

@@ -8,6 +8,14 @@ Offsets use JavaScript UTF-16 code units. PostAttachment remains the canonical
 media relationship and access/lifecycle authority. No text snapshots, file URLs,
 new tables/columns or migration are added for this editor follow-up.
 
+2026-10-11 WP6/WP8/WP9 P0 card deadlines, revision `0035_poll_question_deadline`:
+`poll_questions.ends_at` is a nullable naive-UTC deadline per card; null keeps
+admin-only closing. A card is closed when `closed_at` is set or `ends_at` has
+passed, evaluated per request (no scheduler, no backfill write). Its displayed
+close time is `closed_at` when an admin closed it, otherwise `ends_at`. Downgrade
+copies passed deadlines into `closed_at` before dropping the column. The parent
+`post_polls.ends_at`/`closed_at` stay unused pending operator review of their removal.
+
 2026-10-07 WP6/WP8/WP9 P0 attendance polls, revision `0034_attendance_polls`:
 each existing `poll_questions` row represents an independent card with nullable
 UTC `closed_at` and `first_voted_at`. Backfill both from the old parent values;

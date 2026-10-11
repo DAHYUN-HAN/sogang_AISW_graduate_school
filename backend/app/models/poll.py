@@ -27,6 +27,7 @@ class PollQuestion(Base):
     kind: Mapped[str] = mapped_column(String(10), nullable=False)
     allow_multiple: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    ends_at: Mapped[datetime | None] = mapped_column(DateTime)
     closed_at: Mapped[datetime | None] = mapped_column(DateTime)
     first_voted_at: Mapped[datetime | None] = mapped_column(DateTime)
 

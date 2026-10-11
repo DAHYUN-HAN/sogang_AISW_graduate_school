@@ -229,6 +229,17 @@ test("closed and legacy cards show results and participants without any voting a
   assert.ok(!textsClosed.some(text => /1위|종료/.test(text)));
 });
 
+test("an open card shows its deadline and a passed deadline closes it without waiting for the server", () => {
+  const open = texts(harness({...fixture, questions: [{...fixture.questions[0], ends_at: "2099-10-30T09:00:00"}]}).render());
+  assert.ok(open.includes("10월 30일(금) 18:00 마감"));
+  const view = harness({...fixture, questions: [{...fixture.questions[0], ends_at: "2020-10-30T09:00:00"}]});
+  const nodes = view.render();
+  assert.ok(texts(nodes).includes("10월 30일(금) 18:00 마감됨"));
+  assert.ok(texts(nodes).includes("마감"));
+  assert.ok(!label(nodes, "장소 투표하기"));
+  assert.equal(label(nodes, "장소 · 학교").props.disabled, true);
+});
+
 test("each card's vote button sends only its own question", async () => {
   const view = harness({...fixture, questions: [...fixture.questions, {...fixture.questions[0], id: 11, title: "뒤풀이", options: [
     {id: 30, label: "YES", media_id: null, vote_count: 0}, {id: 31, label: "NO", media_id: null, vote_count: 0}]}]});

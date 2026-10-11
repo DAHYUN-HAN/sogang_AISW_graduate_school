@@ -21,8 +21,17 @@ def fail(code, message, status=422):
     raise AppException(status_code=status, code=code, message=message)
 
 
-def closed(question):
-    return question.closed_at is not None
+def closed(question, now=None):
+    if question.closed_at is not None:
+        return True
+    return question.ends_at is not None and question.ends_at <= (now or utc_now())
+
+
+def closed_time(question):
+    """When the card actually closed: an admin's early close, else its passed deadline."""
+    if question.closed_at is not None:
+        return question.closed_at
+    return question.ends_at if closed(question) else None
 
 
 def get_poll(db, post_id):
@@ -33,11 +42,13 @@ def admin_poll_summaries(db: Session, post_ids: list[int]) -> dict[int, dict]:
     """Aggregate only the selected admin page; never load ballots per notice."""
     if not post_ids:
         return {}
+    now = utc_now()
     ballots = (select(PollBallot.poll_id, func.count(PollBallot.id).label("participants"))
                .join(PostPoll, PostPoll.id == PollBallot.poll_id)
                .where(PostPoll.post_id.in_(post_ids)).group_by(PollBallot.poll_id).subquery())
     rows = db.execute(select(PostPoll.post_id, func.count(PollQuestion.id),
-                             func.count(case((PollQuestion.closed_at.is_(None), PollQuestion.id))),
+                             func.count(case((PollQuestion.closed_at.is_(None) & (PollQuestion.ends_at.is_(None) | (PollQuestion.ends_at > now)),
+                                              PollQuestion.id))),
                              func.coalesce(ballots.c.participants, 0))
                       .outerjoin(PollQuestion, PollQuestion.poll_id == PostPoll.id)
                       .outerjoin(ballots, ballots.c.poll_id == PostPoll.id)
@@ -92,13 +103,13 @@ def serialize_poll(db, poll, user):
                                  .group_by(PollOption.question_id)).all())
     all_closed = bool(questions) and all(closed(q) for q in questions)
     return {"id": poll.id, "post_id": poll.post_id, "revision": poll.revision,
-            "ends_at": None, "closed_at": max((q.closed_at for q in questions), default=None) if all_closed else None, "is_closed": all_closed,
+            "ends_at": None, "closed_at": max((closed_time(q) for q in questions), default=None) if all_closed else None, "is_closed": all_closed,
             "locked": poll.first_voted_at is not None, "participant_count": participants,
             "has_voted": bool(mine),
             "my_answers": [{"question_id": q.id, "option_ids": [o["id"] for o in grouped[q.id] if o["id"] in mine]} for q in questions],
             "questions": [{"id": q.id, "title": q.title, "kind": q.kind,
                            "allow_multiple": q.allow_multiple, "options": grouped[q.id],
-                           "closed_at": q.closed_at, "is_closed": closed(q), "locked": q.first_voted_at is not None,
+                           "ends_at": q.ends_at, "closed_at": closed_time(q), "is_closed": closed(q), "locked": q.first_voted_at is not None,
                            "participant_count": card_counts.get(q.id, 0),
                            "has_voted": any(o["id"] in mine for o in grouped[q.id]),
                            "legacy": q.kind != "text" or q.allow_multiple or len(grouped[q.id]) != 2 or any(o["media_id"] for o in grouped[q.id])}
@@ -174,11 +185,30 @@ def apply_poll_settings(db, post, board, user, draft: PollDraft | None, supplied
                 media = db.get(MediaAsset, o.media_id)
                 if media is None or media.status != "ready" or media.is_private or not media.content_type.startswith("image/"):
                     fail("INVALID_POLL_MEDIA", "준비 완료된 공개 범위의 이미지 파일을 선택해 주세요.")
+    # Deadlines stay editable after votes, but only open cards and only to a future time.
+    now = utc_now()
+    deadline_changed = False
+    for q in draft.questions:
+        stored = q_by_id.get(q.id)
+        if stored is not None and stored.ends_at == q.ends_at:
+            continue
+        if stored is not None and closed(stored, now):
+            fail("POLL_CLOSED", "종료된 투표의 마감 시각은 변경할 수 없습니다.", 409)
+        if q.ends_at is not None and q.ends_at <= now:
+            fail("POLL_DEADLINE_PAST", "마감 시각은 지금 이후로 정해 주세요.")
+        deadline_changed = True
     if existing is None:
         existing = PostPoll(post_id=post.id)
         db.add(existing)
         db.flush()
     elif not changed:
+        if deadline_changed:
+            # Voters' revision stays valid: a deadline does not change what they are answering.
+            for q in draft.questions:
+                q_by_id[q.id].ends_at = q.ends_at
+            existing.updated_at = now
+            log_admin_action(db, actor_id=user.id, action="poll.deadline", target_type="post", target_id=post.id,
+                             details={"poll_id": existing.id})
         return
     else:
         existing.revision += 1
@@ -188,6 +218,7 @@ def apply_poll_settings(db, post, board, user, draft: PollDraft | None, supplied
     for index, q in enumerate(draft.questions):
         stored_q = q_by_id.get(q.id) or PollQuestion(poll_id=existing.id)
         stored_q.title, stored_q.kind, stored_q.allow_multiple, stored_q.sort_order = q.title, q.kind, q.allow_multiple, index
+        stored_q.ends_at = q.ends_at
         db.add(stored_q)
         db.flush()
         kept_q.add(stored_q.id)
