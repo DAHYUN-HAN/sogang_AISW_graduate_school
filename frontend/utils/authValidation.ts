@@ -63,6 +63,11 @@ export function apiRetryAfterSeconds(error: unknown) {
   return parsed;
 }
 
+export function apiErrorData(error: unknown) {
+  if (!isAxiosError(error)) return undefined;
+  return error.response?.data?.data as Record<string, unknown> | undefined;
+}
+
 export function apiErrorStatus(error: unknown) {
   if (!isAxiosError(error)) return undefined;
   return error.response?.status;

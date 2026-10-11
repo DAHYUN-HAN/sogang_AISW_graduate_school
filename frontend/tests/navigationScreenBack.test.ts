@@ -177,6 +177,7 @@ for (const path of ["board/post/[postId]", "board/post/edit/[postId]"]) {
         React: { createElement: (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props, children }) },
         View: "View", Text: "Text", Pressable: "Pressable", BackButton: "BackButton", LoadingState: "LoadingState", NetworkErrorFallback: "NetworkErrorFallback", BackIcon: "BackIcon", CloseIcon: "CloseIcon",
         styles: {}, COLORS: {}, insets: { top: 0 }, board: undefined, isStudyRecruit: false,
+        deletedBoardId: undefined, postDetailTitle: () => "게시글", EmptyCalendarIcon: "EmptyCalendarIcon",
         isLoading, isError: true, error: undefined, post: undefined, event: undefined,
         handleBack: () => backs++, handlePostBack: () => backs++, goBack: () => backs++, requestClose: () => backs++,
       });

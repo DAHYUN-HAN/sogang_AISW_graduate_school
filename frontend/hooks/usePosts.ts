@@ -16,6 +16,7 @@ import type {
 
 import { commentApi, postApi } from "../services/api";
 import type { ApiSuccess, Board, PostDetail, PostListItem } from "../types";
+import { apiErrorStatus } from "../utils/authValidation";
 import { applyBookmarkResult } from "../utils/postDetailCache";
 import {
   firstPostPageData,
@@ -412,6 +413,8 @@ export function usePostDetail(postId: number, enabled = true, forEdit = false) {
     queryKey: forEdit ? ["post", postId, "edit"] : ["post", postId],
     queryFn: () => postApi.getPostDetail(postId, forEdit),
     enabled: canFetch,
+    // 지워진 글(404)은 다시 받아도 없으니 바로 삭제 화면을 보여 준다.
+    retry: (failureCount, error) => apiErrorStatus(error) !== 404 && failureCount < 3,
     refetchOnMount: forEdit ? "always" : true,
   });
   // Hydrate edit forms from the current server state once, then preserve drafts

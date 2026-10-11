@@ -16,7 +16,7 @@ import ImageViewerModal from "../../../../../components/ImageViewerModal";
 import MediaImage, { MediaImageBackground } from "../../../../../components/MediaImage";
 import PhotoPager from "../../../../../components/PhotoPager";
 import NaturalAspectMediaImage from "../../../../../components/NaturalAspectMediaImage";
-import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../../components/icons";
+import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, EmptyCalendarIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../../components/icons";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { useBoardTabHighlight } from "../../../../../hooks/useBoardTabHighlight";
 import { useSwipeBackInScreen } from "../../../../../hooks/useSwipeBackInScreen";
@@ -41,6 +41,7 @@ import {
   navigateFromPostDetail,
   postEditRouteForPostDetail,
 } from "../../../../../utils/appRoutes";
+import { apiErrorCode, apiErrorData } from "../../../../../utils/authValidation";
 import { navigateToRoute, replaceWithRoute } from "../../../../../utils/tabNavigation";
 import { commentKeyAction, commentSubmissionValue } from "../../../../../utils/commentKeyboard";
 import { formatBoardDate } from "../../../../../utils/dateFormat";
@@ -159,6 +160,30 @@ function isAdminParticipationGuideBoard(board?: { slug?: string } | null) {
   return board?.slug === "club-promo" || board?.slug === "networking-programs";
 }
 
+// 글 화면 위 제목. 지워진 글도 서버가 알려 준 게시판으로 살아 있던 글과 같은 제목을 쓴다.
+function postDetailTitle(
+  board: { board_type?: string; slug?: string; name?: string } | undefined,
+  post?: { title: string; isCouncilActivityEntry: boolean },
+) {
+  return board?.board_type === "album" && post
+    ? post.title
+    : isAdminParticipationGuideBoard(board)
+      ? board?.slug === "networking-programs" ? "네트워킹" : "동아리"
+      : post?.isCouncilActivityEntry
+        ? "원우회 활동내역"
+      : board?.board_type === "mutual_aid"
+        ? "상조회 신청 상세"
+      : board?.board_type === "activity_certification"
+        ? "활동 인증"
+        : board?.slug === "lecture-reviews"
+          ? "강의후기"
+          : board?.slug === "exam-archive"
+            ? "시험족보"
+        : board?.board_type === "notice"
+          ? "공지사항"
+          : board?.name ?? "게시글";
+}
+
 function firstUrlFromText(value: string) {
   return value.match(/https?:\/\/[^\s)]+/)?.[0];
 }
@@ -261,6 +286,9 @@ export default function PostDetailScreen() {
   const post = postRes?.data;
   const boards = boardsRes?.data.flatMap((group) => group.boards) ?? [];
   const board = boards.find((item) => item.id === post?.board_id);
+  // 피그마 Screen/Notice/Detail-Deleted: 지워진 글은 서버가 게시판을 알려 준다.
+  const deletedBoardId = apiErrorCode(error) === "POST_DELETED" ? apiErrorData(error)?.board_id : undefined;
+  const deletedBoard = deletedBoardId === undefined ? undefined : boards.find((item) => item.id === deletedBoardId);
   useBoardTabHighlight(board);
   const isMutualAidRequest = board?.board_type === "mutual_aid";
   const isSuggestionRequest = board?.board_type === "suggestion";
@@ -402,7 +430,7 @@ export default function PostDetailScreen() {
     <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
       <View style={styles.appBarRow}>
         <BackButton onPress={handlePostBack} />
-        <Text numberOfLines={1} style={styles.appBarTitle}>{board?.name ?? "게시글"}</Text>
+        <Text numberOfLines={1} style={styles.appBarTitle}>{deletedBoardId === undefined ? board?.name ?? "게시글" : postDetailTitle(deletedBoard)}</Text>
         <View style={styles.iconButton} />
       </View>
     </View>
@@ -410,6 +438,18 @@ export default function PostDetailScreen() {
 
   if (isLoading) {
     return <View style={styles.screen}>{navigationHeader}<LoadingState /></View>;
+  }
+
+  if (isError && deletedBoardId !== undefined) {
+    return (
+      <View style={styles.screen}>
+        {navigationHeader}
+        <View style={styles.deletedState}>
+          <EmptyCalendarIcon size={32} />
+          <Text style={styles.deletedTitle}>삭제된 게시물이에요</Text>
+        </View>
+      </View>
+    );
   }
 
   if (isError || !post) {
@@ -579,24 +619,7 @@ export default function PostDetailScreen() {
       : post.attachments.filter(attachment => !inlineNoticeImageIds.has(attachment.id));
   // 상조회 증빙 파일은 원본을 펼치지 않고 96×96 플레이스홀더 타일로만 보여 준다(Figma MutualAidDetail-V2).
   const hasMutualAidEvidenceFiles = isMutualAidRequest && visibleAttachments.length > 0;
-  const appBarTitle =
-    board?.board_type === "album"
-      ? post.title
-      : isAdminParticipationGuide
-        ? board?.slug === "networking-programs" ? "네트워킹" : "동아리"
-        : isCouncilActivityEntry
-          ? "원우회 활동내역"
-        : isMutualAidRequest
-          ? "상조회 신청 상세"
-        : board?.board_type === "activity_certification"
-          ? "활동 인증"
-          : board?.slug === "lecture-reviews"
-            ? "강의후기"
-            : board?.slug === "exam-archive"
-              ? "시험족보"
-          : board?.board_type === "notice"
-            ? "공지사항"
-            : board?.name ?? "게시글";
+  const appBarTitle = postDetailTitle(board, { title: post.title, isCouncilActivityEntry });
 
   const requireLogin = () => {
     if (!userId) {
@@ -1618,6 +1641,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
     backgroundColor: COLORS.page,
+  },
+  deletedState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 24,
+    backgroundColor: COLORS.page,
+  },
+  deletedTitle: {
+    color: "#2C3038",
+    fontSize: 18,
+    fontWeight: "500",
+    lineHeight: 26,
   },
   loadErrorText: {
     color: COLORS.muted,

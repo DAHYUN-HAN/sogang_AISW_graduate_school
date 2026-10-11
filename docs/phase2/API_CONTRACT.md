@@ -126,6 +126,8 @@ Error:
 }
 ```
 
+An error may carry an optional `data` object when the client needs more than the code (currently only `POST_DELETED`).
+
 ### Common Error Codes
 
 | HTTP | Code | Meaning |
@@ -1053,6 +1055,12 @@ Supplying `notice_category` for a non-notice scope returns normalized `422 VALID
 ### GET `/posts/{post_id}`
 
 Auth: user
+
+Deleted post (2026-10-11, Figma `Screen/Notice/Detail-Deleted`): when the post was soft-deleted and the caller can still read its board, the response is `404` with code `POST_DELETED` and an extra `data` field so the app can title the deleted screen like the live post. Missing posts and posts on boards the caller cannot read keep the plain `404 NOT_FOUND`.
+
+```json
+{ "status": "error", "message": "Post deleted.", "code": "POST_DELETED", "data": { "board_id": 2 } }
+```
 
 Response:
 
