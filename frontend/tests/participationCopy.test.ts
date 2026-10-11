@@ -15,3 +15,12 @@ test("활동 인증 목록이 비면 피그마 문구를 보인다", () => {
 test("네트워킹 활동 인증 선택 칸은 네트워킹명을 묻는다", () => {
   assert.match(create, /return "네트워킹명을 선택하세요";/);
 });
+
+// 2026-10-12 사용자 요청: 피그마 Council/SuggestionEdit와 같게 건의사항 수정 화면을 맞춘다.
+test("건의사항 수정은 익명 안내·한 줄 제목·수정 완료 버튼을 쓴다", () => {
+  const edit = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
+  assert.match(edit, /isSuggestion \? "건의사항 수정" : "글 수정"/);
+  assert.match(edit, /해당 건의사항은 익명으로 등록되며, 작성자는 노출되지 않아요/);
+  assert.match(edit, /multiline=\{!isStudyRecruit && !isSuggestion\}/);
+  assert.match(edit, /isSuggestion \? "수정 완료" : "완료"/);
+});

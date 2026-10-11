@@ -118,6 +118,8 @@ export default function PostEditScreen() {
   // 게시판을 옮기면 받을 과목정보도 바뀐다. 원래 게시판이 아니라 고른 게시판을 본다.
   const resourceFields = resourcePostFields(selectedBoard?.slug);
   const isStudyRecruit = board?.slug === "study-recruit";
+  // Figma Council/SuggestionEdit: 작성 화면과 같은 구성(익명 안내, 한 줄 제목, 내용, "수정 완료").
+  const isSuggestion = board?.board_type === "suggestion";
   const isAdminParticipationPost = board?.slug === "club-promo" || board?.slug === "networking-programs";
   const isAlbum = board?.board_type === "album";
   const isMutualAid = board?.board_type === "mutual_aid";
@@ -318,7 +320,7 @@ export default function PostEditScreen() {
       <Pressable accessibilityLabel="닫기" onPress={requestClose} style={styles.iconButton}>
         <CloseIcon size={20} color={COLORS.text} />
       </Pressable>
-      <Text style={styles.appBarTitle}>{isStudyRecruit ? "스터디 모집" : "글 수정"}</Text>
+      <Text style={styles.appBarTitle}>{isStudyRecruit ? "스터디 모집" : isSuggestion ? "건의사항 수정" : "글 수정"}</Text>
       <View style={styles.iconButton} />
     </View>
   );
@@ -533,7 +535,7 @@ export default function PostEditScreen() {
               <Ionicons name="chevron-down" size={18} color={COLORS.muted} />
             </Pressable>
           </View>
-        ) : isStudyRecruit ? null : (
+        ) : isStudyRecruit || isSuggestion ? null : (
           <View style={styles.readOnlyField}>
             <Text numberOfLines={1} style={styles.readOnlyText}>{boardLabel}</Text>
           </View>
@@ -561,6 +563,13 @@ export default function PostEditScreen() {
           />
         ) : null}
 
+        {isSuggestion ? (
+          <View style={styles.suggestionGuide}>
+            <Ionicons name="information-circle-outline" size={17} color="#0C447C" />
+            <Text style={styles.suggestionGuideText}>해당 건의사항은 익명으로 등록되며, 작성자는 노출되지 않아요</Text>
+          </View>
+        ) : null}
+
         <Controller
           control={control}
           name="title"
@@ -568,12 +577,12 @@ export default function PostEditScreen() {
             <View>
               <TextInput
                 accessibilityLabel="제목"
-                multiline={!isStudyRecruit}
+                multiline={!isStudyRecruit && !isSuggestion}
                 onBlur={field.onBlur}
                 onChangeText={clearOnChange("title", field.onChange)}
                 placeholder={resourceFields?.titlePlaceholder ?? "제목을 입력하세요"}
                 placeholderTextColor={COLORS.subtle}
-                style={[styles.input, isStudyRecruit ? null : styles.titleInput, fieldState.error ? styles.inputError : null]}
+                style={[styles.input, isStudyRecruit || isSuggestion ? null : styles.titleInput, fieldState.error ? styles.inputError : null]}
                 textAlignVertical="top"
                 value={field.value}
               />
@@ -658,7 +667,7 @@ export default function PostEditScreen() {
                   onChangeText={clearOnChange("content", field.onChange)}
                   placeholder="내용을 입력하세요"
                   placeholderTextColor={COLORS.subtle}
-                  style={[styles.input, isStudyRecruit ? styles.studyContentInput : styles.contentInput, fieldState.error ? styles.inputError : null]}
+                  style={[styles.input, isStudyRecruit ? styles.studyContentInput : isSuggestion ? styles.suggestionContentInput : styles.contentInput, fieldState.error ? styles.inputError : null]}
                   textAlignVertical="top"
                   value={field.value}
                 />
@@ -781,7 +790,7 @@ export default function PostEditScreen() {
           onPress={() => { Keyboard.dismiss(); handleSubmit(onSubmit)(); }}
           style={[styles.submitButton, updateMutation.isPending || isUploading ? styles.submitButtonDisabled : null]}
         >
-          <Text style={styles.submitText}>{updateMutation.isPending || isUploading ? "저장 중" : "완료"}</Text>
+          <Text style={styles.submitText}>{updateMutation.isPending || isUploading ? "저장 중" : isSuggestion ? "수정 완료" : "완료"}</Text>
         </Pressable>
       </ScrollView>
       <SelectionSheet
@@ -954,6 +963,26 @@ const styles = StyleSheet.create({
   },
   studyContentInput: {
     height: 111, // Figma: 스터디 내용입력 111h
+  },
+  suggestionContentInput: {
+    height: 180, // Figma SuggestionEdit: 내용입력 180h
+  },
+  // Figma SuggestionEdit 익명안내: 작성 화면(create.tsx guideBoxSuggestion)과 같은 모양
+  suggestionGuide: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    borderRadius: 8,
+    backgroundColor: "#E6F1FB",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  suggestionGuideText: {
+    flex: 1,
+    color: "#0C447C",
+    fontSize: 12,
+    fontWeight: "400",
+    lineHeight: 17,
   },
   // 작성 화면과 같은 규칙. Figma 오류 상태는 1px이고 여백은 기본과 같다.
   inputError: {
