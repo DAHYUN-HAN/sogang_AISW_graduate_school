@@ -454,6 +454,18 @@ export function NoticeAlertIcon({ size = 14, color = "#854F0B" }: IconProps) {
   );
 }
 
+// 입력칸 아래 오류 문구 앞 경고 아이콘 — 디자인 원본 14x14, stroke 1.3.
+// NoticeAlertIcon과 크기는 같지만 원이 더 크고 선이 굵다.
+export function FieldErrorIcon({ size = 14, color = "#D64545" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+      <Path d="M7 13.125C10.3827 13.125 13.125 10.3827 13.125 7C13.125 3.61726 10.3827 0.875 7 0.875C3.61726 0.875 0.875 3.61726 0.875 7C0.875 10.3827 3.61726 13.125 7 13.125Z" stroke={color} strokeWidth={1.3} />
+      <Path d="M7 3.9375V7.6125" stroke={color} strokeWidth={1.3} strokeLinecap="round" />
+      <Path d="M7 10.5875C7.43492 10.5875 7.7875 10.2349 7.7875 9.8C7.7875 9.36508 7.43492 9.0125 7 9.0125C6.56508 9.0125 6.2125 9.36508 6.2125 9.8C6.2125 10.2349 6.56508 10.5875 7 10.5875Z" fill={color} />
+    </Svg>
+  );
+}
+
 // 토스트용 경고 아이콘 — 디자인 원본 18x18. 채워진 원 위에 흰 느낌표라
 // NoticeAlertIcon(테두리만 있는 원)과 다르다. color는 원의 채움색이다.
 export function ToastAlertIcon({ size = 18, color = "#D64545" }: IconProps) {
