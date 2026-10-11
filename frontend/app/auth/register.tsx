@@ -26,11 +26,6 @@ import {
   verificationHasExpired,
 } from "../../utils/authVerificationUi";
 import {
-  CONSENT_DOCUMENT_SECTIONS,
-  PRIVACY_POLICY_SUPPORT_EMAIL,
-  resolvePrivacyPolicyMetadata,
-} from "../../utils/privacyPolicy";
-import {
   registrationVerificationFailure,
   resendAvailableAt,
   resendCountdownLabel,
@@ -38,6 +33,7 @@ import {
 } from "../../utils/signupVerificationUi";
 
 import { BackIcon } from "../../components/icons";
+import PrivacyConsentSheet from "../../components/PrivacyConsentSheet";
 const COLORS = {
   primary: "#2761FF", // primary/500
   primary50: "#EDF2FE",
@@ -107,7 +103,6 @@ export default function RegisterScreen() {
   const registrationOptionsQuery = useRegistrationOptionsQuery();
   const majorOptions = registrationOptionsQuery.data?.data.majors ?? [];
   const privacyPolicy = registrationOptionsQuery.data?.data.privacy_policy;
-  const privacyPolicyDisplay = resolvePrivacyPolicyMetadata(privacyPolicy);
 
   const email = composeSchoolEmail(emailId);
 
@@ -548,50 +543,8 @@ export default function RegisterScreen() {
         </Pressable>
       </Modal>
 
-      <Modal
-        animationType="slide"
-        onRequestClose={() => setPrivacyModalVisible(false)}
-        transparent
-        visible={privacyModalVisible}
-      >
-        <View style={styles.privacyModalBackdrop}>
-          <View style={styles.privacyModalCard}>
-            <View style={styles.privacyModalHandle} />
-            <View style={styles.privacyModalHeader}>
-              <View style={styles.privacyModalTitleRow}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.primary} />
-                <Text style={styles.privacyModalTitle}>이용약관 및 개인정보 처리방침</Text>
-              </View>
-              <Text style={styles.privacyModalInstruction}>내용을 확인하고 언제든 닫을 수 있어요.</Text>
-            </View>
-            <ScrollView contentContainerStyle={styles.privacyModalContent} style={styles.privacyModalScroll}>
-              <View style={styles.privacyPolicyMeta}>
-                <Text style={styles.privacyPolicyMetaText}>버전: {privacyPolicyDisplay.version}</Text>
-                <Text style={styles.privacyPolicyMetaText}>시행일: {privacyPolicyDisplay.effectiveDate}</Text>
-              </View>
-              {CONSENT_DOCUMENT_SECTIONS.map((section, index) => (
-                <View key={`${section.title}-${index}`} style={styles.privacyPolicySection}>
-                  <Text style={styles.privacyPolicySectionTitle}>{section.title}</Text>
-                  <Text style={styles.privacyPolicyBody}>{section.body}</Text>
-                </View>
-              ))}
-              <View style={styles.privacyPolicySection}>
-                <Text style={styles.privacyPolicySectionTitle}>개인정보 문의</Text>
-                <Text style={styles.privacyPolicyBody}>{PRIVACY_POLICY_SUPPORT_EMAIL}</Text>
-              </View>
-            </ScrollView>
-            <View style={styles.privacyModalFooter}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setPrivacyModalVisible(false)}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText}>닫기</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* 계정 설정과 같은 동의 시트(Figma PrivacyConsentSheet)를 쓴다. */}
+      <PrivacyConsentSheet visible={privacyModalVisible} onClose={() => setPrivacyModalVisible(false)} />
     </View>
   );
 }
@@ -657,19 +610,4 @@ const styles = StyleSheet.create({
   modalRetry: { alignItems: "flex-start", gap: 8, paddingVertical: 10 },
   modalRetryButton: { borderRadius: 7, backgroundColor: COLORS.primary50, paddingHorizontal: 12, paddingVertical: 8 },
   modalRetryText: { color: COLORS.primary, fontSize: 12, fontWeight: "700" },
-  privacyModalBackdrop: { flex: 1, alignItems: "center", justifyContent: "flex-end", backgroundColor: "rgba(17,24,39,0.42)" },
-  privacyModalCard: { width: "100%", maxWidth: 405, height: "88%", overflow: "hidden", borderTopLeftRadius: 18, borderTopRightRadius: 18, backgroundColor: COLORS.bg, paddingTop: 12 },
-  privacyModalHandle: { width: 36, height: 4, alignSelf: "center", borderRadius: 2, backgroundColor: "#C7CCD4", marginBottom: 14 },
-  privacyModalHeader: { gap: 6, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: "#EAECEF" },
-  privacyModalTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  privacyModalTitle: { flex: 1, color: COLORS.text, fontSize: 18, fontWeight: "600" },
-  privacyModalInstruction: { color: COLORS.tertiary, fontSize: 12, fontWeight: "400", lineHeight: 18 },
-  privacyModalScroll: { flex: 1 },
-  privacyModalContent: { gap: 18, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 28 },
-  privacyPolicyMeta: { gap: 3, borderRadius: 8, backgroundColor: "#F7F8FA", padding: 12 },
-  privacyPolicyMetaText: { color: COLORS.muted, fontSize: 12, fontWeight: "400", lineHeight: 18 },
-  privacyPolicySection: { gap: 5 },
-  privacyPolicySectionTitle: { color: COLORS.text, fontSize: 14, fontWeight: "700", lineHeight: 20 },
-  privacyPolicyBody: { color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 21 },
-  privacyModalFooter: { gap: 8, borderTopWidth: 1, borderTopColor: "#EAECEF", backgroundColor: COLORS.bg, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
 });

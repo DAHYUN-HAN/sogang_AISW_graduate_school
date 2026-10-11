@@ -32,22 +32,22 @@ test("회원가입 이름은 동명이인을 오류로 처리하지 않는다", 
 
 
 test("개인정보 동의 체크와 전문 열기는 독립적으로 동작한다", () => {
-  assert.match(registerSource, /CONSENT_DOCUMENT_SECTIONS\.map/);
-  assert.match(registerSource, /visible=\{privacyModalVisible\}/);
+  // 2026-10-11 사용자 요청: 계정 설정과 같은 동의 시트(Figma PrivacyConsentSheet)를 같은 내용으로 연다.
+  assert.match(registerSource, /<PrivacyConsentSheet visible=\{privacyModalVisible\} onClose=\{\(\) => setPrivacyModalVisible\(false\)\} \/>/);
   assert.match(registerSource, /onPress=\{togglePrivacyConsent\}/);
   assert.match(registerSource, /accessibilityLabel="이용약관 및 개인정보 처리방침 전문 보기"/);
   assert.match(registerSource, /onPress=\{openPrivacyPolicy\}/);
   assert.match(registerSource, /이용약관 및 개인정보 처리방침 동의 \(필수\)/);
-  assert.match(registerSource, /onRequestClose=\{\(\) => setPrivacyModalVisible\(false\)\}/);
   assert.doesNotMatch(registerSource, /privacyReviewed|privacyReadToEnd|hasReachedPrivacyPolicyEnd/);
   assert.doesNotMatch(registerSource, />전문보기<\/Text>/);
   assert.match(privacyScreenSource, /createPrivacyConsentScreenDocument\(/);
   assert.match(termsScreenSource, /sections=\{TERMS_OF_SERVICE_SECTIONS\}/);
 });
 
-test("회원가입과 이용약관만 활성 정책 메타데이터를 표시한다", () => {
+// 2026-10-11: 회원가입 약관 보기는 계정 설정과 같은 시트라 버전·시행일을 따로 보이지 않는다.
+test("이용약관 화면만 활성 정책 메타데이터를 표시한다", () => {
   assert.match(registerSource, /useRegistrationOptionsQuery\(\)/);
-  assert.match(registerSource, /resolvePrivacyPolicyMetadata\(privacyPolicy\)/);
+  assert.doesNotMatch(registerSource, /resolvePrivacyPolicyMetadata/);
   assert.match(termsScreenSource, /useRegistrationOptionsQuery\(\)/);
   assert.match(termsScreenSource, /resolvePrivacyPolicyMetadata\(/);
   assert.doesNotMatch(privacyScreenSource, /useRegistrationOptionsQuery|resolvePrivacyPolicyMetadata/);

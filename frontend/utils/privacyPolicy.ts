@@ -380,6 +380,11 @@ export function createPrivacyConsentScreenDocument(consentDate?: string | null) 
   };
 }
 
+// 계정 설정의 동의 시트(Figma PrivacyConsentSheet): 회원가입 때 동의한 이용약관과 개인정보 처리방침 전문.
+export function privacyConsentSheetSections(): PrivacyPolicySection[] {
+  return [...TERMS_OF_SERVICE_SECTIONS, ...privacyConsentDisplaySections()];
+}
+
 export const CONSENT_DOCUMENT_SECTIONS: PrivacyPolicySection[] = [
   ...TERMS_OF_SERVICE_SECTIONS,
   ...PRIVACY_POLICY_ONLY_SECTIONS,
