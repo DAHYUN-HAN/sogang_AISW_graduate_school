@@ -42,9 +42,18 @@ test("홈 공지 미리보기는 최신 두 개를 한 번의 집계 요청으�
   assert.strictEqual(result, response);
 });
 
+// 2026-10-12 사용자 요청: 홈 위에 새 공지사항 화면을 쌓으므로 필터는 늘 "전체"로 시작하고 < 로 홈에 돌아온다.
 test("#186 홈 공지사항 더보기는 이전 필터와 무관하게 전체 공지 루트를 연다", () => {
   assert.match(
     homeSource,
-    /<SectionHeader\s+title="공지사항"[\s\S]*?requestTabRootReset\("notices"\)[\s\S]*?navigateToTabRoot\("notices"\)[\s\S]*?\/>/,
+    /<SectionHeader\s+title="공지사항"[\s\S]*?navigation\.dispatch\(StackActions\.push\("notices"\)\)[\s\S]*?\/>/,
+  );
+});
+
+// 2026-10-12 사용자 요청: 공지사항으로 연결된 배너도 홈 위에 쌓아 < 로 홈에 돌아온다.
+test("공지사항·커뮤니티로 연결된 홈 배너는 홈 위에 쌓는다", () => {
+  assert.match(
+    homeSource,
+    /if \(tab === "notices" \|\| tab === "community"\) navigation\.dispatch\(StackActions\.push\(tab\)\);/,
   );
 });

@@ -835,6 +835,8 @@ function AccountingExternalScreen({ board, topInset, onBack }: { board?: Board |
 type BoardPostsScreenProps = {
   initialBoardId?: number;
   isTabRoot?: boolean;
+  // 탭 첫 화면을 홈 "더보기"로 열었을 때만 준다. 있으면 < 를 보인다.
+  onBack?: () => void;
 };
 
 function AlbumTile({ post, index, onPress }: { post: PostListItem; index: number; onPress: (postId: number) => void }) {
@@ -945,7 +947,7 @@ function ActivityTile({ post, boardSlug, index, isLast, onPress }: { post: PostL
 
 // ponytail: embedded (initialBoardId) == rendered inside a tab screen, so it must stay a tab root
 // and switch boards via state instead of router.replace, which would leave the (tabs) group and hide the tab bar.
-export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBoardId !== undefined }: BoardPostsScreenProps = {}) {
+export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBoardId !== undefined, onBack }: BoardPostsScreenProps = {}) {
   const params = useLocalSearchParams<{ boardId: string }>();
   const insets = useSafeAreaInsets();
   const routeBoardId = Number(params.boardId);
@@ -1244,10 +1246,10 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
           </>
         ) : (
           <>
-            {isTabRoot ? (
+            {isTabRoot && !onBack ? (
               <View style={styles.iconButton} />
             ) : (
-              <BackButton onPress={exitBoardDepth} />
+              <BackButton onPress={onBack ?? exitBoardDepth} />
             )}
             <Text style={styles.appBarTitle}>{display.name}</Text>
             {/* 참여활동은 활동 인증에서만 검색을 제공한다. */}

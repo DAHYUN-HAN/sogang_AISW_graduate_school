@@ -64,6 +64,14 @@ test("탭 첫 화면·검색·알림·마이페이지는 기록이 있어도 지
   }
 });
 
+// 2026-10-12 사용자 요청: 홈 "더보기"로 쌓은 공지사항·커뮤니티는 그 탭을 강조한다.
+test("홈 위에 쌓인 공지사항·커뮤니티 첫 화면은 그 탭을 강조한다", () => {
+  for (const name of ["notices", "community"]) {
+    const stack = [{ key: "home-1", name: "home" }, { key: "top", name }];
+    assert.equal(highlighted("(home)", stack, {}), `(${name})`);
+  }
+});
+
 test("지금 탭 스택이 아직 만들어지지 않았으면 지금 탭을 강조한다", () => {
   assert.equal(highlighted("(participation)", [], {}), "(participation)");
 });

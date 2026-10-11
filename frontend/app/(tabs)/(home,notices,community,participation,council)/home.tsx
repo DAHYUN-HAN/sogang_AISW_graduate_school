@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { StackActions } from "@react-navigation/native";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useNavigation } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,7 +17,6 @@ import { BackIcon, BellIcon, EmptyCalendarIcon, ForwardIcon, ProfileIcon } from 
 import { useMyPageDrawer } from "../../../components/MyPageDrawer";
 import { useBoardsQuery } from "../../../hooks/useApi";
 import { API_ORIGIN, bannerApi, eventApi, notificationApi, postApi } from "../../../services/api";
-import { requestTabRootReset } from "../../../stores/tabRootResetStore";
 import { useUserStore } from "../../../stores/userStore";
 import type { BannerItem, Board, EventItem, PostListItem } from "../../../types";
 import { HOME_TAB_ROUTE, postDetailRoute } from "../../../utils/appRoutes";
@@ -322,6 +322,7 @@ function HomeBanner({
   const pageTotal = Math.max(total, 1);
   const pageIndex = Math.min(index + 1, pageTotal);
   const linkHref = banner.cta_href?.trim();
+  const navigation = useNavigation();
   const handlePress = () => {
     if (!linkHref) {
       return;
@@ -330,9 +331,11 @@ function HomeBanner({
       Linking.openURL(linkHref);
       return;
     }
-    // 배너가 탭 첫 화면을 가리키면 홈 스택에 끼워 넣지 않고 그 탭으로 옮긴다.
+    // 공지사항·커뮤니티는 "더보기"처럼 홈 위에 쌓아 < 로 홈에 돌아오게 한다.
+    // 그 밖의 탭 첫 화면은 홈 스택에 끼워 넣지 않고 그 탭으로 옮긴다.
     const tab = tabNameFromRoute(linkHref);
-    if (tab) navigateToTabRoot(tab);
+    if (tab === "notices" || tab === "community") navigation.dispatch(StackActions.push(tab));
+    else if (tab) navigateToTabRoot(tab);
     else router.push(linkHref as never);
   };
 
@@ -981,8 +984,8 @@ export default function HomeScreen() {
           <SectionHeader
             title="공지사항"
             onPress={() => {
-              requestTabRootReset("notices");
-              navigateToTabRoot("notices");
+              // 탭으로 옮기지 않고 홈 위에 쌓아 < 로 홈에 돌아오게 한다.
+              navigation.dispatch(StackActions.push("notices"));
             }}
           />
           <NoticeList
@@ -1024,8 +1027,8 @@ export default function HomeScreen() {
           <SectionHeader
             title="행사 사진첩"
             onPress={() => {
-              requestTabRootReset("community");
-              navigateToTabRoot("community");
+              // 커뮤니티 첫 화면은 행사 사진첩을 먼저 연다.
+              navigation.dispatch(StackActions.push("community"));
             }}
           />
           {albumQuery.isLoading ? (
