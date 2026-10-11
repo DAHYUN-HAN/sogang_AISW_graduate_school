@@ -198,6 +198,7 @@ const styles = StyleSheet.create({
   label: {
     color: COLORS.text,
     fontSize: 14,
+    lineHeight: 22, // Figma Login: 라벨 22h
     fontWeight: "500", // Figma: Inter Medium
   },
   input: {
@@ -226,16 +227,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: COLORS.primary,
   },
+  // Figma Login-Error: 칸 아래 14에 오류 문구, 그 아래 28에 로그인 버튼 (본문 gap 20 기준)
   errorRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginTop: -8,
+    marginTop: -6,
+    marginBottom: 7,
   },
   errorText: {
     color: COLORS.danger,
-    fontSize: 13,
-    fontWeight: "500",
+    fontSize: 12,
+    lineHeight: 14,
+    fontWeight: "400", // Figma 에러행: Regular 12/14
   },
   disabledButton: {
     opacity: 0.55,
@@ -255,6 +259,7 @@ const styles = StyleSheet.create({
   linkText: {
     color: COLORS.muted,
     fontSize: 14,
+    lineHeight: 22, // Figma Login: 링크 22h
     fontWeight: "500", // Figma: Inter Medium
   },
 });

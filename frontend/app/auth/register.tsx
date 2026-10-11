@@ -87,6 +87,8 @@ export default function RegisterScreen() {
   const verificationExpiresAtRef = useRef(0);
   const resendAvailableAtRef = useRef(0);
   const [verificationMessage, setVerificationMessage] = useState<VerificationMessage>(null);
+  // Figma SignUp-Step2-Resent: 재전송 뒤에는 안내문이 "재발송되었어요"로 바뀌고 남은 시간이 회색이 된다.
+  const [codeResent, setCodeResent] = useState(false);
   const [verificationFailureState, setVerificationFailureState] = useState<VerificationFailureState>(null);
   const [nickname, setNickname] = useState("");
   const [cohort, setCohort] = useState("");
@@ -168,6 +170,7 @@ export default function RegisterScreen() {
       setStep(1);
       setVerificationFailureState(null);
       setVerificationMessage(resend ? { type: "success", text: "새 인증코드가 발송되었어요." } : null);
+      setCodeResent(resend);
     } catch (error) {
       const errorCode = apiErrorCode(error);
       if (errorCode === "VERIFICATION_RESEND_COOLDOWN") {
@@ -329,8 +332,6 @@ export default function RegisterScreen() {
   const codeError = verificationExpired
     ? "인증 시간이 만료되었어요. 재전송을 눌러주세요."
     : errors.code;
-  // 상태 문구가 이미 떠 있으면 재전송 라벨을 생략하고 남은 시간만 강조한다.
-  const showResendTimerOnly = Boolean(codeError || verificationMessage);
 
   return (
     <View style={styles.screen}>
@@ -377,7 +378,7 @@ export default function RegisterScreen() {
           {step === 1 ? (
             <>
               <Text style={styles.heading}>인증코드를 입력해주세요</Text>
-              <Text style={styles.helper}>{email}로 발송되었어요</Text>
+              <Text style={styles.helper}>{email}로 {codeResent ? "재발송" : "발송"}되었어요</Text>
               <View style={styles.field}>
                 <TextInput
                   keyboardType="number-pad"
@@ -395,7 +396,7 @@ export default function RegisterScreen() {
                   value={code}
                 />
               </View>
-              <View style={[styles.statusRow, codeError || verificationMessage ? styles.statusRowTight : null]}>
+              <View style={styles.statusRow}>
                 <View style={styles.statusLeft}>
                   {codeError ? (
                     <View style={styles.errorRow}>
@@ -422,10 +423,11 @@ export default function RegisterScreen() {
                     disabled={isSubmitting || resendCooldown > 0}
                     hitSlop={8}
                     onPress={() => void requestCode(true)}
-                    style={!codeError && !verificationMessage ? styles.resendControlLeading : styles.resendControlTrailing}
+                    style={styles.resendControlTrailing}
                   >
-                    <Text style={[styles.resendLink, showResendTimerOnly ? styles.resendTimer : null]}>
-                      {isSubmitting ? "발송 중" : resendCountdownLabel(resendCooldown, { timerOnly: showResendTimerOnly })}
+                    {/* Figma SignUp-Step2: 처음 발송은 파란 "재전송 (04:59)"를 오른쪽에, 재전송 뒤에는 같은 자리에 회색으로 둔다. */}
+                    <Text style={[styles.resendLink, codeResent && resendCooldown > 0 ? styles.resendLinkDisabled : null]}>
+                      {isSubmitting ? "발송 중" : resendCountdownLabel(resendCooldown)}
                     </Text>
                   </Pressable>
                 )}
@@ -437,7 +439,7 @@ export default function RegisterScreen() {
                   style={[styles.primaryButton, isSubmitting ? styles.disabledButton : null, resendCooldown > 0 ? styles.validationDisabledButton : null]}
                 >
                   <Text style={styles.primaryButtonText}>
-                    {isSubmitting ? "발송 중" : resendCooldown > 0 ? resendCountdownLabel(resendCooldown) : "인증코드 재전송"}
+                    {isSubmitting ? "발송 중" : resendCooldown > 0 ? resendCountdownLabel(resendCooldown) : "재전송"}
                   </Text>
                 </Pressable>
               ) : (
@@ -612,16 +614,15 @@ const styles = StyleSheet.create({
   inputError: { borderColor: COLORS.danger },
   // 피그마 SignUp 오류 화면: 오류 칸은 배경 없이 빨간 테두리만 둔다.
   profileInputError: { borderColor: COLORS.danger },
-  errorRow: { minHeight: 30, flexDirection: "row", alignItems: "center", gap: 4 }, // Figma status/error row: 30h, gap4
-  statusRow: { flexDirection: "row", alignItems: "center", width: "100%", gap: 8 }, // 재전송만 있을 때는 본문 gap 20을 그대로 쓴다
-  // 에러/안내 문구는 코드영역 안에 들어가므로 입력창과 8px만 띄운다(본문 gap 20 - 12).
-  statusRowTight: { marginTop: -12 },
+  // Figma SignUp-Step3-Error: 칸 아래 7에 오류 문구(12/14), 그 아래 20에 다음 라벨
+  errorRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // Figma SignUp-Step2: 인증코드 칸 아래 6에 재전송·안내 줄을 둔다(본문 gap 20 - 14).
+  statusRow: { flexDirection: "row", alignItems: "center", width: "100%", gap: 8, marginTop: -14 },
   statusLeft: { flexShrink: 1, minWidth: 0 },
-  resendControlLeading: { alignSelf: "flex-start" },
   resendControlTrailing: { marginLeft: "auto" },
-  resendLink: { color: COLORS.primary, fontSize: 13, fontWeight: "400", lineHeight: 18 }, // Figma "재전송 (04:59)": Regular 13/18
-  resendTimer: { fontWeight: "500", lineHeight: 16 }, // Figma "05:00": Medium 13/16
-  errorText: { flexShrink: 1, color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 15 }, // Figma: error/500 Regular 12/15
+  resendLink: { color: COLORS.primary, fontSize: 13, fontWeight: "400", lineHeight: 16 }, // Figma "재전송 (04:59)": Regular 13/16
+  resendLinkDisabled: { color: "#999EA8" }, // Figma SignUp-Step2-Resent: 재전송 뒤 카운트다운은 회색
+  errorText: { flexShrink: 1, color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 14 }, // Figma: error/500 Regular 12/14
   successText: { color: "#3B6D11", fontSize: 12, fontWeight: "400", lineHeight: 15 }, // Figma: success green Regular 12/15
   successRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   passwordHelper: { color: COLORS.subtle, fontSize: 12, fontWeight: "400", lineHeight: 18 }, // Figma: Regular 12

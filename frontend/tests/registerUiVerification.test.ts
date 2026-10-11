@@ -12,10 +12,14 @@ test("회원가입 인증 단계는 최초 발송과 재전송 상태를 구분�
   assert.match(registerSource, /setVerificationMessage\(resend \?/);
   assert.match(registerSource, /signupProgressDotIndex\(step\)/);
   assert.match(registerSource, /resendAvailableAt\(responseReceivedAt, resendIn\)/);
-  assert.match(registerSource, /resendCountdownLabel\(resendCooldown, \{ timerOnly: showResendTimerOnly \}\)/);
+  // 2026-10-11 사용자 요청: 처음 발송은 파란색, 재전송 뒤에는 회색 "재전송 (04:59)"를 오른쪽에 둔다.
+  assert.match(registerSource, /\{email\}로 \{codeResent \? "재발송" : "발송"\}되었어요/);
+  assert.match(registerSource, /style=\{styles\.resendControlTrailing\}/);
+  assert.match(registerSource, /codeResent && resendCooldown > 0 \? styles\.resendLinkDisabled : null/);
+  assert.match(registerSource, /resendCountdownLabel\(resendCooldown\)\}/);
   assert.match(registerSource, /disabled=\{isSubmitting \|\| resendCooldown > 0\}/);
   assert.match(registerSource, /verificationExpired \? \(/);
-  assert.match(registerSource, /resendCooldown > 0 \? resendCountdownLabel\(resendCooldown\) : "인증코드 재전송"/);
+  assert.match(registerSource, /resendCooldown > 0 \? resendCountdownLabel\(resendCooldown\) : "재전송"/);
 });
 
 

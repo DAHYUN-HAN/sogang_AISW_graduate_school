@@ -7,15 +7,17 @@ type Props = {
   onChangeText: (value: string) => void;
   placeholder?: string;
   hasError?: boolean;
+  // 기본 44(로그인·회원가입 피그마). 비밀번호 찾기는 피그마가 48이라 따로 넘긴다.
+  height?: number;
 };
 
 export const SCHOOL_EMAIL_DOMAIN = "@sogang.ac.kr";
 
-export default function SchoolEmailInput({ value, onChangeText, placeholder = "이메일 ID", hasError = false }: Props) {
+export default function SchoolEmailInput({ value, onChangeText, placeholder = "이메일 ID", hasError = false, height }: Props) {
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, height ? { minHeight: height } : null]}>
       <TextInput
         autoCapitalize="none"
         autoCorrect={false}
