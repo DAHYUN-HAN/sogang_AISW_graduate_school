@@ -134,6 +134,12 @@ export function formatBoardDateTime(value?: string | null): string {
   return parts ? `${shortDateBase(parts)}(${parts.weekday}) · ${time24Base(parts)}` : value;
 }
 
+export function formatMonthDayTime(value?: string | null): string {
+  if (!value) return "";
+  const parts = displayParts(value);
+  return parts ? `${parts.month}월 ${parts.day}일(${parts.weekday}) ${time24Base(parts)}` : "";
+}
+
 export function formatTime24(value?: string | null): string {
   if (!value) return "";
   const parts = displayParts(value);

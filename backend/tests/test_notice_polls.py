@@ -130,6 +130,46 @@ def test_vote_validation_and_stale_revision_do_not_create_votes(api):
     assert api.client.get(f"/api/posts/{post_id}/poll", headers=api.headers["owner"]).json()["data"]["participant_count"] == 0
 
 
+def test_empty_choice_withdraws_vote_and_participation(api):
+    _, post_id, poll = setup(api, draft(questions=[
+        {"title": "모임 장소", "kind": "text", "allow_multiple": False, "options": [{"label": "학교"}, {"label": "식당"}]},
+        {"title": "뒤풀이", "kind": "text", "allow_multiple": False, "options": [{"label": "참석"}, {"label": "불참"}]}]))
+    first, second = poll["questions"]
+
+    def withdraw(question, user="owner"):
+        return api.client.put(f"/api/posts/{post_id}/poll/vote", headers=api.headers[user],
+                              json={"revision": poll["revision"], "answers": [{"question_id": question["id"], "option_ids": []}]})
+
+    # Withdrawing before ever voting is a no-op and does not lock the poll.
+    assert withdraw(first).status_code == 200
+    assert api.client.get(f"/api/posts/{post_id}/poll", headers=api.headers["owner"]).json()["data"]["locked"] is False
+    assert vote(api, post_id, poll).status_code == 200
+    assert vote(api, post_id, poll, "other").status_code == 200
+    data = withdraw(first).json()["data"]
+    assert data["participant_count"] == 2
+    assert [o["vote_count"] for o in data["questions"][0]["options"]] == [1, 0]
+    assert data["questions"][0]["has_voted"] is False and data["questions"][1]["has_voted"] is True
+    assert data["my_answers"][0]["option_ids"] == []
+    data = withdraw(second).json()["data"]
+    assert data["participant_count"] == 1
+    assert data["has_voted"] is False
+    assert data["locked"] is True
+    people = api.client.get(f"/api/posts/{post_id}/poll/participants", headers=api.headers["owner"]).json()["data"]
+    assert [p["user_id"] for p in people] == [2]
+    assert vote(api, post_id, poll).status_code == 200
+    assert api.client.get(f"/api/posts/{post_id}/poll", headers=api.headers["owner"]).json()["data"]["participant_count"] == 2
+
+
+def test_closed_question_rejects_withdrawal(api):
+    _, post_id, poll = setup(api)
+    assert vote(api, post_id, poll).status_code == 200
+    assert api.client.post(f"/api/posts/{post_id}/poll/close", headers=api.headers["admin"]).status_code == 200
+    response = api.client.put(f"/api/posts/{post_id}/poll/vote", headers=api.headers["owner"],
+                              json={"revision": poll["revision"], "answers": [{"question_id": poll["questions"][0]["id"], "option_ids": []}]})
+    assert response.status_code == 409
+    assert response.json()["code"] == "POLL_CLOSED"
+
+
 def test_structure_freezes_after_first_vote_and_rejected_save_is_atomic(api):
     _, post_id, poll = setup(api)
     assert vote(api, post_id, poll).status_code == 200

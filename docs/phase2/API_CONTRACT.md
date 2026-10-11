@@ -51,9 +51,11 @@ sent as timezone-aware UTC and displayed/edited in Asia/Seoul time.
   Parent closure means all cards are closed; `ends_at` is always null. Post detail
   includes optional `poll` for rendering in the existing notice detail.
 - `PUT /posts/{id}/poll/vote` accepts `{revision,answers:[{question_id,option_ids}]}`;
-  a nonempty subset of cards may be answered, each with exactly one option.
-  Replace only that account's submitted card choices atomically, preserving all
-  other cards. Legacy nonbinary/date/multiple/photo votes are read-only and return
+  a nonempty subset of cards may be answered, each with one option or an empty
+  `option_ids` to withdraw that card's answer. Replace only that account's
+  submitted card choices atomically, preserving all other cards. When no choice
+  remains the ballot is deleted, so the account leaves `participant_count`;
+  withdrawal never unlocks a poll that already received a vote. Legacy nonbinary/date/multiple/photo votes are read-only and return
   `409 POLL_LEGACY_READ_ONLY`. Closed votes return `409 POLL_CLOSED`; foreign/invalid choices
   return `422 INVALID_POLL_OPTIONS`. Guests receive 401.
 - `GET /posts/{id}/poll/participants?page=1&size=20&question_id=...&option_id=...` uses the shared

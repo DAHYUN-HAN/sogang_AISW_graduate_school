@@ -36,8 +36,10 @@ function harness(initialPoll: NoticePoll, failures = 0, holdVote = false) {
     if (failures-- > 0) throw {response: {data: {message: "연결을 확인한 뒤 다시 시도해 주세요."}}};
     await pending;
     const answers = args[2] as NoticePoll["my_answers"];
-    const next = {...poll, has_voted: true, my_answers: [...poll.my_answers.filter(a => !answers.some(next => next.question_id === a.question_id)), ...answers],
-      questions: poll.questions.map(q => answers.some(a => a.question_id === q.id) ? {...q, has_voted: true} : q)};
+    const my_answers = [...poll.my_answers.filter(a => !answers.some(next => next.question_id === a.question_id)), ...answers];
+    const next = {...poll, has_voted: my_answers.some(a => a.option_ids.length > 0), my_answers,
+      questions: poll.questions.map(q => {const answer = answers.find(a => a.question_id === q.id);
+        return answer ? {...q, has_voted: answer.option_ids.length > 0} : q;})};
     return {data: next};
   },
     participants: async (...args: unknown[]) => {participantCalls.push(args); return {status: "success", data: [member], pagination: {page: args[1], size: 20, total_pages: 2, total: 21}};}};
@@ -64,6 +66,7 @@ function harness(initialPoll: NoticePoll, failures = 0, holdVote = false) {
     if (id.endsWith("/AppTypography")) return {AppText: "Text"};
     if (id.endsWith("/MediaImage")) return {__esModule: true, default: "MediaImage"};
     if (id.endsWith("/PersonListCard")) return {__esModule: true, default: "PersonListCard"};
+    if (id.endsWith("/icons")) return {VoterAvatarIcon: "VoterAvatarIcon"};
     return nativeRequire(id);
   };
   new Function("module", "exports", "require", compiled)(module, module.exports, loader);
@@ -92,12 +95,21 @@ const voted = (): NoticePoll => ({...fixture, has_voted: true, locked: true, my_
 const words = (value: any): string => Array.isArray(value) ? value.map(words).join("") : typeof value === "string" || typeof value === "number" ? String(value) : "";
 const texts = (nodes: any[]) => nodes.filter(node => node.type === "Text").map(node => words(node.props.children));
 
-test("tapping an option immediately saves only that card and displays the confirmed answer", async () => {
+test("an option is only chosen until the card's vote button saves it", async () => {
   const view = harness(fixture);
-  await label(view.render(), "장소 · 학교").props.onPress();
+  let nodes = view.render();
+  assert.equal(label(nodes, "장소 투표하기").props.disabled, true);
+  label(nodes, "장소 · 학교").props.onPress();
+  nodes = view.render();
+  assert.equal(view.submissions.length, 0);
+  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, true);
+  assert.equal(label(nodes, "장소 투표하기").props.disabled, false);
+  await label(nodes, "장소 투표하기").props.onPress();
   assert.deepEqual(view.submissions, [[50, 2, [{question_id: 10, option_ids: [20]}]]]);
-  assert.equal(label(view.render(), "장소 · 학교").props.accessibilityState.checked, true);
-  assert.ok(label(view.render(), "다시 투표하기"));
+  nodes = view.render();
+  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, true);
+  assert.equal(label(nodes, "장소 · 학교").props.disabled, true);
+  assert.ok(label(nodes, "장소 다시 투표하기"));
   assert.deepEqual(view.cacheActions.slice(0, 3), [
     {action: "cancel", key: ["notice-poll", 1, 50]},
     {action: "write", key: ["notice-poll", 1, 50]},
@@ -105,56 +117,97 @@ test("tapping an option immediately saves only that card and displays the confir
   ]);
 });
 
-test("an open unvoted card exposes option actions without extra status or participant controls", () => {
+test("tapping the chosen option again clears it and disables a first vote", () => {
+  const view = harness(fixture);
+  label(view.render(), "장소 · 학교").props.onPress();
+  label(view.render(), "장소 · 학교").props.onPress();
+  const nodes = view.render();
+  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, false);
+  assert.equal(label(nodes, "장소 투표하기").props.disabled, true);
+});
+
+test("an open unvoted card shows only options, a vote button and participants", () => {
   const view = harness({...fixture, questions: [...fixture.questions, {...fixture.questions[0], id: 11, title: "뒤풀이"}]});
   const nodes = view.render();
   assert.equal(nodes.filter(node => node.props.accessibilityRole === "radio").length, 4);
-  assert.equal(nodes.some(node => node.props.accessibilityRole === "button"), false);
-  assert.ok(!texts(nodes).some(text => /응답 완료|기명 투표|진행 중|하나만 선택/.test(text)));
+  assert.deepEqual(nodes.filter(node => node.props.accessibilityRole === "button").map(node => node.props.accessibilityLabel),
+    ["장소 투표하기", "참여자 보기 · 0명 참여", "뒤풀이 투표하기", "참여자 보기 · 0명 참여"]);
+  assert.ok(!texts(nodes).some(text => /응답 완료|기명 투표|진행 중|하나만 선택|마감/.test(text)));
 });
 
-test("result rows cannot revote or open people until the explicit actions are pressed", async () => {
+test("revoting starts from the saved choice and only the vote button saves a change", async () => {
   const view = harness(voted());
   let nodes = view.render();
   assert.equal(label(nodes, "장소 · 학교").props.disabled, true);
-  await label(nodes, "장소 · 학교").props.onPress();
-  assert.equal(view.submissions.length, 0);
-  assert.ok(!view.render().some(node => node.type === "Modal"));
-  label(nodes, "다시 투표하기").props.onPress();
+  label(nodes, "장소 · 학교").props.onPress();
+  assert.ok(!label(view.render(), "장소 투표하기"));
+  label(nodes, "장소 다시 투표하기").props.onPress();
   nodes = view.render();
-  assert.equal(label(nodes, "장소 · 학교").props.disabled, false);
-  await label(nodes, "장소 · 학교").props.onPress();
-  assert.equal(label(view.render(), "장소 · 학교").props.accessibilityState.checked, true);
-  assert.equal(label(view.render(), "장소 · 식당").props.accessibilityState.checked, false);
+  assert.equal(label(nodes, "장소 · 식당").props.accessibilityState.checked, true);
+  assert.equal(label(nodes, "장소 투표하기").props.disabled, false);
+  label(nodes, "장소 · 학교").props.onPress();
+  nodes = view.render();
+  assert.equal(view.submissions.length, 0);
+  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, true);
+  assert.equal(label(nodes, "장소 · 식당").props.accessibilityState.checked, false);
+  await label(nodes, "장소 투표하기").props.onPress();
+  assert.deepEqual(view.submissions, [[50, 2, [{question_id: 10, option_ids: [20]}]]]);
+  assert.ok(label(view.render(), "장소 다시 투표하기"));
 });
 
-test("a pending revote preserves the saved check and prevents repeated requests", async () => {
+test("resubmitting the saved choice closes revoting without a request", async () => {
+  const view = harness(voted());
+  label(view.render(), "장소 다시 투표하기").props.onPress();
+  await label(view.render(), "장소 투표하기").props.onPress();
+  assert.equal(view.submissions.length, 0);
+  assert.ok(label(view.render(), "장소 다시 투표하기"));
+});
+
+test("clearing the saved choice and voting withdraws it back to a fresh card", async () => {
+  const view = harness(voted());
+  label(view.render(), "장소 다시 투표하기").props.onPress();
+  label(view.render(), "장소 · 식당").props.onPress();
+  let nodes = view.render();
+  assert.equal(label(nodes, "장소 · 식당").props.accessibilityState.checked, false);
+  assert.equal(label(nodes, "장소 투표하기").props.disabled, false);
+  await label(nodes, "장소 투표하기").props.onPress();
+  assert.deepEqual(view.submissions, [[50, 2, [{question_id: 10, option_ids: []}]]]);
+  nodes = view.render();
+  assert.equal(label(nodes, "장소 투표하기").props.disabled, true);
+  assert.equal(label(nodes, "장소 · 식당").props.accessibilityState.checked, false);
+  assert.equal(label(nodes, "장소 · 식당").props.disabled, false);
+});
+
+test("a pending vote keeps the choice and prevents repeated requests", async () => {
   const view = harness(voted(), 0, true);
-  label(view.render(), "다시 투표하기").props.onPress();
-  const option = label(view.render(), "장소 · 학교");
-  const work = option.props.onPress();
-  await option.props.onPress();
+  label(view.render(), "장소 다시 투표하기").props.onPress();
+  label(view.render(), "장소 · 학교").props.onPress();
+  const button = label(view.render(), "장소 투표하기");
+  const work = button.props.onPress();
+  await button.props.onPress();
   const nodes = view.render();
   assert.equal(view.submissions.length, 1);
-  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, false);
-  assert.equal(label(nodes, "장소 · 식당").props.accessibilityState.checked, true);
+  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, true);
   assert.equal(label(nodes, "장소 · 학교").props.disabled, true);
+  assert.equal(label(nodes, "장소 투표하기").props.disabled, true);
   view.release(); await work;
   assert.equal(label(view.render(), "장소 · 학교").props.accessibilityState.checked, true);
+  assert.ok(label(view.render(), "장소 다시 투표하기"));
 });
 
-test("failed immediate votes expose the API reason and allow another option tap", async () => {
+test("failed votes expose the API reason and keep the choice for another try", async () => {
   const view = harness(fixture, 1);
-  await label(view.render(), "장소 · 학교").props.onPress();
+  label(view.render(), "장소 · 학교").props.onPress();
+  await label(view.render(), "장소 투표하기").props.onPress();
   let nodes = view.render();
   assert.ok(nodes.some(node => node.props.accessibilityRole === "alert" && node.props.children === "연결을 확인한 뒤 다시 시도해 주세요."));
-  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, false);
-  assert.equal(label(nodes, "장소 · 학교").props.disabled, false);
-  await label(nodes, "장소 · 학교").props.onPress();
+  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, true);
+  assert.equal(label(nodes, "장소 투표하기").props.disabled, false);
+  await label(nodes, "장소 투표하기").props.onPress();
   nodes = view.render();
   assert.equal(view.submissions.length, 2);
   assert.equal(nodes.some(node => node.props.accessibilityRole === "alert"), false);
-  assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, true);
+  assert.ok(label(nodes, "장소 다시 투표하기"));
 });
 
 test("closed and legacy cards show results and participants without any voting action", async () => {
@@ -162,7 +215,8 @@ test("closed and legacy cards show results and participants without any voting a
     const view = harness(poll);
     const nodes = view.render();
     assert.ok(label(nodes, "참여자 보기 · 0명 참여"));
-    assert.ok(!label(nodes, "다시 투표하기"));
+    assert.ok(!label(nodes, "장소 다시 투표하기"));
+    assert.ok(!label(nodes, "장소 투표하기"));
     assert.equal(label(nodes, "장소 · 학교").props.disabled, true);
     await label(nodes, "장소 · 학교").props.onPress();
     assert.equal(view.submissions.length, 0);
@@ -170,13 +224,17 @@ test("closed and legacy cards show results and participants without any voting a
   const textsClosed = texts(harness({...fixture, is_closed: true}).render());
   assert.ok(textsClosed.includes("마감"));
   assert.ok(textsClosed.includes("마감됨"));
+  const closedAt = texts(harness({...fixture, is_closed: true, questions: [{...fixture.questions[0], is_closed: true, closed_at: "2026-10-30T09:00:00"}]}).render());
+  assert.ok(closedAt.includes("10월 30일(금) 18:00 마감됨"));
   assert.ok(!textsClosed.some(text => /1위|종료/.test(text)));
 });
 
-test("each immediate attendance vote sends only its own question", async () => {
+test("each card's vote button sends only its own question", async () => {
   const view = harness({...fixture, questions: [...fixture.questions, {...fixture.questions[0], id: 11, title: "뒤풀이", options: [
     {id: 30, label: "YES", media_id: null, vote_count: 0}, {id: 31, label: "NO", media_id: null, vote_count: 0}]}]});
-  await label(view.render(), "뒤풀이 · NO").props.onPress();
+  label(view.render(), "장소 · 학교").props.onPress();
+  label(view.render(), "뒤풀이 · NO").props.onPress();
+  await label(view.render(), "뒤풀이 투표하기").props.onPress();
   assert.deepEqual(view.submissions, [[50, 2, [{question_id: 11, option_ids: [31]}]]]);
 });
 
@@ -186,7 +244,7 @@ test("legacy photo results keep their identifying image without enabling voting"
   const nodes = view.render();
   assert.ok(nodes.some(node => node.type === "MediaImage" && node.props.media.id === 44));
   assert.equal(label(nodes, "장소 · 학교").props.disabled, true);
-  assert.ok(!label(nodes, "다시 투표하기"));
+  assert.ok(!label(nodes, "장소 다시 투표하기"));
 });
 
 test("participants open a dismissible bottom sheet with only option tabs and profile summaries", () => {
@@ -219,13 +277,14 @@ test("participant scrolling loads the next question-option page and deduplicates
   assert.equal(view.render().filter(node => node.type === "PersonListCard").length, 1);
 });
 
-test("web radio Space activation submits once without scrolling the page", async () => {
+test("web radio Space activation chooses without saving or scrolling the page", async () => {
   const view = harness(fixture);
   const option = label(view.render(), "장소 · 학교");
   let prevented = false;
-  await option.props.onKeyDown({key: " ", preventDefault: () => {prevented = true;}, stopPropagation: () => {}});
+  option.props.onKeyDown({key: " ", preventDefault: () => {prevented = true;}, stopPropagation: () => {}});
   assert.equal(prevented, true);
-  assert.deepEqual(view.submissions, [[50, 2, [{question_id: 10, option_ids: [20]}]]]);
+  assert.equal(view.submissions.length, 0);
+  assert.equal(label(view.render(), "장소 · 학교").props.accessibilityState.checked, true);
 });
 
 test("adding another card preserves the existing card identity", () => {

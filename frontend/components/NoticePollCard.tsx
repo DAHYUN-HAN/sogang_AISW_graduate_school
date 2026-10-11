@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
-import { Ionicons } from "@expo/vector-icons";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "./AppTypography";
 import MediaImage from "./MediaImage";
 import PersonListCard from "./PersonListCard";
+import { VoterAvatarIcon } from "./icons";
 import { pollApi } from "../services/api";
 import { useUserStore } from "../stores/userStore";
 import type { NoticePoll, NoticePollQuestion } from "../types";
 import { pollCacheKey, pollOptionLabel, validPollAnswers } from "../utils/noticePoll";
 import { pollQuestionAcceptsVote } from "../utils/noticePollUsability";
+import { formatMonthDayTime } from "../utils/dateFormat";
 import { formatCohortName } from "../utils/userLabel";
 
 function Button({label, onPress, disabled = false}: {label: string; onPress: () => void | Promise<void>; disabled?: boolean}) {
@@ -47,26 +48,39 @@ export default function NoticePollCard({postId}: {postId: number; poll?: NoticeP
 function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postId: number; userId: number | null; poll: NoticePoll;
   question: NoticePollQuestion; onSaved: (poll: NoticePoll) => Promise<void>; refresh: () => Promise<void>}) {
   const isClosed = question.is_closed ?? poll.is_closed;
+  const closedAt = question.closed_at ?? poll.closed_at;
   const savedChoice = poll.my_answers.find(a => a.question_id === question.id)?.option_ids ?? [];
+  const savedId = savedChoice[0] ?? null;
   const hasVoted = question.has_voted ?? savedChoice.length > 0;
   const count = question.participant_count ?? poll.participant_count;
   const canVote = pollQuestionAcceptsVote(poll, question);
-  const [editing, setEditing] = useState(!hasVoted && canVote);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [people, setPeople] = useState(false);
   const sending = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {mounted.current = true; return () => {mounted.current = false;};}, []);
-  const selecting = editing && canVote;
-  const submit = async (optionId: number) => {
-    if (sending.current || !selecting || !validPollAnswers(poll, {[question.id]: [optionId]})) return;
+  const selecting = canVote && (editing || !hasVoted);
+  const shownChoice = selecting ? draft === null ? [] : [draft] : savedChoice;
+  // An existing voter may submit no choice to withdraw; a first vote needs one.
+  const canSubmit = selecting && !saving && (draft !== null || hasVoted);
+  const choose = (optionId: number) => {
+    if (!selecting || saving) return;
+    setDraft(current => current === optionId ? null : optionId);
+    setError("");
+  };
+  const submit = async () => {
+    if (sending.current || !canSubmit) return;
+    if (draft === savedId) {setEditing(false); return;}
+    if (draft !== null && !validPollAnswers(poll, {[question.id]: [draft]})) return;
     sending.current = true; setSaving(true); setError("");
     try {
-      const response = await pollApi.vote(postId, poll.revision, [{question_id: question.id, option_ids: [optionId]}]);
+      const response = await pollApi.vote(postId, poll.revision, [{question_id: question.id, option_ids: draft === null ? [] : [draft]}]);
       if (!mounted.current) return;
       await onSaved(response.data);
-      if (mounted.current) setEditing(false);
+      if (mounted.current) {setEditing(false); setDraft(null);}
     } catch (issue) {
       if (mounted.current) {
         setError((issue as {response?: {data?: {message?: string}}}).response?.data?.message ?? "투표를 저장하지 못했습니다. 다시 시도해 주세요.");
@@ -75,13 +89,15 @@ function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postI
     } finally {sending.current = false; if (mounted.current) setSaving(false);}
   };
   return <View style={styles.container}>
-    <View style={styles.titleRow}>
-      <Text style={styles.questionTitle}>{question.title}</Text>
-      {isClosed ? <Text style={styles.closedBadge}>마감</Text> : null}
+    <View style={styles.header}>
+      <View style={styles.titleRow}>
+        <Text style={styles.questionTitle}>{question.title}</Text>
+        {isClosed ? <View style={styles.closedBadge}><Text style={styles.closedBadgeText}>마감</Text></View> : null}
+      </View>
+      {isClosed ? <Text style={styles.subtitle}>{closedAt ? `${formatMonthDayTime(closedAt)} 마감됨` : "마감됨"}</Text> : null}
     </View>
-    {isClosed ? <Text style={styles.muted}>마감됨</Text> : null}
-    <View style={styles.options}>{question.options.map(option => {
-      const selected = savedChoice.includes(option.id);
+    {question.options.map(option => {
+      const selected = shownChoice.includes(option.id);
       const percentage = count > 0 ? Math.min(100, Math.max(0, option.vote_count / count * 100)) : 0;
       const disabled = !selecting || saving;
       return <Pressable key={option.id} accessibilityLabel={`${question.title} · ${option.label}`}
@@ -90,30 +106,38 @@ function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postI
         {...(Platform.OS === "web" ? {onKeyDown: (event: {key: string; preventDefault: () => void; stopPropagation: () => void}) => {
           // RN Web does not activate radio roles on Space or Enter.
           if (!disabled && [" ", "Spacebar", "Enter"].includes(event.key)) {
-            event.preventDefault(); event.stopPropagation(); return submit(option.id);
+            event.preventDefault(); event.stopPropagation(); choose(option.id);
           }
         }} : {})}
-        onPress={() => submit(option.id)} style={[styles.option, selected && styles.selectedOption]}>
+        onPress={() => choose(option.id)} style={[styles.option, selected && styles.selectedOption]}>
         <View pointerEvents="none" style={[styles.bar, {width: `${percentage}%`}]} />
         <View pointerEvents="none" style={styles.optionContent}>
-          {selected ? <Ionicons name="checkmark" size={14} color="#2761FF" /> : null}
-          {option.media_id ? <MediaImage media={{id: option.media_id}} style={styles.legacyImage} resizeMode="cover" /> : null}
-          <Text style={styles.optionLabel}>{pollOptionLabel(option.label, question.kind)}</Text>
+          <View style={styles.optionLeft}>
+            <View style={[styles.radio, selected && styles.radioSelected]}>
+              {selected ? <Text style={styles.radioCheck}>✓</Text> : null}
+            </View>
+            {option.media_id ? <MediaImage media={{id: option.media_id}} style={styles.legacyImage} resizeMode="cover" /> : null}
+            <Text style={styles.optionLabel}>{pollOptionLabel(option.label, question.kind)}</Text>
+          </View>
           <Text style={styles.count}>{option.vote_count}명</Text>
         </View>
       </Pressable>;
-    })}</View>
-    <View style={styles.footer}>
-      <Text style={styles.muted}>{count}명 참여</Text>
-      {saving ? <ActivityIndicator size="small" color="#2761FF" accessibilityLabel="투표 저장 중" />
-        : hasVoted || isClosed || !canVote ? <Pressable accessibilityRole="button" accessibilityLabel={`참여자 보기 · ${count}명 참여`}
-          onPress={() => setPeople(true)} style={styles.peopleButton}>
-          <Text style={styles.peopleLabel}>참여자 보기 ›</Text>
-        </Pressable> : null}
-    </View>
-    {canVote && hasVoted && !selecting ? <Button label="다시 투표하기" disabled={saving}
-      onPress={() => {setEditing(true); setError("");}} /> : null}
+    })}
+    {selecting ? <Pressable accessibilityRole="button" accessibilityLabel={`${question.title} 투표하기`} accessibilityState={{disabled: !canSubmit, busy: saving}}
+      disabled={!canSubmit} onPress={submit} style={[styles.voteButton, canSubmit ? styles.voteButtonActive : styles.voteButtonDisabled]}>
+      <Text style={[styles.voteLabel, canSubmit && styles.voteLabelActive]}>투표하기</Text>
+    </Pressable> : canVote ? <Pressable accessibilityRole="button" accessibilityLabel={`${question.title} 다시 투표하기`}
+      onPress={() => {setEditing(true); setDraft(savedId); setError("");}} style={[styles.voteButton, styles.revoteButton]}>
+      <Text style={styles.revoteLabel}>다시 투표하기</Text>
+    </Pressable> : null}
     {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+    <View style={styles.footer}>
+      <Text style={styles.participants}>{count}명 참여</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel={`참여자 보기 · ${count}명 참여`}
+        onPress={() => setPeople(true)} style={styles.peopleButton}>
+        <Text style={styles.peopleLabel}>참여자 보기 ›</Text>
+      </Pressable>
+    </View>
     {people ? <Participants key={`${userId}:${postId}:${question.id}`} postId={postId} userId={userId}
       question={question} onClose={() => setPeople(false)} /> : null}
   </View>;
@@ -137,10 +161,11 @@ function Participants({postId, userId, question, onClose}: {postId: number; user
         <View accessibilityRole="tablist" style={styles.tabs}>{question.options.map(option =>
           <Pressable key={option.id} accessibilityRole="tab" accessibilityLabel={`${pollOptionLabel(option.label, question.kind)} ${option.vote_count}명`}
             accessibilityState={{selected: optionId === option.id}} aria-selected={optionId === option.id}
-            onPress={() => setOptionId(option.id)} style={[styles.tab, optionId === option.id && styles.activeTab]}>
+            onPress={() => setOptionId(option.id)} style={styles.tab}>
             <Text style={[styles.tabLabel, optionId === option.id && styles.activeTabLabel]}>
               {pollOptionLabel(option.label, question.kind)} {option.vote_count}
             </Text>
+            <View style={[styles.tabLine, optionId === option.id && styles.activeTabLine]} />
           </Pressable>)}</View>
         <PeopleList key={optionId} postId={postId} userId={userId} question={question} optionId={optionId} />
       </View>
@@ -168,46 +193,63 @@ function PeopleList({postId, userId, question, optionId}: {postId: number; userI
       if (layoutMeasurement.height + contentOffset.y >= contentSize.height - 120) return loadMore();
     }}>
     {members.map(member => <PersonListCard key={member.user_id} variant="poll" badge=""
-      avatar={<Ionicons name="person" size={22} color="#FFF" />}
+      avatar={<VoterAvatarIcon />}
       name={formatCohortName(member.cohort, member.nickname)} caption={member.major || undefined} />)}
     {query.isError ? <View style={styles.loadState}><Text accessibilityRole="alert" style={styles.error}>참여자를 불러오지 못했습니다.</Text>
       <Button label="참여자 다시 불러오기" onPress={() => {if (query.isFetchNextPageError) void query.fetchNextPage(); else void query.refetch();}} /></View>
       : !query.data || query.isFetchingNextPage ? <ActivityIndicator color="#2761FF" style={styles.loadState} />
-        : !members.length ? <Text style={[styles.muted, styles.loadState]}>아직 참여자가 없습니다.</Text> : null}
+        : !members.length ? <Text style={styles.emptyPeople}>아직 투표한 사람이 없어요</Text> : null}
   </ScrollView>;
 }
 
 const styles = StyleSheet.create({
   cards: {gap: 16, marginTop: 22},
-  container: {padding: 16, borderWidth: 1, borderColor: "#E5E8EE", borderRadius: 10, backgroundColor: "#FFF"},
-  titleRow: {flexDirection: "row", alignItems: "center", gap: 8},
-  questionTitle: {flexShrink: 1, fontSize: 14, lineHeight: 21, fontWeight: "600", color: "#15171C"},
-  closedBadge: {fontSize: 10, lineHeight: 16, color: "#7B8291", backgroundColor: "#F3F4F6", paddingHorizontal: 6, borderRadius: 8},
+  container: {padding: 16, gap: 12, borderWidth: 1, borderColor: "#E7E9EE", borderRadius: 12, backgroundColor: "#FFF"},
+  header: {gap: 4},
+  titleRow: {flexDirection: "row", alignItems: "center", gap: 6},
+  questionTitle: {flexShrink: 1, fontSize: 15, lineHeight: 20, fontWeight: "600", color: "#15171C"},
+  closedBadge: {paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10, backgroundColor: "#F4F5F7"},
+  closedBadgeText: {fontSize: 11, lineHeight: 14, fontWeight: "500", color: "#6B7280"},
+  subtitle: {fontSize: 12, lineHeight: 16, color: "#6B7280"},
   muted: {fontSize: 11, color: "#7B8291", lineHeight: 18},
-  options: {marginTop: 10, gap: 10},
-  option: {minHeight: 44, borderRadius: 7, borderWidth: 1, borderColor: "transparent", backgroundColor: "#F3F4F6", overflow: "hidden", justifyContent: "center", outlineColor: "#2761FF"},
+  option: {minHeight: 46, borderRadius: 8, borderWidth: 1.5, borderColor: "transparent", backgroundColor: "#F4F5F7", overflow: "hidden", justifyContent: "center", outlineColor: "#2761FF"},
   selectedOption: {borderColor: "#2761FF"},
-  bar: {position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#D5DFFF", borderRadius: 6},
-  optionContent: {flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 10},
-  optionLabel: {flex: 1, color: "#15171C", fontSize: 13, lineHeight: 20},
+  bar: {position: "absolute", left: 0, top: 0, bottom: 0, backgroundColor: "#D5E0FE", borderRadius: 8},
+  optionContent: {flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, paddingLeft: 12, paddingRight: 14, paddingVertical: 10},
+  optionLeft: {flex: 1, flexDirection: "row", alignItems: "center", gap: 10},
+  radio: {width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: "#C4C8D0", backgroundColor: "#FFF", alignItems: "center", justifyContent: "center"},
+  radioSelected: {borderColor: "#2761FF", backgroundColor: "#2761FF"},
+  radioCheck: {fontSize: 11, lineHeight: 13, fontWeight: "700", color: "#FFF"},
+  optionLabel: {flexShrink: 1, color: "#15171C", fontSize: 14, lineHeight: 20, fontWeight: "600"},
   legacyImage: {width: 32, height: 32, borderRadius: 4},
-  count: {fontSize: 11, lineHeight: 18, color: "#737B8B"},
-  footer: {minHeight: 38, flexDirection: "row", justifyContent: "space-between", alignItems: "center"},
-  peopleButton: {minHeight: 44, justifyContent: "center", paddingLeft: 12},
-  peopleLabel: {fontSize: 11, lineHeight: 18, color: "#2761FF"},
+  count: {fontSize: 13, lineHeight: 18, fontWeight: "500", color: "#6B7280"},
+  // Every state keeps the same 1px border so all buttons are 41px and switching never moves the card.
+  voteButton: {paddingVertical: 11, borderRadius: 8, borderWidth: 1, borderColor: "transparent", alignItems: "center", justifyContent: "center"},
+  voteButtonDisabled: {backgroundColor: "#F4F5F7"},
+  voteButtonActive: {backgroundColor: "#2761FF"},
+  revoteButton: {backgroundColor: "#FFF", borderColor: "#E7E9EE"},
+  voteLabel: {fontSize: 14, lineHeight: 17, fontWeight: "500", color: "#A6ACB7"},
+  voteLabelActive: {fontWeight: "600", color: "#FFF"},
+  revoteLabel: {fontSize: 14, lineHeight: 17, fontWeight: "500", color: "#000"},
+  footer: {flexDirection: "row", justifyContent: "space-between", alignItems: "center"},
+  participants: {fontSize: 13, lineHeight: 18, color: "#6B7280"},
+  peopleButton: {minHeight: 32, justifyContent: "center", paddingLeft: 12},
+  peopleLabel: {fontSize: 13, lineHeight: 18, fontWeight: "500", color: "#2761FF"},
   button: {paddingVertical: 10, paddingHorizontal: 12, minHeight: 40, borderRadius: 7, backgroundColor: "#F3F4F6", alignItems: "center", justifyContent: "center"},
   buttonText: {fontSize: 12, lineHeight: 18, color: "#7B8291"},
   error: {fontSize: 12, color: "#B91C1C", lineHeight: 20, marginTop: 8},
   backdrop: {flex: 1, justifyContent: "flex-end", alignItems: "center", backgroundColor: "rgba(0,0,0,.12)"},
-  sheet: {width: "100%", backgroundColor: "#FFF", borderTopLeftRadius: 18, borderTopRightRadius: 18, overflow: "hidden", paddingHorizontal: 20},
-  handleButton: {minHeight: 28, alignItems: "center", justifyContent: "center"},
-  handle: {width: 32, height: 4, borderRadius: 2, backgroundColor: "#D3D7DD"},
-  sheetTitle: {fontSize: 14, lineHeight: 21, fontWeight: "600", color: "#15171C", marginBottom: 8},
-  tabs: {flexDirection: "row", borderBottomWidth: 1, borderColor: "#EFF0F3"},
-  tab: {flex: 1, minHeight: 44, justifyContent: "center", alignItems: "center", borderBottomWidth: 2, borderColor: "transparent"},
-  activeTab: {borderColor: "#2761FF"},
-  tabLabel: {fontSize: 13, lineHeight: 20, color: "#A1A8B7"}, activeTabLabel: {color: "#15171C"},
+  sheet: {width: "100%", backgroundColor: "#FFF", borderTopLeftRadius: 16, borderTopRightRadius: 16, overflow: "hidden", paddingHorizontal: 20},
+  handleButton: {minHeight: 24, paddingVertical: 10, alignItems: "center", justifyContent: "center"},
+  handle: {width: 36, height: 4, borderRadius: 2, backgroundColor: "#D1D6DB"},
+  sheetTitle: {fontSize: 16, lineHeight: 19, fontWeight: "600", color: "#15171C", paddingTop: 4, paddingBottom: 12},
+  tabs: {flexDirection: "row", alignItems: "flex-start"},
+  tab: {flex: 1, minHeight: 44, gap: 8},
+  tabLine: {height: 1, backgroundColor: "#E7E9EE"}, activeTabLine: {height: 2, backgroundColor: "#2761FF"},
+  tabLabel: {paddingVertical: 10, textAlign: "center", fontSize: 14, lineHeight: 17, fontWeight: "500", color: "#A6ACB7"},
+  activeTabLabel: {fontWeight: "600", color: "#15171C"},
   peopleScroll: {flexGrow: 0, flexShrink: 1},
-  peopleContent: {paddingTop: 16, gap: 8},
+  peopleContent: {paddingTop: 16, paddingBottom: 20, gap: 8},
   loadState: {paddingVertical: 16},
+  emptyPeople: {paddingTop: 40, paddingBottom: 48, textAlign: "center", fontSize: 13, lineHeight: 18, color: "#A6ACB7"},
 });

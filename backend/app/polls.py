@@ -231,22 +231,31 @@ def submit_vote(db, post_id, user, payload: PollVote):
         card_options = [o for o in options if o.question_id == q.id]
         if q.kind != "text" or q.allow_multiple or len(card_options) != 2 or any(o.media_id for o in card_options):
             fail("POLL_LEGACY_READ_ONLY", "기존 형식의 투표는 결과만 확인할 수 있습니다.", 409)
-        if len(answer.option_ids) != 1:
+        if len(answer.option_ids) > 1:
             fail("INVALID_POLL_OPTIONS", "선택항목 개수를 확인해 주세요.")
         if any(oid not in by_option or by_option[oid].question_id != q.id for oid in answer.option_ids):
             fail("INVALID_POLL_OPTIONS", "이 질문의 항목을 선택해 주세요.")
+    chosen_ids = [qid for qid, a in zip(requested_ids, payload.answers) if a.option_ids]
     ballot = db.scalar(select(PollBallot).where(PollBallot.poll_id == poll.id, PollBallot.user_id == user.id))
     if ballot is None:
+        if not chosen_ids:
+            return poll
         ballot = PollBallot(poll_id=poll.id, user_id=user.id)
         db.add(ballot)
         db.flush()
     replacement_ids = [o.id for o in options if o.question_id in requested_ids]
     db.execute(delete(PollSelection).where(PollSelection.ballot_id == ballot.id, PollSelection.option_id.in_(replacement_ids)))
     db.add_all([PollSelection(ballot_id=ballot.id, option_id=oid) for a in payload.answers for oid in a.option_ids])
+    db.flush()
+    # A ballot without selections would still count as a participant.
+    if db.scalar(select(PollSelection.id).where(PollSelection.ballot_id == ballot.id).limit(1)) is None:
+        db.delete(ballot)
+        db.flush()
+        return poll
     ballot.updated_at = utc_now()
-    if poll.first_voted_at is None:
+    if chosen_ids and poll.first_voted_at is None:
         poll.first_voted_at = utc_now()
-    for qid in requested_ids:
+    for qid in chosen_ids:
         if by_question[qid].first_voted_at is None:
             by_question[qid].first_voted_at = utc_now()
     db.flush()

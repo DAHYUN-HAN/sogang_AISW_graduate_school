@@ -52,7 +52,8 @@ class PollDraft(BaseModel):
 class PollAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question_id: PositiveId
-    option_ids: list[PositiveId] = Field(min_length=1, max_length=20)
+    # An empty list withdraws this account's answer for the question.
+    option_ids: list[PositiveId] = Field(max_length=20)
 
 
 class PollVote(BaseModel):
