@@ -9,7 +9,7 @@ import { useUserStore } from "../stores/userStore";
 import type { NotificationItem } from "../types";
 import { notificationContentRoute } from "../utils/appRoutes";
 import { setStoredPushToken } from "../utils/pushTokenStorage";
-import { openTabStack } from "../utils/tabNavigation";
+import { navigateToRoute, openTabStack } from "../utils/tabNavigation";
 import { showWebNotification } from "../utils/webNotifications";
 import { NoticeToastIcon } from "./icons";
 
@@ -57,12 +57,25 @@ function getResponseData(response: any) {
   return response?.notification?.request?.content?.data ?? {};
 }
 
-async function openNotification(notification: Pick<NotificationItem, "id" | "post_id" | "event_id">) {
+async function markNotificationRead(notificationId: number) {
   try {
-    await notificationApi.markRead(notification.id);
+    await notificationApi.markRead(notificationId);
   } catch {
     // The notification can still be opened even if read-state sync fails.
   }
+}
+
+// 앱을 쓰다가 누른 알림(앱 안 배너·웹 알림 창)은 보던 탭 위에 글을 연다.
+// 글 화면의 뒤로가기는 아래 화면을 먼저 꺼내므로 원래 보던 화면으로 돌아간다.
+async function openNotificationOverCurrentScreen(notification: Pick<NotificationItem, "id" | "post_id" | "event_id">) {
+  await markNotificationRead(notification.id);
+  const route = notificationContentRoute(notification);
+  if (route) navigateToRoute(route.split("?")[0]);
+}
+
+// 폰 푸시 알림을 눌러 앱이 열린 경우(지금은 푸시가 꺼져 있다).
+async function openNotification(notification: Pick<NotificationItem, "id" | "post_id" | "event_id">) {
+  await markNotificationRead(notification.id);
 
   const route = notificationContentRoute(notification);
   if (!route) return;
@@ -129,7 +142,7 @@ export default function NotificationBootstrap() {
     }
     const target = visibleNotification;
     setVisibleNotification(null);
-    await openNotification(target);
+    await openNotificationOverCurrentScreen(target);
   };
 
   useEffect(() => {
@@ -196,7 +209,7 @@ export default function NotificationBootstrap() {
       }
       setVisibleNotification(newest);
       if (Platform.OS === "web") {
-        showWebNotification("AI·SW CAMPUS", newest.message, () => { void openNotification(newest); });
+        showWebNotification("AI·SW CAMPUS", newest.message, () => { void openNotificationOverCurrentScreen(newest); });
       }
     };
 
