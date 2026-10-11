@@ -26,7 +26,7 @@ export function getReplyComposerState(target: ReplyTarget | null) {
 
   return {
     parentId: target.commentId,
-    noticeText: `${politeLabel}에게 답글 작성 중`,
-    placeholder: "답글을 남겨보세요",
+    noticeText: `${politeLabel}에게 댓글 작성 중`,
+    placeholder: "댓글을 남겨보세요",
   };
 }

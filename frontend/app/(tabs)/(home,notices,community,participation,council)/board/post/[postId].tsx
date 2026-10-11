@@ -1437,7 +1437,7 @@ export default function PostDetailScreen() {
           {replyComposer.noticeText ? (
             <View style={styles.replyNotice}>
               <Text style={styles.replyNoticeText}>{replyComposer.noticeText}</Text>
-              <Pressable accessibilityLabel="답글 대상 취소" onPress={() => setReplyTarget(null)}>
+              <Pressable accessibilityLabel="댓글 대상 취소" onPress={() => setReplyTarget(null)}>
                 <Text style={styles.replyCancelText}>취소</Text>
               </Pressable>
             </View>
