@@ -140,7 +140,6 @@ export default function RegisterScreen() {
       setErrors({ email: emailError });
       return;
     }
-    const requestStartedAt = Date.now();
     try {
       setIsSubmitting(true);
       setErrors({});
@@ -157,9 +156,11 @@ export default function RegisterScreen() {
       }
       setCode("");
       setVerificationToken("");
-      verificationExpiresAtRef.current = requestStartedAt + response.data.expires_in * 1000;
       const resendIn = response.data.resend_in ?? response.data.expires_in;
+      // 만료와 재전송 가능 시각을 같은 기준(응답 받은 때)으로 잰다. 요청 시작을 기준으로 하면
+      // 메일 발송에 걸린 몇 초만큼 만료가 먼저 와서 회색 "재전송 (00:05)"가 잠깐 보였다.
       const responseReceivedAt = Date.now();
+      verificationExpiresAtRef.current = responseReceivedAt + response.data.expires_in * 1000;
       resendAvailableAtRef.current = resendAvailableAt(responseReceivedAt, resendIn);
       setCountdown(
         Math.max(0, Math.ceil((verificationExpiresAtRef.current - responseReceivedAt) / 1000)),
