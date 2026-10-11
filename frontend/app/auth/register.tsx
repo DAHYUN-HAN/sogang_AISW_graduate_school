@@ -391,7 +391,7 @@ export default function RegisterScreen() {
                   }}
                   placeholder="인증코드 6자리"
                   placeholderTextColor={COLORS.tertiary}
-                  style={[styles.codeInput, codeError ? styles.inputError : null, verificationAttemptsLocked ? styles.verificationLockedInput : null]}
+                  style={[styles.codeInput, codeError ? styles.inputError : null]}
                   value={code}
                 />
               </View>
@@ -610,8 +610,8 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, outlineStyle: "none" as never, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, backgroundColor: COLORS.bg, color: COLORS.text, fontSize: 14, fontWeight: "400", paddingHorizontal: 16 }, // Figma SignUp-Step3: 48h, border 1, px16, Regular 14
   codeInput: { height: 48, outlineStyle: "none" as never, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, backgroundColor: COLORS.bg, color: COLORS.text, fontSize: 14, fontWeight: "400", lineHeight: 22, paddingHorizontal: 16 }, // Figma verification code input: 48h, border 1, px16
   inputError: { borderColor: COLORS.danger },
-  profileInputError: { borderColor: COLORS.danger, backgroundColor: "#FFF5F5" },
-  verificationLockedInput: { backgroundColor: "#FFF5F5" },
+  // 피그마 SignUp 오류 화면: 오류 칸은 배경 없이 빨간 테두리만 둔다.
+  profileInputError: { borderColor: COLORS.danger },
   errorRow: { minHeight: 30, flexDirection: "row", alignItems: "center", gap: 4 }, // Figma status/error row: 30h, gap4
   statusRow: { flexDirection: "row", alignItems: "center", width: "100%", gap: 8 }, // 재전송만 있을 때는 본문 gap 20을 그대로 쓴다
   // 에러/안내 문구는 코드영역 안에 들어가므로 입력창과 8px만 띄운다(본문 gap 20 - 12).

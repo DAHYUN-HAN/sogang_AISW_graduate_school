@@ -19,7 +19,6 @@ const COLORS = {
   border: "#E1E4E9",
   bg: "#FFFFFF",
   danger: "#D64545",
-  dangerBg: "#FFF5F5",
   disabled: "#D1D5DB",
 };
 
@@ -187,7 +186,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  inputError: { borderColor: COLORS.danger, backgroundColor: COLORS.dangerBg },
+  // 다른 오류 칸과 같이 배경 없이 빨간 테두리만 둔다. (피그마 PasswordChange-Error는 아직 분홍 배경)
+  inputError: { borderColor: COLORS.danger },
   errorRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   errorText: { color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 15 },
   primaryButton: {

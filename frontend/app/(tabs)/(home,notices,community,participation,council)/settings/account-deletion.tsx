@@ -279,7 +279,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  inputError: { borderColor: COLORS.danger, backgroundColor: COLORS.dangerBg },
+  // 다른 오류 칸과 같이 배경 없이 빨간 테두리만 둔다.
+  inputError: { borderColor: COLORS.danger },
   errorText: { color: COLORS.danger, fontSize: 12, lineHeight: 18 },
   confirmRow: {
     flexDirection: "row",

@@ -211,9 +211,9 @@ const styles = StyleSheet.create({
     fontWeight: "400", // Figma: Inter Regular
     paddingHorizontal: 16,
   },
+  // 피그마 Login-Error: 오류 칸은 배경 없이 빨간 테두리만 둔다.
   inputError: {
     borderColor: COLORS.danger,
-    backgroundColor: "#FFF5F5",
   },
   inputFocused: {
     borderColor: COLORS.primary,

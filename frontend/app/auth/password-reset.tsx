@@ -33,7 +33,6 @@ const COLORS = {
   successText: "#3B6D11", // Figma 재전송 완료 안내
   success: "#2E9E5B", // success/500 (complete icon)
   bg: "#FFFFFF",
-  errorBg: "#FFF5F5",
   disabled: "#D1D5DB",
 };
 
@@ -239,7 +238,6 @@ export default function PasswordResetScreen() {
   const verificationExpired = mode === "code" && verificationHasExpired(countdown, verificationFailureState);
   const verificationAttemptsLocked = verificationFailureState === "attempts";
   const codeError = errors.code ?? (verificationExpired ? "인증 시간이 만료되었어요. 재전송을 눌러주세요." : undefined);
-  const codeErrorHasBackground = Boolean(codeError) && verificationFailureState !== "expired" && !verificationExpired;
   const resendControl = passwordResetResendControl({
     verificationExpired,
     verificationAttemptsLocked,
@@ -335,7 +333,6 @@ export default function PasswordResetScreen() {
                     styles.input,
                     styles.codeInput,
                     codeError ? styles.inputError : null,
-                    codeErrorHasBackground ? styles.inputErrorBackground : null,
                   ]}
                   value={code}
                 />
@@ -415,7 +412,7 @@ export default function PasswordResetScreen() {
                   placeholder="새 비밀번호"
                   placeholderTextColor={COLORS.subtle}
                   secureTextEntry
-                  style={[styles.input, displayedPasswordError ? styles.inputErrorBackground : null]}
+                  style={[styles.input, displayedPasswordError ? styles.inputErrorBorder : null]}
                   value={newPassword}
                 />
                 {displayedPasswordError ? (
@@ -434,7 +431,7 @@ export default function PasswordResetScreen() {
                   placeholder="새 비밀번호 확인"
                   placeholderTextColor={COLORS.subtle}
                   secureTextEntry
-                  style={[styles.input, displayedPasswordConfirmError ? styles.inputErrorBackground : null]}
+                  style={[styles.input, displayedPasswordConfirmError ? styles.inputErrorBorder : null]}
                   value={newPasswordConfirm}
                 />
                 <FieldError message={displayedPasswordConfirmError} />
@@ -492,7 +489,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   inputError: { borderWidth: 1, borderColor: COLORS.danger }, // Figma 만료 상태: 1px #D64545
-  inputErrorBackground: { borderColor: COLORS.danger, backgroundColor: COLORS.errorBg },
+  // 피그마 FindPassword 오류 화면: 오류 칸은 배경 없이 빨간 테두리만 둔다.
+  inputErrorBorder: { borderColor: COLORS.danger },
   messageRow: { flexDirection: "row", alignItems: "center", gap: 6 }, // Figma 에러행: gap 6
   successRow: { flexDirection: "row", alignItems: "center", gap: 4 }, // Figma 재전송 안내: gap 4
   successText: { flexShrink: 1, color: COLORS.successText, fontSize: 12, fontWeight: "400", lineHeight: 14 }, // Figma: 12/14 #3B6D11

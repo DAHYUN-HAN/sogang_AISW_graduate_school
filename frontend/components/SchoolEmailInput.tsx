@@ -15,7 +15,7 @@ export default function SchoolEmailInput({ value, onChangeText, placeholder = "ì
   const [isFocused, setIsFocused] = useState(false);
 
   return (
-    <View style={[styles.container, hasError ? styles.containerError : null]}>
+    <View style={styles.container}>
       <TextInput
         autoCapitalize="none"
         autoCorrect={false}
@@ -60,9 +60,6 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     borderRadius: 8,
     backgroundColor: "#FFFFFF",
-  },
-  containerError: {
-    backgroundColor: "#FFF5F5",
   },
   border: {
     ...StyleSheet.absoluteFillObject,
