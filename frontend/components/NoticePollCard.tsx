@@ -165,11 +165,12 @@ function Participants({postId, userId, question, onClose}: {postId: number; user
   const [optionId, setOptionId] = useState(question.options[0]?.id);
   const {height, width} = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  return <Modal visible transparent animationType="slide" onRequestClose={onClose}>
+  // Draw under Android's system bars so the sheet reaches the screen edge like the design.
+  return <Modal visible transparent statusBarTranslucent navigationBarTranslucent animationType="slide" onRequestClose={onClose}>
     <View style={styles.backdrop}>
       <Pressable accessibilityRole="button" accessibilityLabel="참여자 창 닫기" onPress={onClose} style={StyleSheet.absoluteFillObject} />
       <View style={[styles.sheet, {maxWidth: Platform.OS === "web" && width > 430 ? 405 : 420,
-        maxHeight: Math.min(height * .85, height - insets.top - 12), paddingBottom: Math.max(insets.bottom, 16)}]}
+        maxHeight: Math.min(height * .85, height - insets.top - 12), paddingBottom: Math.max(insets.bottom - LIST_BOTTOM_PADDING, 0)}]}
         accessibilityViewIsModal>
         <Pressable accessibilityRole="button" accessibilityLabel="참여자 닫기" onPress={onClose} style={styles.handleButton}>
           <View style={styles.handle} />
@@ -219,6 +220,7 @@ function PeopleList({postId, userId, question, optionId}: {postId: number; userI
   </ScrollView>;
 }
 
+const LIST_BOTTOM_PADDING = 20;
 const styles = StyleSheet.create({
   cards: {gap: 16, marginTop: 22},
   container: {padding: 16, gap: 12, borderWidth: 1, borderColor: "#E7E9EE", borderRadius: 12, backgroundColor: "#FFF"},
@@ -266,7 +268,8 @@ const styles = StyleSheet.create({
   tabLabel: {paddingVertical: 10, textAlign: "center", fontSize: 14, lineHeight: 17, fontWeight: "500", color: "#A6ACB7"},
   activeTabLabel: {fontWeight: "600", color: "#15171C"},
   peopleScroll: {flexGrow: 0, flexShrink: 1},
-  peopleContent: {paddingTop: 16, paddingBottom: 20, gap: 8},
+  // The design's bottom padding doubles as the home-indicator area, so it is not added twice.
+  peopleContent: {paddingTop: 16, paddingBottom: LIST_BOTTOM_PADDING, gap: 8},
   loadState: {paddingVertical: 16},
   emptyPeople: {paddingTop: 40, paddingBottom: 48, textAlign: "center", fontSize: 13, lineHeight: 18, color: "#A6ACB7"},
 });
