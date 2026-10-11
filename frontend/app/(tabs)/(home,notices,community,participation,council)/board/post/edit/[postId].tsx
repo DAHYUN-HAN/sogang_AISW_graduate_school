@@ -586,8 +586,8 @@ export default function PostEditScreen() {
             control={control}
             name="professor"
             render={({ field, fieldState }) => (
+              // Figma Community/Edit: 교수명 칸 위에 라벨 없이 칸 안의 안내 문구와 "교수"만 보인다.
               <View style={styles.labeledField}>
-                <Text style={styles.fieldLabel}>교수명</Text>
                 <View style={[styles.suffixInputRow, fieldState.error ? styles.inputError : null]}>
                   <TextInput
                     onChangeText={clearOnChange("professor", field.onChange)}
