@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "./AppTypography";
 
 // 아래에서 올라오는 선택 시트. 글쓰기의 게시판·동아리·경조사 선택과 글 수정의
@@ -10,6 +11,8 @@ const COLORS = {
   muted: "#6B7280",
   bg: "#FFFFFF",
 };
+
+const SHEET_BOTTOM_PADDING = 24;
 
 export type SelectionOption = { key: string; label: string };
 
@@ -30,18 +33,23 @@ export default function SelectionSheet({
   onClose: () => void;
   onSelect: (option: SelectionOption) => void;
 }) {
+  const insets = useSafeAreaInsets();
   return (
-    <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
+    // 안드로이드 시스템 바 아래까지 그려 디자인처럼 시트가 화면 끝에 붙게 한다.
+    <Modal animationType="slide" transparent statusBarTranslucent navigationBarTranslucent visible={visible} onRequestClose={onClose}>
       <Pressable onPress={onClose} style={styles.sheetBackdrop}>
-        <Pressable onPress={() => undefined} style={styles.sheetCard}>
+        {/* 디자인의 하단 여백 24 안에 홈 막대 영역을 포개고, 그보다 높을 때만 늘린다. */}
+        <Pressable onPress={() => undefined} style={[styles.sheetCard, { paddingBottom: Math.max(insets.bottom, SHEET_BOTTOM_PADDING) }]}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>{title}</Text>
           <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
             {options.length === 0 ? <Text style={styles.sheetEmpty}>{emptyText}</Text> : null}
-            {options.map((option) => {
+            {options.map((option, index) => {
               const active = option.key === selectedKey;
+              // 디자인처럼 구분선은 항목 사이에만 두고 마지막 항목 아래에는 긋지 않는다.
+              const last = index === options.length - 1;
               return (
-                <Pressable key={option.key} onPress={() => onSelect(option)} style={styles.sheetOption}>
+                <Pressable key={option.key} onPress={() => onSelect(option)} style={[styles.sheetOption, last ? styles.sheetOptionLast : null]}>
                   <Text style={[styles.sheetOptionText, active ? styles.sheetOptionTextActive : null]}>{option.label}</Text>
                   {active ? <Ionicons name="checkmark" size={16} color={COLORS.primary} /> : null}
                 </Pressable>
@@ -65,12 +73,11 @@ const styles = StyleSheet.create({
     width: "100%",
     maxWidth: 405,
     maxHeight: "70%",
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     backgroundColor: COLORS.bg,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: 28,
   },
   sheetHandle: {
     width: 36,
@@ -78,7 +85,8 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     borderRadius: 2,
     backgroundColor: "#C7CCD4",
-    marginBottom: 16,
+    // 디자인의 손잡이 영역은 27 높이(막대 4 + 아래 23)라 제목이 그만큼 내려온다.
+    marginBottom: 23,
   },
   sheetTitle: {
     color: COLORS.text,
@@ -95,6 +103,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: "#EAECEF",
+  },
+  sheetOptionLast: {
+    borderBottomWidth: 0,
   },
   sheetOptionText: {
     flex: 1,
