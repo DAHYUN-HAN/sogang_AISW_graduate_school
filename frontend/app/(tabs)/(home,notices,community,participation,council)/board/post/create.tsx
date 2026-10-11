@@ -229,7 +229,7 @@ const EVIDENCE_MODES = [
 
 function activitySelectPlaceholder(slug?: string) {
   if (slug?.includes("study")) return "모집글을 선택하세요";
-  if (slug?.includes("networking")) return "네트워킹을 선택하세요";
+  if (slug?.includes("networking")) return "네트워킹명을 선택하세요"; // Figma Activity/Verify-Network
   return "동아리명을 선택하세요";
 }
 
