@@ -291,7 +291,8 @@ export default function ProfileSettingsScreen() {
                 setProfileImageMediaId(null);
                 setPhotoSheetVisible(false);
               }}
-              style={styles.modalOption}
+              // Figma MyPage/ProfilePhotoSelect: 마지막 항목 아래에는 구분선을 긋지 않는다.
+              style={[styles.modalOption, styles.modalOptionLast]}
             >
               <Text style={styles.modalOptionText}>기본 이미지 적용</Text>
             </Pressable>
@@ -495,6 +496,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: 0.5,
     borderBottomColor: "#EAECEF",
+  },
+  modalOptionLast: {
+    borderBottomWidth: 0,
   },
   modalOptionText: {
     color: COLORS.text,

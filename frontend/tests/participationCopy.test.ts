@@ -24,3 +24,9 @@ test("건의사항 수정은 익명 안내·한 줄 제목·수정 완료 버튼
   assert.match(edit, /multiline=\{!isStudyRecruit && !isSuggestion\}/);
   assert.match(edit, /isSuggestion \? "수정 완료" : "완료"/);
 });
+
+// 2026-10-12 사용자 요청: 피그마 MyPage/ProfilePhotoSelect처럼 마지막 항목 아래 구분선이 없다.
+test("프로필 사진 시트의 마지막 항목은 구분선이 없다", () => {
+  const profile = readFileSync("app/(tabs)/(home,notices,community,participation,council)/settings/profile.tsx", "utf8");
+  assert.match(profile, /style=\{\[styles\.modalOption, styles\.modalOptionLast\]\}\s*>\s*<Text style=\{styles\.modalOptionText\}>기본 이미지 적용<\/Text>/);
+});
