@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "./AppTypography";
+import LoadingState from "./LoadingState";
 
 // 아래에서 올라오는 선택 시트. 글쓰기의 게시판·동아리·경조사 선택과 글 수정의
 // 게시판 이동이 같은 모양을 쓰도록 한곳에 둔다.
@@ -21,6 +22,7 @@ export default function SelectionSheet({
   title,
   options,
   emptyText,
+  loading = false,
   selectedKey,
   onClose,
   onSelect,
@@ -29,6 +31,8 @@ export default function SelectionSheet({
   title: string;
   options: SelectionOption[];
   emptyText: string;
+  // 목록을 받는 중이면 빈 문구 대신 피그마 공통 로딩을 보인다.
+  loading?: boolean;
   selectedKey?: string;
   onClose: () => void;
   onSelect: (option: SelectionOption) => void;
@@ -43,7 +47,8 @@ export default function SelectionSheet({
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>{title}</Text>
           <ScrollView bounces={false} showsVerticalScrollIndicator={false}>
-            {options.length === 0 ? <Text style={styles.sheetEmpty}>{emptyText}</Text> : null}
+            {options.length === 0 && loading ? <LoadingState compact /> : null}
+            {options.length === 0 && !loading ? <Text style={styles.sheetEmpty}>{emptyText}</Text> : null}
             {options.map((option, index) => {
               const active = option.key === selectedKey;
               // 디자인처럼 구분선은 항목 사이에만 두고 마지막 항목 아래에는 긋지 않는다.

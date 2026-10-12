@@ -2013,7 +2013,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         visible={selectionSheet === "board"}
         title={BOARD_SELECT_PLACEHOLDER}
         options={selectableBoards.map((item) => ({ key: String(item.id), label: item.name }))}
-        emptyText={isBoardsLoading ? "게시판을 불러오는 중입니다." : "선택할 수 있는 게시판이 없습니다."}
+        emptyText="선택할 수 있는 게시판이 없어요"
+        loading={isBoardsLoading}
         selectedKey={board ? String(board.id) : undefined}
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => selectBoard(Number(option.key))}
@@ -2022,7 +2023,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         visible={selectionSheet === "activity"}
         title={activitySelectPlaceholder(board?.slug)}
         options={activityOptions}
-        emptyText={activitySourceQuery.isLoading ? "활동 대상을 불러오는 중입니다." : "선택할 수 있는 활동이 없습니다."}
+        emptyText="선택할 수 있는 활동이 없어요"
+        loading={activitySourceQuery.isLoading}
         selectedKey={activitySourcePostId ? String(activitySourcePostId) : undefined}
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => {

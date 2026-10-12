@@ -41,3 +41,22 @@ test("프로필 사진 시트의 마지막 항목은 구분선이 없다", () =>
   const profile = readFileSync("app/(tabs)/(home,notices,community,participation,council)/settings/profile.tsx", "utf8");
   assert.match(profile, /style=\{\[styles\.modalOption, styles\.modalOptionLast\]\}\s*>\s*<Text style=\{styles\.modalOptionText\}>기본 이미지 적용<\/Text>/);
 });
+
+// 2026-10-12 사용자 결정: 다른 안내와 같은 "~어요" 말투로 맞춘다.
+test("활동 선택 시트가 비면 '선택할 수 있는 활동이 없어요'를 보인다", () => {
+  assert.match(create, /emptyText="선택할 수 있는 활동이 없어요"/);
+});
+
+// 2026-10-12 사용자 결정: 활동 선택 시트는 "활동 대상을 불러오는 중입니다." 대신 피그마 공통 로딩을 쓴다.
+test("활동 선택 시트는 목록을 받는 동안 공통 로딩을 보인다", () => {
+  const sheet = readFileSync("components/SelectionSheet.tsx", "utf8");
+  assert.match(create, /loading=\{activitySourceQuery\.isLoading\}/);
+  assert.doesNotMatch(create, /활동 대상을 불러오는 중입니다/);
+  assert.match(sheet, /options\.length === 0 && loading \? <LoadingState compact \/>/);
+});
+
+// 2026-10-12 사용자 결정: 게시판 선택 시트도 활동 선택 시트와 같은 방식으로 맞춘다.
+test("게시판 선택 시트는 받는 동안 공통 로딩, 비면 '선택할 수 있는 게시판이 없어요'를 보인다", () => {
+  assert.match(create, /emptyText="선택할 수 있는 게시판이 없어요"\r?\n\s+loading=\{isBoardsLoading\}/);
+  assert.doesNotMatch(create, /게시판을 불러오는 중입니다/);
+});

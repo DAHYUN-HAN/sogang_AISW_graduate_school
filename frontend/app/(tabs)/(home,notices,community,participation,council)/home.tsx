@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useNavigation } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
 import NetworkErrorState, { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { isNetworkError } from "../../../utils/networkError";
@@ -13,6 +13,7 @@ import { isNetworkError } from "../../../utils/networkError";
 import { calendarMonthStyles } from "../../../components/CalendarMonth";
 import { MediaImageBackground } from "../../../components/MediaImage";
 import HomeSectionGate from "../../../components/HomeSectionGate";
+import LoadingState from "../../../components/LoadingState";
 import Toast from "../../../components/Toast";
 import { BackIcon, BellIcon, EmptyCalendarIcon, ForwardIcon, ProfileIcon } from "../../../components/icons";
 import { useMyPageDrawer } from "../../../components/MyPageDrawer";
@@ -455,26 +456,16 @@ function HomeBannerCarousel({ banners }: { banners: BannerItem[] }) {
 function NoticeList({
   posts,
   boards,
-  loading,
   isError,
   error,
   onRetry,
 }: {
   posts: PostListItem[];
   boards: Board[];
-  loading: boolean;
   isError: boolean;
   error?: unknown;
   onRetry: () => void;
 }) {
-  if (loading) {
-    return (
-      <View style={styles.loadingBox}>
-        <Text style={styles.emptyText}>공지사항을 불러오는 중이에요</Text>
-      </View>
-    );
-  }
-
   if (isError) {
     return <HomeErrorState error={error} label="공지사항" onRetry={onRetry} />;
   }
@@ -940,7 +931,7 @@ export default function HomeScreen() {
             style={styles.screen}
       contentContainerStyle={[
         styles.content,
-        hasHomeNetworkError ? styles.networkErrorContent : null,
+        hasHomeNetworkError || isHomeLoading ? styles.networkErrorContent : null,
         { paddingTop: Math.max(insets.top + 12, 21) },
       ]}
       refreshControl={
@@ -973,15 +964,15 @@ export default function HomeScreen() {
         <View style={styles.networkErrorBody}>
           <NetworkErrorState onRetry={refreshHome} />
         </View>
+      ) : isHomeLoading ? (
+        // 처음 열 때는 칸마다 띄우지 않고, 위 인사 줄 아래를 피그마 공통 로딩으로 채운다.
+        // 모든 칸이 도착하면 한 번에 보인다. 새로고침·달 변경은 이전 내용을 둔 채 받는다.
+        <View style={styles.networkErrorBody}>
+          <LoadingState />
+        </View>
       ) : (
         <>
-          {isHomeLoading ? <ActivityIndicator accessibilityLabel="홈 콘텐츠 로딩" size="small" color={COLORS.primary} /> : null}
-
-          {bannersQuery.isLoading ? (
-            <View style={styles.loadingBox}>
-              <Text style={styles.emptyText}>배너를 불러오는 중이에요</Text>
-            </View>
-          ) : bannersQuery.isError ? (
+          {bannersQuery.isError ? (
             <HomeErrorState error={bannersQuery.error} label="홈 배너" onRetry={() => void bannersQuery.refetch()} />
           ) : (
             <HomeBannerCarousel banners={banners} />
@@ -997,18 +988,13 @@ export default function HomeScreen() {
           <NoticeList
             posts={notices}
             boards={noticeBoards}
-            loading={noticesQuery.isLoading || boardsLoading}
             isError={boardsError || noticesQuery.isError}
             error={boardsLoadError ?? noticesQuery.error}
             onRetry={() => void Promise.all([refetchBoards(), noticesQuery.refetch()])}
           />
 
           <SectionHeader title="서강생활 일정" />
-          {eventsQuery.isLoading ? (
-            <View style={styles.loadingBox}>
-              <Text style={styles.emptyText}>일정을 불러오는 중이에요</Text>
-            </View>
-          ) : eventsQuery.isError ? (
+          {eventsQuery.isError ? (
             <HomeErrorState error={eventsQuery.error} label="일정" onRetry={() => void eventsQuery.refetch()} />
           ) : (
             <CalendarCard
@@ -1037,11 +1023,7 @@ export default function HomeScreen() {
               navigation.dispatch(StackActions.push("community"));
             }}
           />
-          {albumQuery.isLoading ? (
-            <View style={styles.loadingBox}>
-              <Text style={styles.emptyText}>사진첩을 불러오는 중이에요</Text>
-            </View>
-          ) : boardsError || albumQuery.isError ? (
+          {boardsError || albumQuery.isError ? (
             <HomeErrorState error={boardsLoadError ?? albumQuery.error} label="행사 사진첩" onRetry={() => void Promise.all([refetchBoards(), albumQuery.refetch()])} />
           ) : (
             <AlbumStrip posts={albumPosts} />
