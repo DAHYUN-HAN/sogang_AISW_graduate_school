@@ -29,15 +29,18 @@ function render(errors: Record<string, unknown>) {
     useQuery: ({ queryKey }: any) => query(queryKey[0] === "home" ? queryKey[1] : queryKey[0]),
     bannerApi: {}, postApi: {}, eventApi: {}, notificationApi: {}, keepPreviousData: undefined, HOME_ALBUM_LIMIT: 10,
     homeAlumniDirectoryLink: () => ({ status: "ready", url: "https://example.com" }),
+    useToast: () => ({ toast: null, showToast() {}, hideToast() {} }),
     isNetworkError, enabledRefetch, refreshQueries, styles: { content: {}, networkErrorContent: { flexGrow: 1, backgroundColor: "#FFFFFF" }, networkErrorBody: { backgroundColor: "#FFFFFF" } },
     COLORS: { primary: "#2761FF" }, SHOW_HOME_POPULAR_POSTS: false, tree: undefined,
   };
-  for (const name of ["ScrollView", "RefreshControl", "View", "Text", "IconButton", "BellIcon", "ProfileIcon", "NetworkErrorState", "ActivityIndicator", "HomeErrorState", "HomeBannerCarousel", "SectionHeader", "NoticeList", "CalendarCard", "HomeSectionGate", "HomePopularPostsSection", "AlbumStrip", "Pressable", "ForwardIcon"]) bindings[name] = name;
+  for (const name of ["ScrollView", "RefreshControl", "View", "Text", "IconButton", "BellIcon", "ProfileIcon", "NetworkErrorState", "ActivityIndicator", "HomeErrorState", "HomeBannerCarousel", "SectionHeader", "NoticeList", "CalendarCard", "HomeSectionGate", "HomePopularPostsSection", "AlbumStrip", "Pressable", "ForwardIcon", "Toast"]) bindings[name] = name;
   runInNewContext(js, bindings);
   const nodes: Element[] = [];
   function walk(value: any) { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === "object" && "children" in value) { nodes.push(value); value.children.forEach(walk); } }
   walk(bindings.tree);
-  return { nodes, tree: bindings.tree as Element, retries };
+  // 맨 바깥은 토스트를 함께 담는 View라서 스크롤 화면을 찾아 돌려준다.
+  const scroll = nodes.find((node) => node.type === "ScrollView") as Element;
+  return { nodes, tree: scroll, retries };
 }
 
 test("여러 홈 요청이 연결에 실패해도 흰 배경의 오류 화면은 하나만 표시하고 모두 재시도한다", async () => {

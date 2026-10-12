@@ -5,7 +5,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useNavigation } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Alert, Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { ActivityIndicator, Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
 import NetworkErrorState, { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { isNetworkError } from "../../../utils/networkError";
@@ -13,9 +13,11 @@ import { isNetworkError } from "../../../utils/networkError";
 import { calendarMonthStyles } from "../../../components/CalendarMonth";
 import { MediaImageBackground } from "../../../components/MediaImage";
 import HomeSectionGate from "../../../components/HomeSectionGate";
+import Toast from "../../../components/Toast";
 import { BackIcon, BellIcon, EmptyCalendarIcon, ForwardIcon, ProfileIcon } from "../../../components/icons";
 import { useMyPageDrawer } from "../../../components/MyPageDrawer";
 import { useBoardsQuery } from "../../../hooks/useApi";
+import { useToast } from "../../../hooks/useToast";
 import { API_ORIGIN, bannerApi, eventApi, notificationApi, postApi } from "../../../services/api";
 import { useUserStore } from "../../../stores/userStore";
 import type { BannerItem, Board, EventItem, PostListItem } from "../../../types";
@@ -30,7 +32,8 @@ import {
   shiftCalendarMonth,
 } from "../../../utils/eventCalendar";
 import { toAbsoluteMediaUrl } from "../../../utils/mediaAccess";
-import { homeAlumniDirectoryErrorMessage, homeAlumniDirectoryLink } from "../../../utils/homeAlumniDirectory";
+import { homeAlumniDirectoryLink } from "../../../utils/homeAlumniDirectory";
+import { TOAST_INFO_MESSAGES } from "../../../utils/toast";
 import { homeNoticeDeadlineSuffix } from "../../../utils/homeNoticeDeadline";
 import {
   EVENT_CATEGORY_ORDER,
@@ -802,6 +805,7 @@ function AlbumStrip({ posts }: { posts: PostListItem[] }) {
 }
 
 export default function HomeScreen() {
+  const { toast, showToast, hideToast } = useToast();
   const insets = useSafeAreaInsets();
   const user = useUserStore((state) => state.user);
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
@@ -920,16 +924,18 @@ export default function HomeScreen() {
   };
   const openAlumniDirectory = () => {
     if (alumniDirectoryLink.status !== "ready") {
-      Alert.alert("동문회 주소록", homeAlumniDirectoryErrorMessage(alumniDirectoryLink.status));
+      showToast(TOAST_INFO_MESSAGES.alumniDirectoryOpenFailed, "info");
       return;
     }
 
     void Linking.openURL(alumniDirectoryLink.url).catch(() => {
-      Alert.alert("동문회 주소록", homeAlumniDirectoryErrorMessage("open_failed"));
+      showToast(TOAST_INFO_MESSAGES.alumniDirectoryOpenFailed, "info");
     });
   };
 
   return (
+    // 토스트가 스크롤과 함께 움직이지 않도록 ScrollView 바깥에 둔다.
+    <View style={styles.toastHost}>
     <ScrollView
             style={styles.screen}
       contentContainerStyle={[
@@ -1060,10 +1066,13 @@ export default function HomeScreen() {
         </>
       )}
     </ScrollView>
+    <Toast toast={toast} onHide={hideToast} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  toastHost: { flex: 1 },
   screen: {
     flex: 1,
     backgroundColor: COLORS.bg,

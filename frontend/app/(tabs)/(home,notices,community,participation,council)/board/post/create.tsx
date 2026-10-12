@@ -59,7 +59,7 @@ import {
   maximumActivityCertificationDate,
   minimumMutualAidEventDate,
 } from "../../../../../utils/dateSelection";
-import { TOAST_MESSAGES, nextToastState, type ToastState } from "../../../../../utils/toast";
+import { TOAST_INFO_MESSAGES, TOAST_MESSAGES, nextToastState, type ToastState, type ToastVariant } from "../../../../../utils/toast";
 import { uploadFailureFeedback } from "../../../../../utils/uploadFeedback";
 import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../../utils/mediaPicker";
 import {
@@ -343,7 +343,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [toast, setToast] = useState<ToastState>(null);
   // 첨부·증빙은 react-hook-form 밖에 있어서 테두리 표시를 따로 들고 있는다.
   const [missingRequiredAttachment, setMissingRequiredAttachment] = useState(false);
-  const showToast = useCallback((message: string) => setToast((current) => nextToastState(current, message)), []);
+  const showToast = useCallback(
+    (message: string, variant?: ToastVariant) => setToast((current) => nextToastState(current, message, variant)),
+    [],
+  );
   const hideToast = useCallback(() => setToast(null), []);
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
   // 확인창을 띄우는 동안 고른 게시판을 들고 있는다. 확인 전에는 바꾸지 않는다.
@@ -780,7 +783,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
   const pickPostImages = () => {
     if (isAlbumImageLimitReached) {
-      showToast("게시글당 최대 20장까지 등록할 수 있어요");
+      showToast(TOAST_INFO_MESSAGES.albumPhotoLimit, "info");
       return Promise.resolve([]);
     }
     return pickAndUploadImages(

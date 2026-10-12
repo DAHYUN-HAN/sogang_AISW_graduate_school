@@ -82,6 +82,8 @@ function harness(origin = "/home") {
     "../utils/userLabel": userLabel,
     "./ProfileAvatar": { default: "Avatar" }, "./icons": { BackIcon: "BackIcon", ChevronRightIcon: "ChevronRightIcon" },
     "./MyPageDrawerOverlay": { default: "Overlay" },
+    "../hooks/useToast": { useToast: () => ({ toast: null, showToast() {}, hideToast() {} }) },
+    "./Toast": { default: "Toast" }, "../utils/toast": { takeQueuedToast: () => null },
   };
   const exports = {} as { MyPageDrawerProvider: (props: object) => Element };
   const code = ts.transpileModule(readFileSync("components/MyPageDrawer.tsx", "utf8"), {

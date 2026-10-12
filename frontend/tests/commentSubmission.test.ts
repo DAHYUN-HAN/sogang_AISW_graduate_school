@@ -34,7 +34,8 @@ function harness(parentId: number | null = null) {
     setCommentInputHeight: (value: number) => actions.push(`height:${value}`),
     setReplyTarget: (value: unknown) => actions.push(`reply:${value}`),
     Keyboard: { dismiss: () => actions.push("keyboard:dismiss") },
-    Alert: { alert: () => actions.push("error") },
+    showToast: () => actions.push("error"),
+    TOAST_ERROR_MESSAGES: {},
   });
   return { actions, submit, payload: () => payload, succeed: () => callbacks!.onSuccess(), fail: () => callbacks!.onError() };
 }

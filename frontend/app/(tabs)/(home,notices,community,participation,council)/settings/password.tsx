@@ -1,14 +1,18 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import NoticeModal from "../../../../components/NoticeModal";
+import Toast from "../../../../components/Toast";
+import { useToast } from "../../../../hooks/useToast";
 import { userApi } from "../../../../services/api";
 import { useUserStore } from "../../../../stores/userStore";
 import { apiErrorCode, apiErrorStatus, passwordError } from "../../../../utils/authValidation";
 import { clearStoredPushToken } from "../../../../utils/pushTokenStorage";
+import { TOAST_ERROR_MESSAGES } from "../../../../utils/toast";
 
 import { BackIcon } from "../../../../components/icons";
 const COLORS = {
@@ -33,6 +37,7 @@ function ErrorRow({ message }: { message: string }) {
 
 export default function PasswordChangeScreen() {
   const insets = useSafeAreaInsets();
+  const { toast, showToast, hideToast } = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -40,7 +45,16 @@ export default function PasswordChangeScreen() {
   const [newError, setNewError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [passwordChanged, setPasswordChanged] = useState(false);
   const clearSession = useUserStore((state) => state.clearSession);
+
+  // 서버가 저장된 로그인 세션을 이미 끝냈다. 안내를 닫으면 이 기기에서도 로그아웃하고 로그인 화면으로 간다.
+  const goToLogin = async () => {
+    setPasswordChanged(false);
+    await clearStoredPushToken().catch(() => undefined);
+    clearSession();
+    router.replace("/auth/login");
+  };
 
   const canSubmit = Boolean(currentPassword && newPassword && confirmPassword) && !isSubmitting;
 
@@ -70,15 +84,12 @@ export default function PasswordChangeScreen() {
       if (currentMessage || newMessage || confirmMessage) return;
 
       await userApi.updatePassword({ current_password: currentPassword, new_password: newPassword });
-      await clearStoredPushToken().catch(() => undefined);
-      clearSession();
-      Alert.alert("비밀번호 변경 완료", "보안을 위해 저장된 로그인 세션을 종료했습니다. 새 비밀번호로 다시 로그인해주세요.");
-      router.replace("/auth/login");
+      setPasswordChanged(true);
     } catch (error) {
       if (apiErrorCode(error) === "FORBIDDEN" || apiErrorStatus(error) === 403) {
         setCurrentError("현재 비밀번호가 일치하지 않아요.");
       } else {
-        Alert.alert("비밀번호 변경 실패", "비밀번호를 변경하지 못했어요. 잠시 후 다시 시도해주세요.");
+        showToast(TOAST_ERROR_MESSAGES.passwordChange);
       }
     } finally {
       setIsSubmitting(false);
@@ -153,6 +164,13 @@ export default function PasswordChangeScreen() {
           <Text style={styles.primaryButtonText}>{isSubmitting ? "변경 중" : "변경 완료"}</Text>
         </Pressable>
       </ScrollView>
+      <Toast toast={toast} onHide={hideToast} />
+      {/* Figma Screen/MyPage/PasswordChanged-ReloginModal */}
+      <NoticeModal
+        notice={passwordChanged ? { title: "비밀번호를 변경했어요", body: "보안을 위해 다시 로그인해주세요." } : null}
+        onClose={() => void goToLogin()}
+        primary
+      />
     </View>
   );
 }

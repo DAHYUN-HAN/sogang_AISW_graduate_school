@@ -30,7 +30,7 @@ import {
   resourcePostFields,
   withResourcePostMetadata,
 } from "../../../../../../utils/resourcePostFields";
-import { TOAST_MESSAGES, nextToastState, type ToastState } from "../../../../../../utils/toast";
+import { TOAST_ERROR_MESSAGES, TOAST_INFO_MESSAGES, TOAST_MESSAGES, nextToastState, type ToastState } from "../../../../../../utils/toast";
 import { uploadFailureFeedback } from "../../../../../../utils/uploadFeedback";
 import type { MediaAsset } from "../../../../../../types";
 import { pickAndUploadImages } from "../../../../../../utils/mediaPicker";
@@ -434,7 +434,7 @@ export default function PostEditScreen() {
           }
           setSubmitted(true);
         },
-        onError: () => Alert.alert("저장 실패", "작성자 또는 관리자만 이 게시글을 수정할 수 있습니다."),
+        onError: () => setToast((current) => nextToastState(current, TOAST_ERROR_MESSAGES.postEditForbidden)),
       }
     );
   };
@@ -442,7 +442,8 @@ export default function PostEditScreen() {
   const selectImages = async () => {
     Keyboard.dismiss();
     if (isAlbumImageLimitReached) {
-      setUploadNotice("사진첩은 게시글당 최대 20장까지 등록할 수 있어요.");
+      // 등록 화면과 같은 피그마 Toast-Info를 쓴다.
+      setToast((current) => nextToastState(current, TOAST_INFO_MESSAGES.albumPhotoLimit, "info"));
       return;
     }
     try {

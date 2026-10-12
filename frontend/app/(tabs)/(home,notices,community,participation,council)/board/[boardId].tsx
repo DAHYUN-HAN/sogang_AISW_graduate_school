@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
 import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ import ImageViewerModal from "../../../../components/ImageViewerModal";
 import MediaImage, { MediaImageBackground } from "../../../../components/MediaImage";
 import { BackIcon, EmptyCalendarIcon, LedgerIcon, SearchBackIcon, SearchIcon } from "../../../../components/icons";
 import LoadingState from "../../../../components/LoadingState";
+import Toast from "../../../../components/Toast";
 import PostCard from "../../../../components/PostCard";
 import PersonListCard from "../../../../components/PersonListCard";
 import { useBoardsQuery } from "../../../../hooks/useApi";
@@ -22,6 +23,8 @@ import { boardParentRoute, boardRoute, handleNestedBoardHardwareBack, participat
 import { replaceWithRoute } from "../../../../utils/tabNavigation";
 import { useBoardTabHighlight } from "../../../../hooks/useBoardTabHighlight";
 import { useSwipeBackInScreen } from "../../../../hooks/useSwipeBackInScreen";
+import { useToast } from "../../../../hooks/useToast";
+import { TOAST_INFO_MESSAGES } from "../../../../utils/toast";
 import {
   activityCertificationBadgeLabel,
   activityCertificationCardTitle,
@@ -799,9 +802,10 @@ function CouncilActivityHistoryScreen({
 
 function AccountingExternalScreen({ board, topInset, onBack }: { board?: Board | null; topInset: number; onBack: () => void }) {
   const accountingUrl = metadataString(board?.metadata, ["notion_url", "external_url", "url", "link"]);
+  const { toast, showToast, hideToast } = useToast();
   const openAccounting = () => {
     if (!accountingUrl) {
-      Alert.alert("회계장부 링크", "관리자 페이지에서 Notion 링크를 등록해 주세요.");
+      showToast(TOAST_INFO_MESSAGES.ledgerLinkMissing, "info");
       return;
     }
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -828,6 +832,7 @@ function AccountingExternalScreen({ board, topInset, onBack }: { board?: Board |
           <Text style={styles.accountingButtonText}>회계장부 보러가기</Text>
         </Pressable>
       </View>
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }

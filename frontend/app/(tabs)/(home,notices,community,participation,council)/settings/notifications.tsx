@@ -1,15 +1,18 @@
 import { router } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../../components/AppTypography";
 import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../../../components/LoadingState";
+import Toast from "../../../../components/Toast";
+import { useToast } from "../../../../hooks/useToast";
 import { useReturnToMyPageDrawer } from "../../../../hooks/useReturnToMyPageDrawer";
 import { notificationApi } from "../../../../services/api";
 import { useUserStore } from "../../../../stores/userStore";
 import type { NotificationSettings } from "../../../../types";
+import { TOAST_ERROR_MESSAGES } from "../../../../utils/toast";
 
 import { BackIcon } from "../../../../components/icons";
 function Toggle({ value, disabled, onValueChange }: { value: boolean; disabled?: boolean; onValueChange: (next: boolean) => void }) {
@@ -53,6 +56,7 @@ const SETTING_ROWS: { key: keyof NotificationSettings; label: string }[] = [
 export default function NotificationSettingsScreen() {
   const insets = useSafeAreaInsets();
   const { returnToMyPageDrawer, onLayout } = useReturnToMyPageDrawer("/settings/notifications");
+  const { toast, showToast, hideToast } = useToast();
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
@@ -92,7 +96,7 @@ export default function NotificationSettingsScreen() {
       setSettings(response.data);
     } catch {
       setSettings(settings);
-      Alert.alert("저장 실패", "알림 설정을 저장하지 못했습니다.");
+      showToast(TOAST_ERROR_MESSAGES.notificationSettings);
     } finally {
       setSavingKey(null);
     }
@@ -142,6 +146,7 @@ export default function NotificationSettingsScreen() {
           ) : null}
         </View>
       )}
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }

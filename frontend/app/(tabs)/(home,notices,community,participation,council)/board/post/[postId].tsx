@@ -12,6 +12,7 @@ import NoticePollCard from "../../../../../components/NoticePollCard";
 import { noticeBodyBlocks } from "../../../../../utils/noticeBody";
 import ActivityCertificationMediaImage from "../../../../../components/ActivityCertificationMediaImage";
 import LoadingState from "../../../../../components/LoadingState";
+import Toast from "../../../../../components/Toast";
 import ImageViewerModal from "../../../../../components/ImageViewerModal";
 import MediaImage, { MediaImageBackground } from "../../../../../components/MediaImage";
 import PhotoPager from "../../../../../components/PhotoPager";
@@ -20,6 +21,7 @@ import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIco
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { useBoardTabHighlight } from "../../../../../hooks/useBoardTabHighlight";
 import { useSwipeBackInScreen } from "../../../../../hooks/useSwipeBackInScreen";
+import { useToast } from "../../../../../hooks/useToast";
 import { resolveMediaAccessUrl, useMediaAccessUrl } from "../../../../../hooks/useMediaAccessUrl";
 import type { MediaReference } from "../../../../../utils/mediaAccess";
 import {
@@ -58,6 +60,7 @@ import { activityCertificationDetailHeading } from "../../../../../utils/activit
 import { activityImageLayoutFromMetadata, resolveActivityImageRule } from "../../../../../utils/activityImageLayout";
 import { createPhotoSwipeConfig } from "../../../../../utils/photoCarouselSwipe";
 import { COMMENT_DELETE_COPY } from "../../../../../utils/commentPresentation";
+import { TOAST_ERROR_MESSAGES, TOAST_INFO_MESSAGES, TOAST_SUCCESS_MESSAGES } from "../../../../../utils/toast";
 import {
   noticeAttachmentFrameAspectRatio,
   postDetailImagePresentation,
@@ -272,6 +275,7 @@ export default function PostDetailScreen() {
   const adminPathname = usePathname();
   const Alert = adminPathname.startsWith("/admin/") ? adminAlert : NativeAlert;
   const adminWorkspace = adminPathname.startsWith("/admin/");
+  const { toast, showToast, hideToast } = useToast();
   const router = useMemo(() => adminPostRouter(expoRouter, adminWorkspace), [adminWorkspace]);
   const params = useLocalSearchParams<{ postId: string; fromBoardId?: string; returnTo?: string }>();
   const insets = useSafeAreaInsets();
@@ -660,9 +664,10 @@ export default function PostDetailScreen() {
       setReportedTargets((current) => ({ ...current, [`${reportTarget.type}:${reportTarget.id}`]: true }));
       setReportTarget(null);
       setReportDetail("");
-      Alert.alert(response.data.duplicate ? "이미 신고됨" : "신고 접수 완료", "검토 후 조치하겠습니다.");
+      if (response.data.duplicate) showToast(TOAST_INFO_MESSAGES.alreadyReported, "info");
+      else showToast(TOAST_SUCCESS_MESSAGES.reportSubmitted, "success");
     } catch {
-      Alert.alert("신고 실패", "신고 내용을 확인하거나 잠시 후 다시 시도하세요.");
+      showToast(TOAST_ERROR_MESSAGES.report);
     } finally {
       setIsReporting(false);
     }
@@ -675,7 +680,7 @@ export default function PostDetailScreen() {
       setIsLiked(response.data.is_liked);
       setLikeCount(response.data.like_count);
     } catch {
-      Alert.alert("좋아요 실패", "좋아요 상태를 변경할 수 없습니다.");
+      showToast(TOAST_ERROR_MESSAGES.like);
     }
   };
 
@@ -685,7 +690,7 @@ export default function PostDetailScreen() {
       const response = await bookmarkMutation.mutateAsync();
       setIsBookmarked(response.data.is_bookmarked);
     } catch {
-      Alert.alert("북마크 실패", "북마크 상태를 변경할 수 없습니다.");
+      showToast(TOAST_ERROR_MESSAGES.bookmark);
     }
   };
 
@@ -694,7 +699,7 @@ export default function PostDetailScreen() {
       Linking.openURL(applicationUrl);
       return;
     }
-    Alert.alert(applicationButtonLabel, "관리자가 참여 링크를 준비 중입니다.");
+    showToast(TOAST_INFO_MESSAGES.applicationLinkMissing, "info");
   };
 
   const handleDeletePost = () => {
@@ -716,7 +721,7 @@ export default function PostDetailScreen() {
           replace: replaceWithRoute,
         });
       },
-      onError: () => Alert.alert("삭제 실패", "게시글을 삭제할 수 없습니다."),
+      onError: () => showToast(TOAST_ERROR_MESSAGES.postDelete),
     });
   };
 
@@ -762,7 +767,7 @@ export default function PostDetailScreen() {
           setReplyTarget(null);
           Keyboard.dismiss();
         },
-        onError: () => Alert.alert("댓글 등록 실패", "댓글을 저장할 수 없습니다."),
+        onError: () => showToast(TOAST_ERROR_MESSAGES.commentCreate),
         onSettled: () => {
           commentSubmitLockRef.current = false;
         },
@@ -1156,7 +1161,7 @@ export default function PostDetailScreen() {
                         });
                       }
                     } catch {
-                      Alert.alert("파일 열기 실패", "첨부 파일에 접근할 수 없습니다.");
+                      showToast(TOAST_INFO_MESSAGES.attachmentOpenFailed, "info");
                     }
                   }}
                   style={styles.mutualAidEvidenceTile}
@@ -1202,7 +1207,7 @@ export default function PostDetailScreen() {
                         });
                       }
                     } catch {
-                      Alert.alert("파일 열기 실패", "첨부 파일에 접근할 수 없습니다.");
+                      showToast(TOAST_INFO_MESSAGES.attachmentOpenFailed, "info");
                     }
                   }}
                   style={isImage ? styles.imageAttachment : styles.fileAttachment}
@@ -1409,7 +1414,7 @@ export default function PostDetailScreen() {
                   try {
                     await updateCommentMutation.mutateAsync({ commentId, content });
                   } catch (error) {
-                    Alert.alert("댓글 수정 실패", "댓글을 수정할 수 없습니다.");
+                    showToast(TOAST_ERROR_MESSAGES.commentEdit);
                     throw error;
                   }
                 }}
@@ -1626,6 +1631,7 @@ export default function PostDetailScreen() {
           </Pressable>
         </Pressable>
       ) : null}
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }

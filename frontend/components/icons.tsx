@@ -478,6 +478,16 @@ export function ToastAlertIcon({ size = 18, color = "#D64545" }: IconProps) {
   );
 }
 
+// 피그마 Component/Toast-Success의 초록 체크.
+export function ToastSuccessIcon({ size = 18, color = "#2E9E5B" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <Path d="M9 18C13.9706 18 18 13.9706 18 9C18 4.02944 13.9706 0 9 0C4.02944 0 0 4.02944 0 9C0 13.9706 4.02944 18 9 18Z" fill={color} />
+      <Path d="M5 9.2L7.6 11.8L13 6" stroke="#FFFFFF" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // 기본 프로필 아바타 — 디자인 원본 80x80 (파란 배경 원 + 흰 실루엣, 카메라 배지는 별도 오버레이).
 // 투표 참여자 행 아바타 — 디자인 원본 44px 원 + 28px 프로필 아이콘.
 export function VoterAvatarIcon({ size = 44 }: IconProps) {
