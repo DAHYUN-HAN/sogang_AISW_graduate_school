@@ -924,6 +924,12 @@ export default function HomeScreen() {
     });
   };
 
+  // 처음 열 때는 인사 줄까지 비우고 흰 화면에 피그마 공통 로딩만 보인다. 모든 칸이
+  // 도착하면 한 번에 보인다. 새로고침·달 변경은 이전 내용을 둔 채 받는다.
+  if (isHomeLoading && !hasHomeNetworkError) {
+    return <LoadingState style={{ paddingTop: insets.top }} />;
+  }
+
   return (
     // 토스트가 스크롤과 함께 움직이지 않도록 ScrollView 바깥에 둔다.
     <View style={styles.toastHost}>
@@ -931,7 +937,7 @@ export default function HomeScreen() {
             style={styles.screen}
       contentContainerStyle={[
         styles.content,
-        hasHomeNetworkError || isHomeLoading ? styles.networkErrorContent : null,
+        hasHomeNetworkError ? styles.networkErrorContent : null,
         { paddingTop: Math.max(insets.top + 12, 21) },
       ]}
       refreshControl={
@@ -963,12 +969,6 @@ export default function HomeScreen() {
       {hasHomeNetworkError ? (
         <View style={styles.networkErrorBody}>
           <NetworkErrorState onRetry={refreshHome} />
-        </View>
-      ) : isHomeLoading ? (
-        // 처음 열 때는 칸마다 띄우지 않고, 위 인사 줄 아래를 피그마 공통 로딩으로 채운다.
-        // 모든 칸이 도착하면 한 번에 보인다. 새로고침·달 변경은 이전 내용을 둔 채 받는다.
-        <View style={styles.networkErrorBody}>
-          <LoadingState />
         </View>
       ) : (
         <>

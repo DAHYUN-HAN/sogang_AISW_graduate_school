@@ -142,7 +142,7 @@ test("달을 넘겨도 달력이 불러오는 중 화면으로 바뀌지 않는�
   assert.match(homeSource, /import \{ keepPreviousData, useQuery \}/);
   // 홈 전체 로딩은 첫 로딩에만 켜지는 isLoading으로 판단한다(2026-10-12 칸별 로딩 → 홈 전체 로딩).
   assert.match(homeSource, /\|\| eventsQuery\.isLoading \|\| albumQuery\.isLoading;/);
-  assert.match(homeSource, /\) : isHomeLoading \? \(/);
+  assert.match(homeSource, /if \(isHomeLoading && !hasHomeNetworkError\) \{\r?\n\s+return <LoadingState /);
 });
 
 test("이전 달 데이터가 남아 있어도 보고 있는 달에 점이 잘못 찍히지 않는다", () => {
