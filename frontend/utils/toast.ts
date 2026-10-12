@@ -30,6 +30,7 @@ export const TOAST_ERROR_MESSAGES = {
   postDelete: "글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.",
   commentCreate: "댓글을 등록하지 못했어요. 잠시 후 다시 시도해주세요.",
   commentEdit: "댓글을 수정하지 못했어요. 잠시 후 다시 시도해주세요.",
+  commentDelete: "댓글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.",
   notificationSettings: "설정을 저장하지 못했어요. 잠시 후 다시 시도해주세요.",
   passwordChange: "비밀번호를 변경하지 못했어요. 잠시 후 다시 시도해주세요.",
   photoUpload: "사진을 업로드하지 못했어요. 잠시 후 다시 시도해주세요.",

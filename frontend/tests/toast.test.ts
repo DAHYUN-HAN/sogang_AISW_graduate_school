@@ -194,3 +194,10 @@ test("사진첩 20장 안내는 등록·수정 화면 모두 안내 토스트로
   assert.match(createSource, /showToast\(TOAST_INFO_MESSAGES\.albumPhotoLimit, "info"\)/);
   assert.match(edit, /nextToastState\(current, TOAST_INFO_MESSAGES\.albumPhotoLimit, "info"\)/);
 });
+
+test("댓글 삭제 실패는 확인창을 닫고 오류 토스트로 알린다", () => {
+  const detail = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
+  assert.equal(TOAST_ERROR_MESSAGES.commentDelete, "댓글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.");
+  assert.match(detail, /setPendingDeleteCommentId\(null\);\r?\n\s+showToast\(TOAST_ERROR_MESSAGES\.commentDelete\);/);
+  assert.doesNotMatch(detail, /commentDeleteError/);
+});

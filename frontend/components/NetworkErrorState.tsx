@@ -1,17 +1,19 @@
 import { useEffect, type ReactNode } from "react";
 import { useIsFocused } from "@react-navigation/native";
 import { Pressable, StyleSheet, View } from "react-native";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { AppText as Text } from "./AppTypography";
-import { isNetworkError } from "../utils/networkError";
+import { isNetworkError, isServerLoadError } from "../utils/networkError";
 import { registerNetworkRetry } from "../stores/networkStatusStore";
 
 export function NetworkErrorFallback({ error, onRetry, children }: { error: unknown; onRetry: () => void; children: ReactNode }) {
   const focused = useIsFocused();
   const networkError = isNetworkError(error);
+  // 서버 조회 실패도 앱 전체 LoadError의 "다시 시도"로 이 화면을 다시 불러온다.
+  const retryable = networkError || isServerLoadError(error);
   useEffect(() => {
-    if (focused && networkError) return registerNetworkRetry(onRetry);
-  }, [focused, networkError, onRetry]);
+    if (focused && retryable) return registerNetworkRetry(onRetry);
+  }, [focused, retryable, onRetry]);
   return isNetworkError(error) ? <NetworkErrorState onRetry={onRetry} /> : <>{children}</>;
 }
 
@@ -25,6 +27,26 @@ export default function NetworkErrorState({ onRetry, retrying = false }: { onRet
       </View>
       <Text style={styles.title}>네트워크 연결이 원활하지 않아요</Text>
       <Text style={styles.description}>인터넷 연결 상태를 확인한 후 다시 시도해주세요</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="다시 시도" accessibilityState={{ disabled: retrying, busy: retrying }} disabled={retrying} onPress={onRetry} style={styles.retryButton}>
+        <Text style={styles.retryText}>다시 시도</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// 피그마 Screen/Common/LoadError(1923:64). 네트워크 오류 화면과 같은 틀에 아이콘·문구만 다르다.
+export function LoadErrorState({ onRetry, retrying = false }: { onRetry: () => void; retrying?: boolean }) {
+  return (
+    <View style={styles.container} accessibilityRole="alert">
+      <View style={styles.icon} accessible={false}>
+        <Svg width={48} height={48} viewBox="0 0 48 48">
+          <Circle cx={24} cy={24} r={20} stroke="#D64545" strokeWidth={2.5} fill="none" />
+          <Rect x={22.3} y={13} width={3.4} height={13} rx={1.7} fill="#D64545" />
+          <Circle cx={24} cy={31.8} r={1.8} fill="#D64545" />
+        </Svg>
+      </View>
+      <Text style={styles.title}>페이지를 불러오지 못했어요</Text>
+      <Text style={styles.description}>잠시 후 다시 시도해주세요</Text>
       <Pressable accessibilityRole="button" accessibilityLabel="다시 시도" accessibilityState={{ disabled: retrying, busy: retrying }} disabled={retrying} onPress={onRetry} style={styles.retryButton}>
         <Text style={styles.retryText}>다시 시도</Text>
       </Pressable>

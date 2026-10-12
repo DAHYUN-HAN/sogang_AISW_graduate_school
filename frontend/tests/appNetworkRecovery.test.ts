@@ -44,14 +44,14 @@ test("인증 API와 공통 API 모두 연결 오류를 보고하고 HTTP 오류�
   const { runInNewContext } = await import("node:vm");
   const ts = (await import("typescript")).default;
   const { AxiosError, CanceledError } = await import("axios");
-  const { isNetworkError } = await import("../utils/networkError");
+  const { isNetworkError, isServerLoadError } = await import("../utils/networkError");
   const source = ts.createSourceFile("api.ts", readFileSync("services/api.ts", "utf8"), ts.ScriptTarget.Latest, true);
   const interceptor = source.statements.find(node => ts.isForOfStatement(node) && node.getText(source).includes("markDisconnected"))!;
   assert.ok(interceptor);
   const handlers: ((error: unknown) => Promise<never>)[] = [];
   const client = () => ({ interceptors: { response: { use: (_success: unknown, reject: (error: unknown) => Promise<never>) => handlers.push(reject) } } });
   runInNewContext(ts.transpileModule(interceptor.getText(source), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, {
-    api: client(), publicApi: client(), isNetworkError, useNetworkStatusStore,
+    api: client(), publicApi: client(), isNetworkError, isServerLoadError, useNetworkStatusStore,
   });
   assert.equal(handlers.length, 2);
   for (const handler of handlers) {
@@ -59,9 +59,22 @@ test("인증 API와 공통 API 모두 연결 오류를 보고하고 HTTP 오류�
     const error = new AxiosError("offline", "ERR_NETWORK");
     await assert.rejects(handler(error), actual => actual === error);
     assert.equal(useNetworkStatusStore.getState().revision, revision + 1);
-    const httpError = new AxiosError("server response", "ERR_BAD_RESPONSE", undefined, {}, { status: 500 } as any);
+    // 2026-10-12: 조회(GET)가 500번대로 실패하면 연결 오류가 아니라 LoadError 상태로 보고한다.
+    useNetworkStatusStore.setState({ serverFailed: false });
+    const httpError = new AxiosError("server response", "ERR_BAD_RESPONSE", { method: "get" } as any, {}, { status: 500 } as any);
     await assert.rejects(handler(httpError));
+    assert.equal(useNetworkStatusStore.getState().serverFailed, true);
+    assert.equal(useNetworkStatusStore.getState().revision, revision + 2);
+    // 쓰기 실패·4xx·취소는 덮개를 띄우지 않는다(화면별 토스트·안내).
+    await assert.rejects(handler(new AxiosError("write failed", "ERR_BAD_RESPONSE", { method: "post" } as any, {}, { status: 500 } as any)));
+    await assert.rejects(handler(new AxiosError("not found", "ERR_BAD_RESPONSE", { method: "get" } as any, {}, { status: 404 } as any)));
     await assert.rejects(handler(new CanceledError()));
-    assert.equal(useNetworkStatusStore.getState().revision, revision + 1);
+    assert.equal(useNetworkStatusStore.getState().revision, revision + 2);
   }
+});
+
+test("LoadError 재시도가 성공하면 서버 조회 실패 상태도 지운다", async () => {
+  useNetworkStatusStore.getState().markServerFailed();
+  await retryNetworkReads(async () => {}, async () => {});
+  assert.equal(useNetworkStatusStore.getState().serverFailed, false);
 });

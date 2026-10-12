@@ -325,7 +325,6 @@ export default function PostDetailScreen() {
   const [showPostMenu, setShowPostMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<number | null>(null);
-  const [commentDeleteError, setCommentDeleteError] = useState<string | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
@@ -390,7 +389,6 @@ export default function PostDetailScreen() {
     if (pendingDeleteCommentId !== null) {
       if (!deleteCommentMutation.isPending) {
         setPendingDeleteCommentId(null);
-        setCommentDeleteError(null);
       }
       return;
     }
@@ -727,14 +725,12 @@ export default function PostDetailScreen() {
 
   const handleDeleteComment = (commentId: number) => {
     if (deleteCommentMutation.isPending) return;
-    setCommentDeleteError(null);
     setPendingDeleteCommentId(commentId);
   };
 
   const closeCommentDeleteConfirm = () => {
     if (deleteCommentMutation.isPending) return;
     setPendingDeleteCommentId(null);
-    setCommentDeleteError(null);
   };
 
   const confirmDeleteComment = () => {
@@ -742,10 +738,12 @@ export default function PostDetailScreen() {
     deleteCommentMutation.mutate(pendingDeleteCommentId, {
       onSuccess: () => {
         setPendingDeleteCommentId(null);
-        setCommentDeleteError(null);
         setReplyTarget(null);
       },
-      onError: () => setCommentDeleteError("댓글을 삭제할 수 없습니다. 잠시 후 다시 시도해주세요."),
+      onError: () => {
+        setPendingDeleteCommentId(null);
+        showToast(TOAST_ERROR_MESSAGES.commentDelete);
+      },
     });
   };
 
@@ -1611,11 +1609,6 @@ export default function PostDetailScreen() {
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.confirmCard}>
             <Text style={styles.confirmTitle}>{COMMENT_DELETE_COPY.title}</Text>
             <Text style={styles.confirmBody}>{COMMENT_DELETE_COPY.body}</Text>
-            {commentDeleteError ? (
-              <Text accessibilityRole="alert" style={styles.confirmErrorText}>
-                {commentDeleteError}
-              </Text>
-            ) : null}
             <View style={styles.confirmActions}>
               <Pressable disabled={deleteCommentMutation.isPending} onPress={closeCommentDeleteConfirm} style={styles.confirmCancelButton}>
                 <Text style={styles.confirmCancelText}>취소</Text>
@@ -1935,14 +1928,6 @@ const styles = StyleSheet.create({
   },
   sheetMenuItemLast: {
     borderBottomWidth: 0,
-  },
-  confirmErrorText: {
-    color: COLORS.danger,
-    fontSize: 13,
-    fontWeight: "500",
-    lineHeight: 19,
-    marginTop: 12,
-    textAlign: "center",
   },
   confirmActions: {
     flexDirection: "row",
