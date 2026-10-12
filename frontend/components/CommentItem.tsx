@@ -177,7 +177,7 @@ export default function CommentItem({
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16, marginTop: 4, paddingVertical: 8 }}>
           {actionState.showReply && onReply ? (
             <Pressable onPress={() => onReply(comment)}>
-              <Text style={{ color: "#2761FF", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>답글</Text>
+              <Text style={{ color: "#2761FF", fontSize: 13, fontWeight: "500", lineHeight: 16 }}>댓글</Text>
             </Pressable>
           ) : null}
 

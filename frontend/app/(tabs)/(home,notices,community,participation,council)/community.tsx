@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
 import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
@@ -5,6 +6,7 @@ import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import BoardPostsScreen from "./board/[boardId]";
 import LoadingState from "../../../components/LoadingState";
 import { useBoardsQuery } from "../../../hooks/useApi";
+import { useIsStackRoot } from "../../../hooks/useIsStackRoot";
 import { useTabRootResetStore } from "../../../stores/tabRootResetStore";
 
 const COLORS = {
@@ -22,6 +24,7 @@ export default function CommunityScreen() {
 
 function CommunityContent() {
   const { data, isLoading, isError, error, refetch } = useBoardsQuery();
+  const isStackRoot = useIsStackRoot();
   const boards = data?.data.flatMap((group) => group.boards) ?? [];
   const initialBoard =
     boards.find((board) => board.slug === "event-album") ??
@@ -48,7 +51,7 @@ function CommunityContent() {
     );
   }
 
-  return <BoardPostsScreen initialBoardId={initialBoard.id} isTabRoot />;
+  return <BoardPostsScreen initialBoardId={initialBoard.id} isTabRoot onBack={isStackRoot ? undefined : () => router.back()} />;
 }
 
 const styles = StyleSheet.create({

@@ -28,8 +28,8 @@ const styles = StyleSheet.create({
   plainRow: {minHeight: 60, borderWidth: 0, borderRadius: 0, paddingHorizontal: 0, paddingVertical: 10, marginBottom: 0},
   plainBadge: {width: 36, height: 36, borderRadius: 18, backgroundColor: "#F0F2F4", marginRight: 10},
   plainBadgeText: {fontSize: 11, color: "#59616C"}, plainName: {fontSize: 14},
-  pollRow: {minHeight: 68, paddingHorizontal: 12, paddingVertical: 10, marginBottom: 0, borderColor: "#E8EBF0"},
-  pollAvatar: {width: 40, height: 40, borderRadius: 20, marginRight: 10},
-  pollName: {fontSize: 13, lineHeight: 20, fontWeight: "400"},
-  pollCaption: {fontSize: 11, lineHeight: 16, color: "#7B8291"},
+  pollRow: {minHeight: 72, padding: 14, marginBottom: 0, borderWidth: 0.5, borderColor: "#E1E4E9"},
+  pollAvatar: {width: 44, height: 44, borderRadius: 22, marginRight: 12, backgroundColor: "transparent"},
+  pollName: {color: "#212429", fontSize: 14, lineHeight: 17, fontWeight: "500"},
+  pollCaption: {fontSize: 12, lineHeight: 15, color: "#6B7280"},
 });

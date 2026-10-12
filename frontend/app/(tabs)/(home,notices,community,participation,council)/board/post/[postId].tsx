@@ -12,14 +12,16 @@ import NoticePollCard from "../../../../../components/NoticePollCard";
 import { noticeBodyBlocks } from "../../../../../utils/noticeBody";
 import ActivityCertificationMediaImage from "../../../../../components/ActivityCertificationMediaImage";
 import LoadingState from "../../../../../components/LoadingState";
+import Toast from "../../../../../components/Toast";
 import ImageViewerModal from "../../../../../components/ImageViewerModal";
 import MediaImage, { MediaImageBackground } from "../../../../../components/MediaImage";
 import PhotoPager from "../../../../../components/PhotoPager";
 import NaturalAspectMediaImage from "../../../../../components/NaturalAspectMediaImage";
-import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../../components/icons";
+import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, EmptyCalendarIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../../components/icons";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { useBoardTabHighlight } from "../../../../../hooks/useBoardTabHighlight";
 import { useSwipeBackInScreen } from "../../../../../hooks/useSwipeBackInScreen";
+import { useToast } from "../../../../../hooks/useToast";
 import { resolveMediaAccessUrl, useMediaAccessUrl } from "../../../../../hooks/useMediaAccessUrl";
 import type { MediaReference } from "../../../../../utils/mediaAccess";
 import {
@@ -41,6 +43,7 @@ import {
   navigateFromPostDetail,
   postEditRouteForPostDetail,
 } from "../../../../../utils/appRoutes";
+import { apiErrorCode, apiErrorData } from "../../../../../utils/authValidation";
 import { navigateToRoute, replaceWithRoute } from "../../../../../utils/tabNavigation";
 import { commentKeyAction, commentSubmissionValue } from "../../../../../utils/commentKeyboard";
 import { formatBoardDate } from "../../../../../utils/dateFormat";
@@ -57,6 +60,7 @@ import { activityCertificationDetailHeading } from "../../../../../utils/activit
 import { activityImageLayoutFromMetadata, resolveActivityImageRule } from "../../../../../utils/activityImageLayout";
 import { createPhotoSwipeConfig } from "../../../../../utils/photoCarouselSwipe";
 import { COMMENT_DELETE_COPY } from "../../../../../utils/commentPresentation";
+import { TOAST_ERROR_MESSAGES, TOAST_INFO_MESSAGES, TOAST_SUCCESS_MESSAGES } from "../../../../../utils/toast";
 import {
   noticeAttachmentFrameAspectRatio,
   postDetailImagePresentation,
@@ -159,6 +163,30 @@ function isAdminParticipationGuideBoard(board?: { slug?: string } | null) {
   return board?.slug === "club-promo" || board?.slug === "networking-programs";
 }
 
+// 글 화면 위 제목. 지워진 글도 서버가 알려 준 게시판으로 살아 있던 글과 같은 제목을 쓴다.
+function postDetailTitle(
+  board: { board_type?: string; slug?: string; name?: string } | undefined,
+  post?: { title: string; isCouncilActivityEntry: boolean },
+) {
+  return board?.board_type === "album" && post
+    ? post.title
+    : isAdminParticipationGuideBoard(board)
+      ? board?.slug === "networking-programs" ? "네트워킹" : "동아리"
+      : post?.isCouncilActivityEntry
+        ? "원우회 활동내역"
+      : board?.board_type === "mutual_aid"
+        ? "상조회 신청 상세"
+      : board?.board_type === "activity_certification"
+        ? "활동 인증"
+        : board?.slug === "lecture-reviews"
+          ? "강의후기"
+          : board?.slug === "exam-archive"
+            ? "시험족보"
+        : board?.board_type === "notice"
+          ? "공지사항"
+          : board?.name ?? "게시글";
+}
+
 function firstUrlFromText(value: string) {
   return value.match(/https?:\/\/[^\s)]+/)?.[0];
 }
@@ -247,6 +275,7 @@ export default function PostDetailScreen() {
   const adminPathname = usePathname();
   const Alert = adminPathname.startsWith("/admin/") ? adminAlert : NativeAlert;
   const adminWorkspace = adminPathname.startsWith("/admin/");
+  const { toast, showToast, hideToast } = useToast();
   const router = useMemo(() => adminPostRouter(expoRouter, adminWorkspace), [adminWorkspace]);
   const params = useLocalSearchParams<{ postId: string; fromBoardId?: string; returnTo?: string }>();
   const insets = useSafeAreaInsets();
@@ -261,6 +290,9 @@ export default function PostDetailScreen() {
   const post = postRes?.data;
   const boards = boardsRes?.data.flatMap((group) => group.boards) ?? [];
   const board = boards.find((item) => item.id === post?.board_id);
+  // 피그마 Screen/Notice/Detail-Deleted: 지워진 글은 서버가 게시판을 알려 준다.
+  const deletedBoardId = apiErrorCode(error) === "POST_DELETED" ? apiErrorData(error)?.board_id : undefined;
+  const deletedBoard = deletedBoardId === undefined ? undefined : boards.find((item) => item.id === deletedBoardId);
   useBoardTabHighlight(board);
   const isMutualAidRequest = board?.board_type === "mutual_aid";
   const isSuggestionRequest = board?.board_type === "suggestion";
@@ -293,7 +325,6 @@ export default function PostDetailScreen() {
   const [showPostMenu, setShowPostMenu] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState<number | null>(null);
-  const [commentDeleteError, setCommentDeleteError] = useState<string | null>(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
 
@@ -358,7 +389,6 @@ export default function PostDetailScreen() {
     if (pendingDeleteCommentId !== null) {
       if (!deleteCommentMutation.isPending) {
         setPendingDeleteCommentId(null);
-        setCommentDeleteError(null);
       }
       return;
     }
@@ -402,7 +432,7 @@ export default function PostDetailScreen() {
     <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
       <View style={styles.appBarRow}>
         <BackButton onPress={handlePostBack} />
-        <Text numberOfLines={1} style={styles.appBarTitle}>{board?.name ?? "게시글"}</Text>
+        <Text numberOfLines={1} style={styles.appBarTitle}>{deletedBoardId === undefined ? board?.name ?? "게시글" : postDetailTitle(deletedBoard)}</Text>
         <View style={styles.iconButton} />
       </View>
     </View>
@@ -410,6 +440,18 @@ export default function PostDetailScreen() {
 
   if (isLoading) {
     return <View style={styles.screen}>{navigationHeader}<LoadingState /></View>;
+  }
+
+  if (isError && deletedBoardId !== undefined) {
+    return (
+      <View style={styles.screen}>
+        {navigationHeader}
+        <View style={styles.deletedState}>
+          <EmptyCalendarIcon size={32} />
+          <Text style={styles.deletedTitle}>삭제된 게시물이에요</Text>
+        </View>
+      </View>
+    );
   }
 
   if (isError || !post) {
@@ -579,24 +621,7 @@ export default function PostDetailScreen() {
       : post.attachments.filter(attachment => !inlineNoticeImageIds.has(attachment.id));
   // 상조회 증빙 파일은 원본을 펼치지 않고 96×96 플레이스홀더 타일로만 보여 준다(Figma MutualAidDetail-V2).
   const hasMutualAidEvidenceFiles = isMutualAidRequest && visibleAttachments.length > 0;
-  const appBarTitle =
-    board?.board_type === "album"
-      ? post.title
-      : isAdminParticipationGuide
-        ? board?.slug === "networking-programs" ? "네트워킹" : "동아리"
-        : isCouncilActivityEntry
-          ? "원우회 활동내역"
-        : isMutualAidRequest
-          ? "상조회 신청 상세"
-        : board?.board_type === "activity_certification"
-          ? "활동 인증"
-          : board?.slug === "lecture-reviews"
-            ? "강의후기"
-            : board?.slug === "exam-archive"
-              ? "시험족보"
-          : board?.board_type === "notice"
-            ? "공지사항"
-            : board?.name ?? "게시글";
+  const appBarTitle = postDetailTitle(board, { title: post.title, isCouncilActivityEntry });
 
   const requireLogin = () => {
     if (!userId) {
@@ -637,9 +662,10 @@ export default function PostDetailScreen() {
       setReportedTargets((current) => ({ ...current, [`${reportTarget.type}:${reportTarget.id}`]: true }));
       setReportTarget(null);
       setReportDetail("");
-      Alert.alert(response.data.duplicate ? "이미 신고됨" : "신고 접수 완료", "검토 후 조치하겠습니다.");
+      if (response.data.duplicate) showToast(TOAST_INFO_MESSAGES.alreadyReported, "info");
+      else showToast(TOAST_SUCCESS_MESSAGES.reportSubmitted, "success");
     } catch {
-      Alert.alert("신고 실패", "신고 내용을 확인하거나 잠시 후 다시 시도하세요.");
+      showToast(TOAST_ERROR_MESSAGES.report);
     } finally {
       setIsReporting(false);
     }
@@ -652,7 +678,7 @@ export default function PostDetailScreen() {
       setIsLiked(response.data.is_liked);
       setLikeCount(response.data.like_count);
     } catch {
-      Alert.alert("좋아요 실패", "좋아요 상태를 변경할 수 없습니다.");
+      showToast(TOAST_ERROR_MESSAGES.like);
     }
   };
 
@@ -662,7 +688,7 @@ export default function PostDetailScreen() {
       const response = await bookmarkMutation.mutateAsync();
       setIsBookmarked(response.data.is_bookmarked);
     } catch {
-      Alert.alert("북마크 실패", "북마크 상태를 변경할 수 없습니다.");
+      showToast(TOAST_ERROR_MESSAGES.bookmark);
     }
   };
 
@@ -671,7 +697,7 @@ export default function PostDetailScreen() {
       Linking.openURL(applicationUrl);
       return;
     }
-    Alert.alert(applicationButtonLabel, "관리자가 참여 링크를 준비 중입니다.");
+    showToast(TOAST_INFO_MESSAGES.applicationLinkMissing, "info");
   };
 
   const handleDeletePost = () => {
@@ -693,20 +719,18 @@ export default function PostDetailScreen() {
           replace: replaceWithRoute,
         });
       },
-      onError: () => Alert.alert("삭제 실패", "게시글을 삭제할 수 없습니다."),
+      onError: () => showToast(TOAST_ERROR_MESSAGES.postDelete),
     });
   };
 
   const handleDeleteComment = (commentId: number) => {
     if (deleteCommentMutation.isPending) return;
-    setCommentDeleteError(null);
     setPendingDeleteCommentId(commentId);
   };
 
   const closeCommentDeleteConfirm = () => {
     if (deleteCommentMutation.isPending) return;
     setPendingDeleteCommentId(null);
-    setCommentDeleteError(null);
   };
 
   const confirmDeleteComment = () => {
@@ -714,10 +738,12 @@ export default function PostDetailScreen() {
     deleteCommentMutation.mutate(pendingDeleteCommentId, {
       onSuccess: () => {
         setPendingDeleteCommentId(null);
-        setCommentDeleteError(null);
         setReplyTarget(null);
       },
-      onError: () => setCommentDeleteError("댓글을 삭제할 수 없습니다. 잠시 후 다시 시도해주세요."),
+      onError: () => {
+        setPendingDeleteCommentId(null);
+        showToast(TOAST_ERROR_MESSAGES.commentDelete);
+      },
     });
   };
 
@@ -739,7 +765,7 @@ export default function PostDetailScreen() {
           setReplyTarget(null);
           Keyboard.dismiss();
         },
-        onError: () => Alert.alert("댓글 등록 실패", "댓글을 저장할 수 없습니다."),
+        onError: () => showToast(TOAST_ERROR_MESSAGES.commentCreate),
         onSettled: () => {
           commentSubmitLockRef.current = false;
         },
@@ -1133,7 +1159,7 @@ export default function PostDetailScreen() {
                         });
                       }
                     } catch {
-                      Alert.alert("파일 열기 실패", "첨부 파일에 접근할 수 없습니다.");
+                      showToast(TOAST_INFO_MESSAGES.attachmentOpenFailed, "info");
                     }
                   }}
                   style={styles.mutualAidEvidenceTile}
@@ -1179,7 +1205,7 @@ export default function PostDetailScreen() {
                         });
                       }
                     } catch {
-                      Alert.alert("파일 열기 실패", "첨부 파일에 접근할 수 없습니다.");
+                      showToast(TOAST_INFO_MESSAGES.attachmentOpenFailed, "info");
                     }
                   }}
                   style={isImage ? styles.imageAttachment : styles.fileAttachment}
@@ -1386,7 +1412,7 @@ export default function PostDetailScreen() {
                   try {
                     await updateCommentMutation.mutateAsync({ commentId, content });
                   } catch (error) {
-                    Alert.alert("댓글 수정 실패", "댓글을 수정할 수 없습니다.");
+                    showToast(TOAST_ERROR_MESSAGES.commentEdit);
                     throw error;
                   }
                 }}
@@ -1414,7 +1440,7 @@ export default function PostDetailScreen() {
           {replyComposer.noticeText ? (
             <View style={styles.replyNotice}>
               <Text style={styles.replyNoticeText}>{replyComposer.noticeText}</Text>
-              <Pressable accessibilityLabel="답글 대상 취소" onPress={() => setReplyTarget(null)}>
+              <Pressable accessibilityLabel="댓글 대상 취소" onPress={() => setReplyTarget(null)}>
                 <Text style={styles.replyCancelText}>취소</Text>
               </Pressable>
             </View>
@@ -1583,11 +1609,6 @@ export default function PostDetailScreen() {
           <Pressable onPress={(event) => event.stopPropagation()} style={styles.confirmCard}>
             <Text style={styles.confirmTitle}>{COMMENT_DELETE_COPY.title}</Text>
             <Text style={styles.confirmBody}>{COMMENT_DELETE_COPY.body}</Text>
-            {commentDeleteError ? (
-              <Text accessibilityRole="alert" style={styles.confirmErrorText}>
-                {commentDeleteError}
-              </Text>
-            ) : null}
             <View style={styles.confirmActions}>
               <Pressable disabled={deleteCommentMutation.isPending} onPress={closeCommentDeleteConfirm} style={styles.confirmCancelButton}>
                 <Text style={styles.confirmCancelText}>취소</Text>
@@ -1603,6 +1624,7 @@ export default function PostDetailScreen() {
           </Pressable>
         </Pressable>
       ) : null}
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }
@@ -1618,6 +1640,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 12,
     backgroundColor: COLORS.page,
+  },
+  deletedState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 24,
+    backgroundColor: COLORS.page,
+  },
+  deletedTitle: {
+    color: "#2C3038",
+    fontSize: 18,
+    fontWeight: "500",
+    lineHeight: 26,
   },
   loadErrorText: {
     color: COLORS.muted,
@@ -1892,14 +1928,6 @@ const styles = StyleSheet.create({
   },
   sheetMenuItemLast: {
     borderBottomWidth: 0,
-  },
-  confirmErrorText: {
-    color: COLORS.danger,
-    fontSize: 13,
-    fontWeight: "500",
-    lineHeight: 19,
-    marginTop: 12,
-    textAlign: "center",
   },
   confirmActions: {
     flexDirection: "row",

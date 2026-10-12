@@ -34,7 +34,6 @@ import {
   ACTIVITY_PARTICIPANT_GUIDANCE,
   activityBankAccountFieldState,
   activityParticipantSearchKey,
-  activityParticipantSelectionError,
   activityParticipantTextColor,
   activityParticipantsFromMetadata,
   withParticipantDuesState,
@@ -55,13 +54,12 @@ import { formatBoardDate } from "../../../../../utils/dateFormat";
 import {
   calendarMonthFromDotDate,
   formatDotDate,
-  isActivityCertificationDateAllowed,
   isCalendarDateWithinBounds,
   isCalendarMonthAfterMaximum,
   maximumActivityCertificationDate,
   minimumMutualAidEventDate,
 } from "../../../../../utils/dateSelection";
-import { TOAST_MESSAGES, nextToastState, type ToastState } from "../../../../../utils/toast";
+import { TOAST_INFO_MESSAGES, TOAST_MESSAGES, nextToastState, type ToastState, type ToastVariant } from "../../../../../utils/toast";
 import { uploadFailureFeedback } from "../../../../../utils/uploadFeedback";
 import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../../utils/mediaPicker";
 import {
@@ -229,7 +227,7 @@ const EVIDENCE_MODES = [
 
 function activitySelectPlaceholder(slug?: string) {
   if (slug?.includes("study")) return "모집글을 선택하세요";
-  if (slug?.includes("networking")) return "네트워킹을 선택하세요";
+  if (slug?.includes("networking")) return "네트워킹명을 선택하세요"; // Figma Activity/Verify-Network
   return "동아리명을 선택하세요";
 }
 
@@ -345,7 +343,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [toast, setToast] = useState<ToastState>(null);
   // 첨부·증빙은 react-hook-form 밖에 있어서 테두리 표시를 따로 들고 있는다.
   const [missingRequiredAttachment, setMissingRequiredAttachment] = useState(false);
-  const showToast = useCallback((message: string) => setToast((current) => nextToastState(current, message)), []);
+  const showToast = useCallback(
+    (message: string, variant?: ToastVariant) => setToast((current) => nextToastState(current, message, variant)),
+    [],
+  );
   const hideToast = useCallback(() => setToast(null), []);
   const [discardPromptOpen, setDiscardPromptOpen] = useState(false);
   // 확인창을 띄우는 동안 고른 게시판을 들고 있는다. 확인 전에는 바꾸지 않는다.
@@ -708,19 +709,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       showToast(TOAST_MESSAGES.requiredFieldError);
       return;
     }
-    if (isActivity) {
-      if (!isActivityCertificationDateAllowed(values.activityDate)) {
-        const message = "오늘 이후 날짜는 선택할 수 없어요.";
-        setError("activityDate", { message: "" });
-        showToast(message);
-        return;
-      }
-      const participantError = activityParticipantSelectionError(selectedParticipants, existingPost?.metadata);
-      if (participantError) {
-        showToast(participantError);
-        return;
-      }
-    }
     if (isMutualAid && evidenceMode === "link" && !isValidEvidenceLink(evidenceLink)) {
       showToast(TOAST_MESSAGES.linkFormatError);
       return;
@@ -795,7 +783,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
   const pickPostImages = () => {
     if (isAlbumImageLimitReached) {
-      showToast("게시글당 최대 20장까지 등록할 수 있어요");
+      showToast(TOAST_INFO_MESSAGES.albumPhotoLimit, "info");
       return Promise.resolve([]);
     }
     return pickAndUploadImages(
@@ -896,7 +884,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     { key: "marriage", label: "결혼" },
     { key: "bereavement", label: "상(喪)" },
   ];
-  const mutualAidRelationOptions: SelectionOption[] = ["본인", "배우자", "부모", "자녀", "형제/자매"].map((label) => ({ key: label, label }));
+  const mutualAidRelationOptions: SelectionOption[] = ["본인", "배우자", "부모", "자녀"].map((label) => ({ key: label, label }));
   const imageAttachments = attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
   const nonImageAttachments = attachments.filter((attachment) => !attachment.content_type.startsWith("image/"));
 
@@ -2025,7 +2013,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         visible={selectionSheet === "board"}
         title={BOARD_SELECT_PLACEHOLDER}
         options={selectableBoards.map((item) => ({ key: String(item.id), label: item.name }))}
-        emptyText={isBoardsLoading ? "게시판을 불러오는 중입니다." : "선택할 수 있는 게시판이 없습니다."}
+        emptyText="선택할 수 있는 게시판이 없어요"
+        loading={isBoardsLoading}
         selectedKey={board ? String(board.id) : undefined}
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => selectBoard(Number(option.key))}
@@ -2034,7 +2023,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         visible={selectionSheet === "activity"}
         title={activitySelectPlaceholder(board?.slug)}
         options={activityOptions}
-        emptyText={activitySourceQuery.isLoading ? "활동 대상을 불러오는 중입니다." : "선택할 수 있는 활동이 없습니다."}
+        emptyText="선택할 수 있는 활동이 없어요"
+        loading={activitySourceQuery.isLoading}
         selectedKey={activitySourcePostId ? String(activitySourcePostId) : undefined}
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => {

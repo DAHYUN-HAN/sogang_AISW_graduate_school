@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { AppText as Text, AppTextInput as TextInput } from "../AppTypography";
 import MediaImage from "../MediaImage";
+import AdminBannerSchedule from "./AdminBannerSchedule";
 import type { NoticePollDraft } from "../../types";
 import { blankPoll, blankPollQuestion, noticePollDraft } from "../../utils/noticePoll";
 import { pollApi } from "../../services/api";
@@ -73,7 +74,7 @@ export default function AdminNoticePollEditor({value, onChange, disabled, postId
   const canRemove = !value.questions.some(q => q.locked || q.is_closed);
   return <View style={styles.container}>
     <View style={styles.header}><View style={{gap: 5}}><Text style={styles.heading}>참석 투표</Text>
-      <Text style={styles.muted}>투표 {value.questions.length}/20개 · 항목 2개 · 하나만 선택 · 관리자 직접 종료</Text></View>
+      <Text style={styles.muted}>투표 {value.questions.length}/20개 · 항목 2개 · 하나만 선택 · 마감 시각 또는 관리자 종료</Text></View>
       {canRemove ? <Button label="투표 모두 삭제" disabled={blocked} onPress={() => onChange(null)} /> : null}
     </View>
     <Text style={styles.guidance}>첫 응답이 등록되면 해당 투표의 제목·항목을 수정하거나 삭제할 수 없습니다. 등록 전에 질문과 항목을 확인해 주세요.</Text>
@@ -103,10 +104,13 @@ export default function AdminNoticePollEditor({value, onChange, disabled, postId
             style={[styles.input, {flex: 1}, locked && styles.readonly]} />
           {option.media_id ? <MediaImage media={{id: option.media_id}} style={styles.image} resizeMode="cover" /> : null}
         </View>)}
+        {!question.legacy ? <AdminBannerSchedule label="마감 시각" value={question.ends_at ?? ""} fallbackTime="18:00"
+          disabled={blocked || Boolean(question.is_closed)} onChange={ends_at => updateQuestion(qi, {ends_at})} /> : null}
         {question.legacy ? <Text style={styles.muted}>기존 형식의 투표는 결과와 참여 기록을 유지합니다. 새 참석 투표를 추가해 주세요.</Text>
           : question.is_closed ? <Text style={styles.muted}>종료한 투표의 결과와 참여 기록은 계속 확인할 수 있습니다.</Text>
           : question.locked ? <Text style={styles.muted}>참여 기록이 있어 제목과 항목을 유지합니다. 다른 투표는 계속 추가할 수 있습니다.</Text>
           : <Text style={styles.muted}>YES / NO의 이름을 변경할 수 있습니다. 참여자는 종료 전까지 선택을 바꿀 수 있습니다.</Text>}
+        {!question.legacy && !question.is_closed ? <Text style={styles.muted}>마감 시각이 지나면 자동으로 종료됩니다. 비워 두면 ‘투표 종료’를 눌러야 종료되며, 참여 기록이 있어도 마감 시각은 바꿀 수 있습니다.</Text> : null}
       </View>;
     })}
     <Button label="투표 추가" primary disabled={blocked || value.questions.length >= 20}

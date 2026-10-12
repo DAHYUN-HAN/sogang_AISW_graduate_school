@@ -33,7 +33,6 @@ const COLORS = {
   successText: "#3B6D11", // Figma 재전송 완료 안내
   success: "#2E9E5B", // success/500 (complete icon)
   bg: "#FFFFFF",
-  errorBg: "#FFF5F5",
   disabled: "#D1D5DB",
 };
 
@@ -239,7 +238,6 @@ export default function PasswordResetScreen() {
   const verificationExpired = mode === "code" && verificationHasExpired(countdown, verificationFailureState);
   const verificationAttemptsLocked = verificationFailureState === "attempts";
   const codeError = errors.code ?? (verificationExpired ? "인증 시간이 만료되었어요. 재전송을 눌러주세요." : undefined);
-  const codeErrorHasBackground = Boolean(codeError) && verificationFailureState !== "expired" && !verificationExpired;
   const resendControl = passwordResetResendControl({
     verificationExpired,
     verificationAttemptsLocked,
@@ -298,6 +296,7 @@ export default function PasswordResetScreen() {
                     setRateLimited(false);
                   }}
                   hasError={Boolean(errors.email)}
+                  height={48} // Figma FindPassword: 이메일 칸 48
                 />
                 <FieldError message={errors.email} />
               </View>
@@ -335,7 +334,6 @@ export default function PasswordResetScreen() {
                     styles.input,
                     styles.codeInput,
                     codeError ? styles.inputError : null,
-                    codeErrorHasBackground ? styles.inputErrorBackground : null,
                   ]}
                   value={code}
                 />
@@ -370,7 +368,7 @@ export default function PasswordResetScreen() {
                     onPress={() => void requestCode(true)}
                     style={styles.resendControlTrailing}
                   >
-                    <Text style={[styles.resendLink, resendControl.disabled ? styles.resendLinkDisabled : null]}>{resendControl.label}</Text>
+                    <Text style={[styles.resendLink, codeResent && resendControl.disabled ? styles.resendLinkDisabled : null]}>{resendControl.label}</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -415,7 +413,7 @@ export default function PasswordResetScreen() {
                   placeholder="새 비밀번호"
                   placeholderTextColor={COLORS.subtle}
                   secureTextEntry
-                  style={[styles.input, displayedPasswordError ? styles.inputErrorBackground : null]}
+                  style={[styles.input, displayedPasswordError ? styles.inputErrorBorder : null]}
                   value={newPassword}
                 />
                 {displayedPasswordError ? (
@@ -434,7 +432,7 @@ export default function PasswordResetScreen() {
                   placeholder="새 비밀번호 확인"
                   placeholderTextColor={COLORS.subtle}
                   secureTextEntry
-                  style={[styles.input, displayedPasswordConfirmError ? styles.inputErrorBackground : null]}
+                  style={[styles.input, displayedPasswordConfirmError ? styles.inputErrorBorder : null]}
                   value={newPasswordConfirm}
                 />
                 <FieldError message={displayedPasswordConfirmError} />
@@ -492,18 +490,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   inputError: { borderWidth: 1, borderColor: COLORS.danger }, // Figma 만료 상태: 1px #D64545
-  inputErrorBackground: { borderColor: COLORS.danger, backgroundColor: COLORS.errorBg },
+  // 피그마 FindPassword 오류 화면: 오류 칸은 배경 없이 빨간 테두리만 둔다.
+  inputErrorBorder: { borderColor: COLORS.danger },
   messageRow: { flexDirection: "row", alignItems: "center", gap: 6 }, // Figma 에러행: gap 6
   successRow: { flexDirection: "row", alignItems: "center", gap: 4 }, // Figma 재전송 안내: gap 4
   successText: { flexShrink: 1, color: COLORS.successText, fontSize: 12, fontWeight: "400", lineHeight: 14 }, // Figma: 12/14 #3B6D11
   errorText: { flexShrink: 1, color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 14 }, // Figma 에러행: 12/14 error/500
   codeGroup: { width: "100%", gap: 8 }, // Figma 코드영역: 입력 + 타이머행 gap 8
-  codeInput: { minHeight: 44, borderWidth: 0.5, paddingHorizontal: 14, paddingVertical: 12, lineHeight: 17 }, // Figma 코드입력: 44h, padding 12/14
+  codeInput: { minHeight: 48, borderWidth: 0.5, paddingHorizontal: 14, paddingVertical: 12, lineHeight: 17 }, // Figma 코드입력: 48h(Sent·Resent·Expired·Failed), padding 12/14
   statusRow: { flexDirection: "row", alignItems: "center", width: "100%", gap: 8, minHeight: 16 },
   statusLeft: { flexShrink: 1, minWidth: 0 },
   resendControlTrailing: { marginLeft: "auto" },
   resendLink: { color: COLORS.primary, fontSize: 13, fontWeight: "400", lineHeight: 16 }, // Figma 타이머행: Regular 13/16
-  resendLinkDisabled: { color: "#999EA8" }, // Figma: 카운트다운 중에는 회색
+  resendLinkDisabled: { color: "#999EA8" }, // Figma FindPassword-Resent: 재전송 뒤 카운트다운은 회색 (처음 발송은 파랑, FindPassword-Sent)
   passwordHelper: { color: COLORS.subtle, fontSize: 12, fontWeight: "400", lineHeight: 18 }, // Figma: Regular 12
   primaryButton: {
     height: 48,

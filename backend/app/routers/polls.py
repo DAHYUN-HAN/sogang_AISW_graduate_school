@@ -8,7 +8,7 @@ from app.audit import log_admin_action
 from app.deps import get_current_user, get_db, require_admin
 from app.models.poll import PollBallot, PollOption, PollQuestion, PollSelection
 from app.models.user import User
-from app.polls import fail, readable_poll, serialize_poll, submit_vote, questions_and_options
+from app.polls import closed, fail, readable_poll, serialize_poll, submit_vote, questions_and_options
 from app.response import success_response
 from app.schemas.poll import PollVote
 from app.security import utc_now
@@ -38,7 +38,8 @@ def close(post_id: int, question_id: int | None = Query(None, ge=1), db: Session
         fail("NOT_FOUND", "이 공지의 투표를 찾을 수 없습니다.", 404)
     changed = False
     for question in targets:
-        if question.closed_at is None:
+        # A card already past its deadline keeps that moment as its close time.
+        if not closed(question):
             question.closed_at = utc_now()
             changed = True
     if changed:

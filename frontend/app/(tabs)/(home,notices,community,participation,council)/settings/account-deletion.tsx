@@ -12,7 +12,7 @@ import { accountDeletionErrorMessage } from "../../../../utils/accountDeletion";
 import { apiErrorCode, apiErrorStatus } from "../../../../utils/authValidation";
 import { clearStoredPushToken } from "../../../../utils/pushTokenStorage";
 
-import { AlertCircleIcon, BackIcon, NoticeAlertIcon } from "../../../../components/icons";
+import { AlertCircleIcon, BackIcon, FieldErrorIcon, NoticeAlertIcon } from "../../../../components/icons";
 const COLORS = {
   primary: "#2761FF",
   text: "#15171C",
@@ -44,7 +44,7 @@ export default function AccountDeletionScreen() {
     setRequestError(null);
 
     if (!currentPassword) {
-      setPasswordError("현재 비밀번호를 입력해주세요.");
+      setPasswordError("비밀번호를 입력해주세요.");
       return;
     }
     if (!acknowledged) {
@@ -69,7 +69,7 @@ export default function AccountDeletionScreen() {
       const status = apiErrorStatus(error);
       const code = apiErrorCode(error);
       if (status === 403 || code === "FORBIDDEN") {
-        setPasswordError("현재 비밀번호가 일치하지 않습니다.");
+        setPasswordError("비밀번호가 일치하지 않아요.");
       } else {
         setRequestError(accountDeletionErrorMessage(status ?? (code ? undefined : 0), code));
       }
@@ -182,44 +182,55 @@ export default function AccountDeletionScreen() {
       <Modal transparent animationType="fade" visible={passwordModalVisible} onRequestClose={() => setPasswordModalVisible(false)}>
         <KeyboardViewport>
           <Pressable onPress={() => setPasswordModalVisible(false)} style={styles.modalBackdrop}>
+            {/* Figma: Screen/MyPage/AccountDelete-PasswordModal, -Error */}
             <Pressable onPress={(event) => event.stopPropagation()} style={styles.modalCard}>
-              <Text style={styles.modalTitle}>현재 비밀번호 확인</Text>
+              <Text accessibilityRole="header" style={styles.modalTitle}>비밀번호 확인</Text>
+              <Text style={styles.modalBody}>본인 확인을 위해 비밀번호를 입력해주세요.</Text>
               <TextInput
-                accessibilityLabel="현재 비밀번호"
+                accessibilityLabel="비밀번호"
                 autoCapitalize="none"
                 autoComplete="current-password"
                 autoFocus
                 onChangeText={(value) => {
                   setCurrentPassword(value);
                   setPasswordError(null);
+                  setRequestError(null);
                 }}
                 onSubmitEditing={() => {
-                  if (currentPassword && !isSubmitting) void deleteAccount();
+                  if (!isSubmitting) void deleteAccount();
                 }}
-                placeholder="현재 비밀번호를 입력하세요"
+                placeholder="비밀번호 입력"
                 placeholderTextColor={COLORS.subtle}
                 secureTextEntry
                 style={[styles.input, passwordError ? styles.inputError : null]}
                 value={currentPassword}
               />
-              {passwordError ? (
-                <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorText}>
-                  {passwordError}
-                </Text>
+              {passwordError || requestError ? (
+                <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.modalErrorRow}>
+                  <FieldErrorIcon size={14} color={COLORS.danger} />
+                  <Text style={styles.errorText}>{passwordError ?? requestError}</Text>
+                </View>
               ) : null}
               <View style={styles.modalActions}>
-                <Pressable onPress={() => setPasswordModalVisible(false)} style={styles.modalCancelButton}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setPasswordModalVisible(false)}
+                  style={styles.modalCancelButton}
+                >
                   <Text style={styles.modalCancelText}>취소</Text>
                 </Pressable>
                 <Pressable
-                  disabled={!currentPassword || isSubmitting}
+                  accessibilityLabel="탈퇴하기"
+                  accessibilityRole="button"
+                  accessibilityState={{ busy: isSubmitting, disabled: isSubmitting }}
+                  disabled={isSubmitting}
                   onPress={() => void deleteAccount()}
-                  style={[styles.modalDeleteButton, !currentPassword || isSubmitting ? styles.deleteButtonDisabled : null]}
+                  style={styles.modalDeleteButton}
                 >
                   {isSubmitting ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={[styles.deleteButtonText, !currentPassword ? styles.deleteButtonTextDisabled : null]}>탈퇴하기</Text>
+                    <Text style={styles.modalDeleteText}>탈퇴하기</Text>
                   )}
                 </Pressable>
               </View>
@@ -269,18 +280,21 @@ const styles = StyleSheet.create({
   noticeBannerTextAmber: { color: "#854F0B" },
   fieldGroup: { gap: 8 },
   label: { color: COLORS.text, fontSize: 13, fontWeight: "500", lineHeight: 16 },
+  // Figma PasswordModal 입력칸: 48h, 테두리 1px, 좌우 16, 14/22
   input: {
-    minHeight: 41,
+    height: 48,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: 8,
     color: COLORS.text,
     fontSize: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    lineHeight: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 0,
   },
-  inputError: { borderColor: COLORS.danger, backgroundColor: COLORS.dangerBg },
-  errorText: { color: COLORS.danger, fontSize: 12, lineHeight: 18 },
+  // 다른 오류 칸과 같이 배경 없이 빨간 테두리만 둔다.
+  inputError: { borderColor: COLORS.danger },
+  errorText: { flexShrink: 1, color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 14 }, // Figma 에러행: Regular 12
   confirmRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -328,32 +342,38 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(17, 24, 39, 0.38)",
     paddingHorizontal: 24,
   },
+  // Figma PasswordModal: 300 폭, 라운드 16, 위 24 / 좌우·아래 20, 간격 14
   modalCard: {
     width: "100%",
-    maxWidth: 320,
-    gap: 12,
-    borderRadius: 12,
+    maxWidth: 300,
+    alignItems: "stretch",
+    gap: 14,
+    borderRadius: 16,
     backgroundColor: COLORS.bg,
-    padding: 20,
+    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  modalTitle: { color: COLORS.text, fontSize: 16, fontWeight: "500", lineHeight: 19 },
+  modalTitle: { color: COLORS.text, fontSize: 17, fontWeight: "600", textAlign: "center" },
+  modalBody: { color: COLORS.muted, fontSize: 13, fontWeight: "400", textAlign: "center" },
+  modalErrorRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   modalActions: { flexDirection: "row", gap: 8 },
   modalCancelButton: {
     flex: 1,
-    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
+    backgroundColor: "#F4F5F7",
+    paddingVertical: 13,
   },
-  modalCancelText: { color: COLORS.text, fontSize: 14, fontWeight: "500", lineHeight: 17 },
+  modalCancelText: { color: COLORS.muted, fontSize: 15, fontWeight: "500" },
   modalDeleteButton: {
     flex: 1,
-    height: 44,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 8,
     backgroundColor: COLORS.danger,
+    paddingVertical: 13,
   },
+  modalDeleteText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
 });

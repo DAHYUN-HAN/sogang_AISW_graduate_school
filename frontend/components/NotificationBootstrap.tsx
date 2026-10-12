@@ -1,6 +1,7 @@
 import Constants from "expo-constants";
-import { useEffect, useRef, useState } from "react";
-import { Platform, Pressable, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, Dimensions, PanResponder, Platform, Pressable, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "./AppTypography";
 
 import { notificationApi } from "../services/api";
@@ -8,7 +9,7 @@ import { useUserStore } from "../stores/userStore";
 import type { NotificationItem } from "../types";
 import { notificationContentRoute } from "../utils/appRoutes";
 import { setStoredPushToken } from "../utils/pushTokenStorage";
-import { openTabStack } from "../utils/tabNavigation";
+import { navigateToRoute, openTabStack } from "../utils/tabNavigation";
 import { showWebNotification } from "../utils/webNotifications";
 import { NoticeToastIcon } from "./icons";
 
@@ -16,6 +17,13 @@ declare const require: any;
 
 const LAST_NOTIFICATION_KEY = "aisw_last_notification_id";
 const POLL_INTERVAL_MS = 30_000;
+// 앱 안 배너는 4초 뒤 사라진다. 그 전에 위·왼쪽·오른쪽으로 밀어서 치울 수도 있다.
+const BANNER_AUTO_HIDE_MS = 4_000;
+const BANNER_FADE_OUT_MS = 250;
+const BANNER_SWIPE_UP_DISTANCE = 30;
+const BANNER_SWIPE_SIDE_DISTANCE = 80;
+const BANNER_SWIPE_VELOCITY = 0.5;
+const useNativeDriver = Platform.OS !== "web";
 
 type ExpoNotificationsModule = {
   setNotificationHandler?: (handler: unknown) => void;
@@ -56,12 +64,25 @@ function getResponseData(response: any) {
   return response?.notification?.request?.content?.data ?? {};
 }
 
-async function openNotification(notification: Pick<NotificationItem, "id" | "post_id" | "event_id">) {
+async function markNotificationRead(notificationId: number) {
   try {
-    await notificationApi.markRead(notification.id);
+    await notificationApi.markRead(notificationId);
   } catch {
     // The notification can still be opened even if read-state sync fails.
   }
+}
+
+// 앱을 쓰다가 누른 알림(앱 안 배너·웹 알림 창)은 보던 탭 위에 글을 연다.
+// 글 화면의 뒤로가기는 아래 화면을 먼저 꺼내므로 원래 보던 화면으로 돌아간다.
+async function openNotificationOverCurrentScreen(notification: Pick<NotificationItem, "id" | "post_id" | "event_id">) {
+  await markNotificationRead(notification.id);
+  const route = notificationContentRoute(notification);
+  if (route) navigateToRoute(route.split("?")[0]);
+}
+
+// 폰 푸시 알림을 눌러 앱이 열린 경우(지금은 푸시가 꺼져 있다).
+async function openNotification(notification: Pick<NotificationItem, "id" | "post_id" | "event_id">) {
+  await markNotificationRead(notification.id);
 
   const route = notificationContentRoute(notification);
   if (!route) return;
@@ -120,6 +141,61 @@ export default function NotificationBootstrap() {
   const latestSeenIdRef = useRef(getStoredLatestId());
   const initializedRef = useRef(false);
   const [visibleNotification, setVisibleNotification] = useState<NotificationItem | null>(null);
+  const insets = useSafeAreaInsets();
+  const drag = useRef(new Animated.ValueXY()).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopHideTimer = useCallback(() => {
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = null;
+    // 사라지는 중에 손가락으로 잡으면 다시 또렷하게 되돌린다.
+    opacity.stopAnimation();
+    opacity.setValue(1);
+  }, [opacity]);
+  const startHideTimer = useCallback(() => {
+    stopHideTimer();
+    hideTimerRef.current = setTimeout(() => {
+      Animated.timing(opacity, { toValue: 0, duration: BANNER_FADE_OUT_MS, useNativeDriver })
+        .start(({ finished }) => { if (finished) setVisibleNotification(null); });
+    }, BANNER_AUTO_HIDE_MS);
+  }, [opacity, stopHideTimer]);
+
+  useEffect(() => {
+    if (!visibleNotification) return;
+    drag.setValue({ x: 0, y: 0 });
+    startHideTimer();
+    return stopHideTimer;
+  }, [visibleNotification, drag, startHideTimer, stopHideTimer]);
+
+  const panResponder = useRef(PanResponder.create({
+    // 탭은 Pressable이 받고, 손가락이 움직였을 때만 밀기로 가져온다.
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dx) > 8 || gesture.dy < -8,
+    onPanResponderGrant: () => stopHideTimer(),
+    onPanResponderMove: (_, gesture) => {
+      const sideways = Math.abs(gesture.dx) > Math.abs(gesture.dy);
+      drag.setValue(sideways ? { x: gesture.dx, y: 0 } : { x: 0, y: Math.min(gesture.dy, 0) });
+    },
+    onPanResponderRelease: (_, gesture) => {
+      const sideways = Math.abs(gesture.dx) > Math.abs(gesture.dy);
+      const width = Dimensions.get("window").width;
+      const toValue = sideways
+        ? Math.abs(gesture.dx) > BANNER_SWIPE_SIDE_DISTANCE || Math.abs(gesture.vx) > BANNER_SWIPE_VELOCITY
+          ? { x: Math.sign(gesture.dx || gesture.vx) * width, y: 0 } : null
+        : gesture.dy < -BANNER_SWIPE_UP_DISTANCE || gesture.vy < -BANNER_SWIPE_VELOCITY
+          ? { x: 0, y: -200 } : null;
+      if (toValue) {
+        Animated.timing(drag, { toValue, duration: 150, useNativeDriver }).start(() => setVisibleNotification(null));
+        return;
+      }
+      Animated.spring(drag, { toValue: { x: 0, y: 0 }, useNativeDriver }).start();
+      startHideTimer();
+    },
+    onPanResponderTerminate: () => {
+      Animated.spring(drag, { toValue: { x: 0, y: 0 }, useNativeDriver }).start();
+      startHideTimer();
+    },
+  })).current;
 
   const openVisibleNotification = async () => {
     if (!visibleNotification) {
@@ -127,7 +203,7 @@ export default function NotificationBootstrap() {
     }
     const target = visibleNotification;
     setVisibleNotification(null);
-    await openNotification(target);
+    await openNotificationOverCurrentScreen(target);
   };
 
   useEffect(() => {
@@ -194,7 +270,7 @@ export default function NotificationBootstrap() {
       }
       setVisibleNotification(newest);
       if (Platform.OS === "web") {
-        showWebNotification("AI·SW CAMPUS", newest.message, () => { void openNotification(newest); });
+        showWebNotification("AI·SW CAMPUS", newest.message, () => { void openNotificationOverCurrentScreen(newest); });
       }
     };
 
@@ -213,40 +289,50 @@ export default function NotificationBootstrap() {
   }
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={openVisibleNotification}
+    <Animated.View
+      {...panResponder.panHandlers}
       style={{
         position: "absolute",
-        top: 8,
+        // Sit below the status bar (clock, Wi-Fi) instead of over it.
+        top: insets.top + 8,
         left: 12,
         right: 12,
         zIndex: 9999,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 10,
-        borderRadius: 14,
-        borderWidth: 0.5,
-        borderColor: "#E1E4E9",
-        backgroundColor: "#FFFFFF",
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        shadowColor: "#000",
-        shadowOpacity: 0.12,
-        shadowRadius: 20,
-        shadowOffset: { width: 0, height: 6 },
         elevation: 8,
+        opacity,
+        transform: drag.getTranslateTransform(),
       }}
     >
-      <NoticeToastIcon size={32} />
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text style={{ color: "#15171C", fontSize: 13, lineHeight: 16, fontWeight: "500" }}>
-          AI·SW 캠퍼스
-        </Text>
-        <Text numberOfLines={1} style={{ color: "#6B7280", fontSize: 13, lineHeight: 16, fontWeight: "400" }}>
-          {visibleNotification.message}
-        </Text>
-      </View>
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        onPress={openVisibleNotification}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 10,
+          borderRadius: 14,
+          borderWidth: 0.5,
+          borderColor: "#E1E4E9",
+          backgroundColor: "#FFFFFF",
+          paddingHorizontal: 14,
+          paddingVertical: 12,
+          shadowColor: "#000",
+          shadowOpacity: 0.12,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 6 },
+          elevation: 8,
+        }}
+      >
+        <NoticeToastIcon size={32} />
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ color: "#15171C", fontSize: 13, lineHeight: 16, fontWeight: "500" }}>
+            AI·SW 캠퍼스
+          </Text>
+          <Text numberOfLines={1} style={{ color: "#6B7280", fontSize: 13, lineHeight: 16, fontWeight: "400" }}>
+            {visibleNotification.message}
+          </Text>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }

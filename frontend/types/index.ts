@@ -216,7 +216,7 @@ export type MutualAidStatus = "processing" | "completed" | "rejected";
 
 export type NoticePollQuestion = {
   id: number; title: string; kind: "text" | "date"; allow_multiple: boolean;
-  closed_at?: string | null; is_closed?: boolean; locked?: boolean;
+  ends_at?: string | null; closed_at?: string | null; is_closed?: boolean; locked?: boolean;
   participant_count?: number; has_voted?: boolean; legacy?: boolean;
   options: {id: number; label: string; media_id: number | null; vote_count: number}[];
 };
@@ -228,10 +228,13 @@ export type NoticePoll = {
 export type NoticePollDraft = {
   revision?: number; ends_at: string; locked?: boolean; is_closed?: boolean; participant_count?: number;
   questions: {id?: number; title: string; kind: "text" | "date"; allow_multiple: boolean;
+    // ends_at is the editor's Korea-time "YYYY-MM-DDTHH:mm" ("" = closed by an admin only).
+    ends_at?: string; saved_ends_at?: string | null;
     locked?: boolean; is_closed?: boolean; participant_count?: number; legacy?: boolean; saved_title?: string;
     options: {id?: number; label: string; media_id?: number | null}[]}[];
 };
-export type NoticePollPayload = {revision?: number; ends_at: string | null; questions: NoticePollDraft["questions"]};
+export type NoticePollPayload = {revision?: number; ends_at: string | null;
+  questions: (Omit<NoticePollDraft["questions"][number], "ends_at"> & {ends_at: string | null})[]};
 export type NoticePollParticipant = {
   user_id: number; nickname: string; cohort: string | null; major?: string | null;
   answers: {question_id: number; question_title: string; option_id: number; label: string}[];

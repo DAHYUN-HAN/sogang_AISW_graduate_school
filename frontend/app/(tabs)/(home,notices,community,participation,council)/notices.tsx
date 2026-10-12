@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { EmptyCalendarIcon } from "../../../components/icons";
+import { BackIcon, EmptyCalendarIcon } from "../../../components/icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
@@ -9,6 +9,7 @@ import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useBoardsQuery } from "../../../hooks/useApi";
+import { useIsStackRoot } from "../../../hooks/useIsStackRoot";
 import LoadingState from "../../../components/LoadingState";
 import NoticeRow, { type NoticeRowModel } from "../../../components/NoticeRow";
 import { useAggregatePosts } from "../../../hooks/usePosts";
@@ -89,6 +90,7 @@ export default function NoticesScreen() {
 
 function NoticesContent() {
   const insets = useSafeAreaInsets();
+  const isStackRoot = useIsStackRoot();
   const [selectedFilter, setSelectedFilter] = useState<NoticeFilter>("all");
   // 당겨서 새로고침 표시는 사용자가 실제로 당겼을 때만 켠다.
   // 탭 진입 시 자동으로 도는 백그라운드 refetch(isRefetching)에 연동하면
@@ -132,8 +134,14 @@ function NoticesContent() {
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
-        {/* 공지사항은 하단 탭 루트이므로 뒤로가기 없이 좌측은 자리만 맞춘다. */}
-        <View style={styles.iconButton} />
+        {/* 하단 탭으로 열면 뒤로가기 없이 자리만 맞추고, 홈 "더보기"로 열면 홈으로 돌아간다. */}
+        {isStackRoot ? (
+          <View style={styles.iconButton} />
+        ) : (
+          <Pressable accessibilityLabel="뒤로" onPress={() => router.back()} style={styles.iconButton}>
+            <BackIcon size={24} color={COLORS.text} />
+          </Pressable>
+        )}
         <Text style={styles.appBarTitle}>공지사항</Text>
         <IconButton icon="search-outline" label="검색" onPress={() => router.push("/search?scope=notices" as never)} />
       </View>

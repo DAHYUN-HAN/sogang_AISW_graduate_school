@@ -5,8 +5,13 @@ import test from "node:test";
 import {
   TOAST_DURATION_MS,
   TOAST_FADE_OUT_MS,
+  TOAST_ERROR_MESSAGES,
+  TOAST_INFO_MESSAGES,
   TOAST_MESSAGES,
+  TOAST_SUCCESS_MESSAGES,
   nextToastState,
+  queueToastForNextScreen,
+  takeQueuedToast,
   toastHoldMs,
 } from "../utils/toast";
 
@@ -137,4 +142,62 @@ test("오류 테두리는 1px #D64545 이고 포커스보다 우선한다", () =
   assert.match(createSource, /borderOnlyError: \{\r?\n\s+borderWidth: 1,\r?\n\s+borderColor: "#D64545"/);
   // FormTextInput 안에서 오류 스타일이 포커스 스타일보다 뒤에 온다.
   assert.match(createSource, /focused \? styles\.inputFocused : null,\r?\n\s+hasError \? styles\.inputError : null,/);
+});
+
+// 2026-10-12 피그마 Spec/앱 알림 → 토스트 전환: 휴대폰 기본 알림창 대신 토스트를 쓴다.
+test("앱 알림창을 바꾼 토스트는 피그마 스펙 문구를 쓴다", () => {
+  assert.equal(TOAST_ERROR_MESSAGES.postEditForbidden, "작성자·관리자만 수정할 수 있어요.");
+  assert.equal(TOAST_ERROR_MESSAGES.like, "좋아요를 반영하지 못했어요. 잠시 후 다시 시도해주세요.");
+  assert.equal(TOAST_SUCCESS_MESSAGES.reportSubmitted, "신고가 접수됐어요.");
+  assert.equal(TOAST_SUCCESS_MESSAGES.profileSaved, "프로필을 저장했어요.");
+  assert.equal(TOAST_INFO_MESSAGES.alreadyReported, "이미 신고한 글이에요.");
+  assert.equal(TOAST_INFO_MESSAGES.albumPhotoLimit, "사진은 최대 20장까지 올릴 수 있어요.");
+  assert.equal(nextToastState(null, "x").variant, "error");
+  assert.equal(nextToastState(null, "x", "info").variant, "info");
+});
+
+test("토스트 종류마다 아이콘이 다르고 안내는 아이콘·그림자가 없다", () => {
+  assert.match(toastSource, /variant === "error" \? <ToastAlertIcon/);
+  assert.match(toastSource, /variant === "success" \? <ToastSuccessIcon/);
+  assert.match(toastSource, /toastInfo: \{\r?\n\s+shadowOpacity: 0,/);
+});
+
+test("일반 회원 화면에는 바꾼 알림창이 남아 있지 않다", () => {
+  const root = "app/(tabs)/(home,notices,community,participation,council)/";
+  const screens = ["board/post/[postId].tsx", "board/post/edit/[postId].tsx", "board/[boardId].tsx", "home.tsx", "settings/notifications.tsx", "settings/profile.tsx", "settings/password.tsx"];
+  const replaced = /Alert\.alert\("(신고 실패|좋아요 실패|북마크 실패|삭제 실패|댓글 등록 실패|댓글 수정 실패|파일 열기 실패|저장 실패|회계장부 링크|동문회 주소록|비밀번호 변경 실패|이미지 업로드 실패|저장 완료)"/;
+  for (const screen of screens) assert.doesNotMatch(readFileSync(root + screen, "utf8"), replaced, screen);
+});
+
+test("저장하고 옮겨 간 화면은 맡겨 둔 토스트를 한 번만 띄운다", () => {
+  queueToastForNextScreen(TOAST_SUCCESS_MESSAGES.profileSaved, "success");
+  assert.deepEqual(takeQueuedToast(), { message: "프로필을 저장했어요.", variant: "success" });
+  assert.equal(takeQueuedToast(), null);
+  const drawer = readFileSync("components/MyPageDrawer.tsx", "utf8");
+  assert.match(drawer, /const queued = takeQueuedToast\(\);/);
+  assert.match(drawer, /<Toast toast=\{toast\} onHide=\{hideToast\} \/>/);
+});
+
+// 2026-10-12 피그마 Screen/MyPage/PasswordChanged-ReloginModal: 비밀번호를 바꾸면 기본 알림창 대신 이 모달을 띄운다.
+test("비밀번호 변경 성공은 다시 로그인 안내 모달을 띄운다", () => {
+  const password = readFileSync("app/(tabs)/(home,notices,community,participation,council)/settings/password.tsx", "utf8");
+  assert.match(password, /title: "비밀번호를 변경했어요", body: "보안을 위해 다시 로그인해주세요\." /);
+  assert.doesNotMatch(password, /Alert\.alert/);
+  // 모달을 닫아야 로그아웃하고 로그인 화면으로 간다.
+  assert.match(password, /clearSession\(\);\r?\n\s+router\.replace\("\/auth\/login"\);/);
+  const modal = readFileSync("components/NoticeModal.tsx", "utf8");
+  assert.match(modal, /confirmButtonPrimary: \{\r?\n\s+flex: 1,\r?\n\s+borderWidth: 0,\r?\n\s+backgroundColor: COLORS\.primary,/);
+});
+
+test("사진첩 20장 안내는 등록·수정 화면 모두 안내 토스트로 띄운다", () => {
+  const edit = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
+  assert.match(createSource, /showToast\(TOAST_INFO_MESSAGES\.albumPhotoLimit, "info"\)/);
+  assert.match(edit, /nextToastState\(current, TOAST_INFO_MESSAGES\.albumPhotoLimit, "info"\)/);
+});
+
+test("댓글 삭제 실패는 확인창을 닫고 오류 토스트로 알린다", () => {
+  const detail = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
+  assert.equal(TOAST_ERROR_MESSAGES.commentDelete, "댓글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.");
+  assert.match(detail, /setPendingDeleteCommentId\(null\);\r?\n\s+showToast\(TOAST_ERROR_MESSAGES\.commentDelete\);/);
+  assert.doesNotMatch(detail, /commentDeleteError/);
 });

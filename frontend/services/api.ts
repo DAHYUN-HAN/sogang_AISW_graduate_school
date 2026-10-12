@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 
 import { useUserStore } from "../stores/userStore";
 import { useNetworkStatusStore } from "../stores/networkStatusStore";
-import { isNetworkError } from "../utils/networkError";
+import { isNetworkError, isServerLoadError } from "../utils/networkError";
 import type {
   AccountDeletionEmailRequest,
   AccountDeletionEmailRequestResult,
@@ -97,6 +97,7 @@ const publicApi = createAxiosClient({
 for (const client of [api, publicApi]) {
   client.interceptors.response.use(response => response, error => {
     if (isNetworkError(error)) useNetworkStatusStore.getState().markDisconnected();
+    else if (isServerLoadError(error)) useNetworkStatusStore.getState().markServerFailed();
     return Promise.reject(error);
   });
 }

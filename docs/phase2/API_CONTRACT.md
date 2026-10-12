@@ -37,8 +37,12 @@ sent as timezone-aware UTC and displayed/edited in Asia/Seoul time.
 - Existing post create/update accepts optional `poll` with 1–20 independent cards
   in `questions`. New/changed cards require exactly two text labels, single choice,
   `kind=text`, `allow_multiple=false`, no option media. Titles/labels are trimmed
-  and limited to 100 characters; duplicate labels are rejected. `ends_at` must be
-  omitted/null; no automatic closure exists. Admin and notice-only rules apply.
+  and limited to 100 characters; duplicate labels are rejected. Parent `ends_at`
+  must be omitted/null. Each card accepts optional `ends_at` (ISO datetime, null =
+  admin-only closing); once it passes the card closes automatically. A new or
+  changed card deadline must be in the future (`422 POLL_DEADLINE_PAST`); it stays
+  editable after votes, does not bump `revision`, and cannot change on a closed
+  card (`409 POLL_CLOSED`). Admin and notice-only rules apply.
 - Omitted `poll` preserves stored settings/ballots. Non-null edits carry the
   loaded `poll.revision`; `poll:null` removal carries `poll_revision` on the post
   request. Stale edits/removals return `409 POLL_CHANGED`. First vote freezes only
@@ -47,13 +51,16 @@ sent as timezone-aware UTC and displayed/edited in Asia/Seoul time.
   unvoted and open. Unchanged legacy records are accepted to preserve results.
 - `GET /posts/{id}/poll` returns revision, closed/locked state, participant count,
   questions/options/counts and authenticated account's answers. Every card has
-  `closed_at`, `is_closed`, `locked`, `has_voted`, `participant_count`, `legacy`.
-  Parent closure means all cards are closed; `ends_at` is always null. Post detail
+  `ends_at`, `closed_at`, `is_closed`, `locked`, `has_voted`, `participant_count`,
+  `legacy`. A card's `closed_at` is the admin close time, else its passed `ends_at`.
+  Parent closure means all cards are closed; parent `ends_at` is always null. Post detail
   includes optional `poll` for rendering in the existing notice detail.
 - `PUT /posts/{id}/poll/vote` accepts `{revision,answers:[{question_id,option_ids}]}`;
-  a nonempty subset of cards may be answered, each with exactly one option.
-  Replace only that account's submitted card choices atomically, preserving all
-  other cards. Legacy nonbinary/date/multiple/photo votes are read-only and return
+  a nonempty subset of cards may be answered, each with one option or an empty
+  `option_ids` to withdraw that card's answer. Replace only that account's
+  submitted card choices atomically, preserving all other cards. When no choice
+  remains the ballot is deleted, so the account leaves `participant_count`;
+  withdrawal never unlocks a poll that already received a vote. Legacy nonbinary/date/multiple/photo votes are read-only and return
   `409 POLL_LEGACY_READ_ONLY`. Closed votes return `409 POLL_CLOSED`; foreign/invalid choices
   return `422 INVALID_POLL_OPTIONS`. Guests receive 401.
 - `GET /posts/{id}/poll/participants?page=1&size=20&question_id=...&option_id=...` uses the shared
@@ -61,7 +68,8 @@ sent as timezone-aware UTC and displayed/edited in Asia/Seoul time.
   `nickname`, `cohort` and chosen question/option IDs/titles/labels. Question scope
   filters people and answers; an option must belong to the selected card/post.
 - `POST /posts/{id}/poll/close?question_id=...` closes only that card; omitted ID
-  retains the legacy close-all operation. Explicit administrator dependency and
+  retains the legacy close-all operation. A card already past its deadline keeps
+  that deadline as its close time. Explicit administrator dependency and
   idempotency apply. Current notice read/visibility rules apply to every poll endpoint;
   voting additionally requires an active board and published post.
 - New invalid card config: 422; incompatible board type:
@@ -117,6 +125,8 @@ Error:
   "code": "MACHINE_READABLE_CODE"
 }
 ```
+
+An error may carry an optional `data` object when the client needs more than the code (currently only `POST_DELETED`).
 
 ### Common Error Codes
 
@@ -1045,6 +1055,12 @@ Supplying `notice_category` for a non-notice scope returns normalized `422 VALID
 ### GET `/posts/{post_id}`
 
 Auth: user
+
+Deleted post (2026-10-11, Figma `Screen/Notice/Detail-Deleted`): when the post was soft-deleted and the caller can still read its board, the response is `404` with code `POST_DELETED` and an extra `data` field so the app can title the deleted screen like the live post. Missing posts and posts on boards the caller cannot read keep the plain `404 NOT_FOUND`.
+
+```json
+{ "status": "error", "message": "Post deleted.", "code": "POST_DELETED", "data": { "board_id": 2 } }
+```
 
 Response:
 

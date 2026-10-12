@@ -16,9 +16,22 @@ test("editor hydration preserves legacy IDs and images but removes automatic dea
   assert.equal(draft.ends_at, "");
   assert.deepEqual(noticePollPayload(draft), {
     revision: 3, ends_at: null,
-    questions: [{id: 10, title: "장소", kind: "text", allow_multiple: false,
+    questions: [{id: 10, title: "장소", kind: "text", allow_multiple: false, ends_at: null,
       options: [{id: 20, label: "학교", media_id: 4}, {id: 21, label: "식당", media_id: null}]}],
   });
+});
+
+test("card deadlines round-trip in Korea time and only convert when edited", () => {
+  const withDeadline = {...poll, questions: [{...poll.questions[0], ends_at: "2026-10-30T09:00:00.000001"}]};
+  const draft = noticePollDraft(withDeadline)!;
+  assert.equal(draft.questions[0].ends_at, "2026-10-30T18:00");
+  assert.equal(noticePollPayload(draft)!.questions[0].ends_at, "2026-10-30T09:00:00.000001");
+  draft.questions[0].ends_at = "2026-10-31T21:30";
+  assert.equal(noticePollPayload(draft)!.questions[0].ends_at, "2026-10-31T12:30:00.000Z");
+  draft.questions[0].ends_at = "";
+  assert.equal(noticePollPayload(draft)!.questions[0].ends_at, null);
+  draft.questions[0].ends_at = "2026-13-40T99:00";
+  assert.throws(() => noticePollPayload(draft), /투표 1의 마감 시각/);
 });
 
 test("new polls have two editable options and no implicit deadline", () => {

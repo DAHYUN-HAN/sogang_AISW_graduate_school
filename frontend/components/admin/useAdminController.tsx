@@ -2239,7 +2239,7 @@ export function useAdminController() {
             onChange={poll => setNoticeForm(current => ({...current, poll}))} disabled={noticeOperationPending} onBusy={handleNoticePollBusy} /> : null}
           <AdminBannerSchedule label="신청·접수 마감" value={noticeForm.deadline_at} fallbackTime="18:00" disabled={noticeOperationPending}
             onChange={value => {if (!noticeOperationPending) setNoticeForm(current => ({...current, deadline_at: value}));}} />
-          {noticeForm.poll ? <Text style={{fontSize:13,color:COLORS.muted,lineHeight:21}}>신청·접수 마감은 투표 종료 날짜가 아닙니다. 날짜가 지나도 투표는 열려 있으며, 관리자가 ‘투표 종료’를 눌러야 종료됩니다.</Text> : null}
+          {noticeForm.poll ? <Text style={{fontSize:13,color:COLORS.muted,lineHeight:21}}>신청·접수 마감은 투표 마감 시각이 아닙니다. 투표는 각 투표의 마감 시각이 지나거나 관리자가 ‘투표 종료’를 누르면 종료됩니다.</Text> : null}
           <View style={{ gap: 8 }}>
             <Text style={{ color: COLORS.text, fontWeight: "600" }}>분류</Text>
             <BoardFilterRow>{NOTICE_CATEGORY_OPTIONS.filter(option => Platform.OS !== "web" || !["all", "webinar"].includes(option.value)).map((option) => (

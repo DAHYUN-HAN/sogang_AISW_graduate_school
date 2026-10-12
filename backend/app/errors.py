@@ -18,17 +18,19 @@ class AppException(Exception):
         message: str,
         code: str,
         headers: dict[str, str] | None = None,
+        data: dict | None = None,
     ):
         self.status_code = status_code
         self.message = message
         self.code = code
         self.headers = headers
+        self.data = data
 
 
 def app_exception_handler(_, exc: AppException) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
-        content=error_response(exc.message, exc.code),
+        content=error_response(exc.message, exc.code, exc.data),
         headers=exc.headers,
     )
 

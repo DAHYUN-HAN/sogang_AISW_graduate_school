@@ -17,8 +17,8 @@ test("답글 작성 상태는 내부 ID 없이 작성 중 안내를 노출한다
   const state = getReplyComposerState({ commentId: 248, authorLabel: "72기 김진산" });
 
   assert.equal(state.parentId, 248);
-  assert.equal(state.noticeText, "72기 김진산님에게 답글 작성 중"); // Figma 답글대상표시 문구
-  assert.equal(state.placeholder, "답글을 남겨보세요");
+  assert.equal(state.noticeText, "72기 김진산님에게 댓글 작성 중"); // Figma Detail2-ReplyMode: 2026-10-12 "답글"을 "댓글"로 바꿈
+  assert.equal(state.placeholder, "댓글을 남겨보세요");
   assert.equal(state.noticeText.includes("248"), false);
 });
 

@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { StackActions } from "@react-navigation/native";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router, useFocusEffect, useNavigation } from "expo-router";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ActivityIndicator, Alert, Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
 import NetworkErrorState, { NetworkErrorFallback } from "../../../components/NetworkErrorState";
 import { isNetworkError } from "../../../utils/networkError";
@@ -12,11 +13,13 @@ import { isNetworkError } from "../../../utils/networkError";
 import { calendarMonthStyles } from "../../../components/CalendarMonth";
 import { MediaImageBackground } from "../../../components/MediaImage";
 import HomeSectionGate from "../../../components/HomeSectionGate";
+import LoadingState from "../../../components/LoadingState";
+import Toast from "../../../components/Toast";
 import { BackIcon, BellIcon, EmptyCalendarIcon, ForwardIcon, ProfileIcon } from "../../../components/icons";
 import { useMyPageDrawer } from "../../../components/MyPageDrawer";
 import { useBoardsQuery } from "../../../hooks/useApi";
+import { useToast } from "../../../hooks/useToast";
 import { API_ORIGIN, bannerApi, eventApi, notificationApi, postApi } from "../../../services/api";
-import { requestTabRootReset } from "../../../stores/tabRootResetStore";
 import { useUserStore } from "../../../stores/userStore";
 import type { BannerItem, Board, EventItem, PostListItem } from "../../../types";
 import { HOME_TAB_ROUTE, postDetailRoute } from "../../../utils/appRoutes";
@@ -30,7 +33,8 @@ import {
   shiftCalendarMonth,
 } from "../../../utils/eventCalendar";
 import { toAbsoluteMediaUrl } from "../../../utils/mediaAccess";
-import { homeAlumniDirectoryErrorMessage, homeAlumniDirectoryLink } from "../../../utils/homeAlumniDirectory";
+import { homeAlumniDirectoryLink } from "../../../utils/homeAlumniDirectory";
+import { TOAST_INFO_MESSAGES } from "../../../utils/toast";
 import { homeNoticeDeadlineSuffix } from "../../../utils/homeNoticeDeadline";
 import {
   EVENT_CATEGORY_ORDER,
@@ -322,6 +326,7 @@ function HomeBanner({
   const pageTotal = Math.max(total, 1);
   const pageIndex = Math.min(index + 1, pageTotal);
   const linkHref = banner.cta_href?.trim();
+  const navigation = useNavigation();
   const handlePress = () => {
     if (!linkHref) {
       return;
@@ -330,9 +335,11 @@ function HomeBanner({
       Linking.openURL(linkHref);
       return;
     }
-    // 배너가 탭 첫 화면을 가리키면 홈 스택에 끼워 넣지 않고 그 탭으로 옮긴다.
+    // 공지사항·커뮤니티는 "더보기"처럼 홈 위에 쌓아 < 로 홈에 돌아오게 한다.
+    // 그 밖의 탭 첫 화면은 홈 스택에 끼워 넣지 않고 그 탭으로 옮긴다.
     const tab = tabNameFromRoute(linkHref);
-    if (tab) navigateToTabRoot(tab);
+    if (tab === "notices" || tab === "community") navigation.dispatch(StackActions.push(tab));
+    else if (tab) navigateToTabRoot(tab);
     else router.push(linkHref as never);
   };
 
@@ -449,26 +456,16 @@ function HomeBannerCarousel({ banners }: { banners: BannerItem[] }) {
 function NoticeList({
   posts,
   boards,
-  loading,
   isError,
   error,
   onRetry,
 }: {
   posts: PostListItem[];
   boards: Board[];
-  loading: boolean;
   isError: boolean;
   error?: unknown;
   onRetry: () => void;
 }) {
-  if (loading) {
-    return (
-      <View style={styles.loadingBox}>
-        <Text style={styles.emptyText}>공지사항을 불러오는 중이에요</Text>
-      </View>
-    );
-  }
-
   if (isError) {
     return <HomeErrorState error={error} label="공지사항" onRetry={onRetry} />;
   }
@@ -799,6 +796,7 @@ function AlbumStrip({ posts }: { posts: PostListItem[] }) {
 }
 
 export default function HomeScreen() {
+  const { toast, showToast, hideToast } = useToast();
   const insets = useSafeAreaInsets();
   const user = useUserStore((state) => state.user);
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
@@ -917,16 +915,24 @@ export default function HomeScreen() {
   };
   const openAlumniDirectory = () => {
     if (alumniDirectoryLink.status !== "ready") {
-      Alert.alert("동문회 주소록", homeAlumniDirectoryErrorMessage(alumniDirectoryLink.status));
+      showToast(TOAST_INFO_MESSAGES.alumniDirectoryOpenFailed, "info");
       return;
     }
 
     void Linking.openURL(alumniDirectoryLink.url).catch(() => {
-      Alert.alert("동문회 주소록", homeAlumniDirectoryErrorMessage("open_failed"));
+      showToast(TOAST_INFO_MESSAGES.alumniDirectoryOpenFailed, "info");
     });
   };
 
+  // 처음 열 때는 인사 줄까지 비우고 흰 화면에 피그마 공통 로딩만 보인다. 모든 칸이
+  // 도착하면 한 번에 보인다. 새로고침·달 변경은 이전 내용을 둔 채 받는다.
+  if (isHomeLoading && !hasHomeNetworkError) {
+    return <LoadingState style={{ paddingTop: insets.top }} />;
+  }
+
   return (
+    // 토스트가 스크롤과 함께 움직이지 않도록 ScrollView 바깥에 둔다.
+    <View style={styles.toastHost}>
     <ScrollView
             style={styles.screen}
       contentContainerStyle={[
@@ -966,13 +972,7 @@ export default function HomeScreen() {
         </View>
       ) : (
         <>
-          {isHomeLoading ? <ActivityIndicator accessibilityLabel="홈 콘텐츠 로딩" size="small" color={COLORS.primary} /> : null}
-
-          {bannersQuery.isLoading ? (
-            <View style={styles.loadingBox}>
-              <Text style={styles.emptyText}>배너를 불러오는 중이에요</Text>
-            </View>
-          ) : bannersQuery.isError ? (
+          {bannersQuery.isError ? (
             <HomeErrorState error={bannersQuery.error} label="홈 배너" onRetry={() => void bannersQuery.refetch()} />
           ) : (
             <HomeBannerCarousel banners={banners} />
@@ -981,25 +981,20 @@ export default function HomeScreen() {
           <SectionHeader
             title="공지사항"
             onPress={() => {
-              requestTabRootReset("notices");
-              navigateToTabRoot("notices");
+              // 탭으로 옮기지 않고 홈 위에 쌓아 < 로 홈에 돌아오게 한다.
+              navigation.dispatch(StackActions.push("notices"));
             }}
           />
           <NoticeList
             posts={notices}
             boards={noticeBoards}
-            loading={noticesQuery.isLoading || boardsLoading}
             isError={boardsError || noticesQuery.isError}
             error={boardsLoadError ?? noticesQuery.error}
             onRetry={() => void Promise.all([refetchBoards(), noticesQuery.refetch()])}
           />
 
           <SectionHeader title="서강생활 일정" />
-          {eventsQuery.isLoading ? (
-            <View style={styles.loadingBox}>
-              <Text style={styles.emptyText}>일정을 불러오는 중이에요</Text>
-            </View>
-          ) : eventsQuery.isError ? (
+          {eventsQuery.isError ? (
             <HomeErrorState error={eventsQuery.error} label="일정" onRetry={() => void eventsQuery.refetch()} />
           ) : (
             <CalendarCard
@@ -1024,15 +1019,11 @@ export default function HomeScreen() {
           <SectionHeader
             title="행사 사진첩"
             onPress={() => {
-              requestTabRootReset("community");
-              navigateToTabRoot("community");
+              // 커뮤니티 첫 화면은 행사 사진첩을 먼저 연다.
+              navigation.dispatch(StackActions.push("community"));
             }}
           />
-          {albumQuery.isLoading ? (
-            <View style={styles.loadingBox}>
-              <Text style={styles.emptyText}>사진첩을 불러오는 중이에요</Text>
-            </View>
-          ) : boardsError || albumQuery.isError ? (
+          {boardsError || albumQuery.isError ? (
             <HomeErrorState error={boardsLoadError ?? albumQuery.error} label="행사 사진첩" onRetry={() => void Promise.all([refetchBoards(), albumQuery.refetch()])} />
           ) : (
             <AlbumStrip posts={albumPosts} />
@@ -1057,10 +1048,13 @@ export default function HomeScreen() {
         </>
       )}
     </ScrollView>
+    <Toast toast={toast} onHide={hideToast} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  toastHost: { flex: 1 },
   screen: {
     flex: 1,
     backgroundColor: COLORS.bg,

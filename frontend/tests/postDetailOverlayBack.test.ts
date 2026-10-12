@@ -34,7 +34,6 @@ function harness() {
     showPostMenu: false,
     showDeleteConfirm: false,
     pendingDeleteCommentId: null as number | null,
-    commentDeleteError: null as string | null,
     deletingPost: false,
     deletingComment: false,
   };
@@ -57,7 +56,6 @@ function harness() {
     setShowPostMenu: (show: boolean) => { state.showPostMenu = show; },
     setShowDeleteConfirm: (show: boolean) => { state.showDeleteConfirm = show; },
     setPendingDeleteCommentId: (id: number | null) => { state.pendingDeleteCommentId = id; },
-    setCommentDeleteError: (error: string | null) => { state.commentDeleteError = error; },
     useCallback(callback: () => void, dependencies: unknown[]) {
       if (!cached || dependencies.some((value, index) => !Object.is(value, cached!.dependencies[index]))) {
         cached = { callback, dependencies };
@@ -113,7 +111,7 @@ test("게시글 삭제 확인은 Back으로 취소하되 삭제 요청 중에는
   assert.deepEqual(h.navigation, []);
 });
 
-test("댓글 삭제 확인은 요청 종료 후 Back으로 닫고 이전 오류를 초기화한다", () => {
+test("댓글 삭제 확인은 요청 종료 후 Back으로 닫는다", () => {
   const h = harness();
   h.state.pendingDeleteCommentId = 99;
   h.state.deletingComment = true;
@@ -121,10 +119,8 @@ test("댓글 삭제 확인은 요청 종료 후 Back으로 닫고 이전 오류�
   assert.equal(h.state.pendingDeleteCommentId, 99);
   assert.deepEqual(h.navigation, []);
   h.state.deletingComment = false;
-  h.state.commentDeleteError = "삭제 실패";
   h.back();
   assert.equal(h.state.pendingDeleteCommentId, null);
-  assert.equal(h.state.commentDeleteError, null);
   assert.deepEqual(h.navigation, []);
 });
 

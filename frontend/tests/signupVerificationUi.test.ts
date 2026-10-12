@@ -9,8 +9,11 @@ import {
 } from "../utils/signupVerificationUi";
 
 
-test("인증코드 화면은 첫 번째 진행 점을 활성화한다", () => {
-  assert.equal(signupProgressDotIndex(1), 0);
+// 2026-10-11 사용자 확인: 인증코드는 두 번째, 기본 정보는 세 번째 점이 켜진다.
+test("회원가입 진행 점은 이메일·인증코드·기본 정보 순서로 켜진다", () => {
+  assert.equal(signupProgressDotIndex(0), 0);
+  assert.equal(signupProgressDotIndex(1), 1);
+  assert.equal(signupProgressDotIndex(2), 2);
 });
 
 

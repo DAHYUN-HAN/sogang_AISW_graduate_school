@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useMeQuery } from "../hooks/useApi";
 import { useAndroidTabBack } from "../hooks/useAndroidTabBack";
+import { useToast } from "../hooks/useToast";
 import ProfileAvatar from "./ProfileAvatar";
 import { authApi, notificationApi } from "../services/api";
 import { useUserStore } from "../stores/userStore";
@@ -23,6 +24,8 @@ import { navigateToTabRoot, tabNameFromRoute } from "../utils/tabNavigation";
 import { BackIcon, ChevronRightIcon } from "./icons";
 import { formatCohortName } from "../utils/userLabel";
 import MyPageDrawerOverlay from "./MyPageDrawerOverlay";
+import Toast from "./Toast";
+import { takeQueuedToast } from "../utils/toast";
 const COLORS = {
   primary: "#2761FF",
   primary50: "#EDF2FE",
@@ -77,6 +80,14 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
   const lastMountedOriginRef = useRef<MyPageOriginRoute | null>(null);
   const drawerOriginRef = useRef<MyPageOriginRoute | null>(null);
   const me = data?.data;
+  const { toast, showToast, hideToast } = useToast();
+
+  // 프로필 수정에서 저장하면 그 화면이 닫히고 서랍이 다시 열린다. 맡겨 둔 성공 토스트를 서랍 위에 띄운다.
+  useEffect(() => {
+    if (!isVisible) return;
+    const queued = takeQueuedToast();
+    if (queued) showToast(queued.message, queued.variant);
+  }, [isVisible, showToast]);
 
   useEffect(() => {
     const origin = myPageOriginRoute(pathname);
@@ -272,6 +283,7 @@ export function MyPageDrawerProvider({ children }: { children: ReactNode }) {
                   </Pressable>
                 </ScrollView>
               </Animated.View>
+              <Toast toast={toast} onHide={hideToast} />
             </View>
           </MyPageDrawerOverlay>
         ) : null}

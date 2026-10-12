@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, BackHandler, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
 import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -11,6 +11,7 @@ import ImageViewerModal from "../../../../components/ImageViewerModal";
 import MediaImage, { MediaImageBackground } from "../../../../components/MediaImage";
 import { BackIcon, EmptyCalendarIcon, LedgerIcon, SearchBackIcon, SearchIcon } from "../../../../components/icons";
 import LoadingState from "../../../../components/LoadingState";
+import Toast from "../../../../components/Toast";
 import PostCard from "../../../../components/PostCard";
 import PersonListCard from "../../../../components/PersonListCard";
 import { useBoardsQuery } from "../../../../hooks/useApi";
@@ -22,6 +23,8 @@ import { boardParentRoute, boardRoute, handleNestedBoardHardwareBack, participat
 import { replaceWithRoute } from "../../../../utils/tabNavigation";
 import { useBoardTabHighlight } from "../../../../hooks/useBoardTabHighlight";
 import { useSwipeBackInScreen } from "../../../../hooks/useSwipeBackInScreen";
+import { useToast } from "../../../../hooks/useToast";
+import { TOAST_INFO_MESSAGES } from "../../../../utils/toast";
 import {
   activityCertificationBadgeLabel,
   activityCertificationCardTitle,
@@ -799,9 +802,10 @@ function CouncilActivityHistoryScreen({
 
 function AccountingExternalScreen({ board, topInset, onBack }: { board?: Board | null; topInset: number; onBack: () => void }) {
   const accountingUrl = metadataString(board?.metadata, ["notion_url", "external_url", "url", "link"]);
+  const { toast, showToast, hideToast } = useToast();
   const openAccounting = () => {
     if (!accountingUrl) {
-      Alert.alert("회계장부 링크", "관리자 페이지에서 Notion 링크를 등록해 주세요.");
+      showToast(TOAST_INFO_MESSAGES.ledgerLinkMissing, "info");
       return;
     }
     if (Platform.OS === "web" && typeof window !== "undefined") {
@@ -828,6 +832,7 @@ function AccountingExternalScreen({ board, topInset, onBack }: { board?: Board |
           <Text style={styles.accountingButtonText}>회계장부 보러가기</Text>
         </Pressable>
       </View>
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }
@@ -835,6 +840,8 @@ function AccountingExternalScreen({ board, topInset, onBack }: { board?: Board |
 type BoardPostsScreenProps = {
   initialBoardId?: number;
   isTabRoot?: boolean;
+  // 탭 첫 화면을 홈 "더보기"로 열었을 때만 준다. 있으면 < 를 보인다.
+  onBack?: () => void;
 };
 
 function AlbumTile({ post, index, onPress }: { post: PostListItem; index: number; onPress: (postId: number) => void }) {
@@ -945,7 +952,7 @@ function ActivityTile({ post, boardSlug, index, isLast, onPress }: { post: PostL
 
 // ponytail: embedded (initialBoardId) == rendered inside a tab screen, so it must stay a tab root
 // and switch boards via state instead of router.replace, which would leave the (tabs) group and hide the tab bar.
-export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBoardId !== undefined }: BoardPostsScreenProps = {}) {
+export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBoardId !== undefined, onBack }: BoardPostsScreenProps = {}) {
   const params = useLocalSearchParams<{ boardId: string }>();
   const insets = useSafeAreaInsets();
   const routeBoardId = Number(params.boardId);
@@ -1244,10 +1251,10 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
           </>
         ) : (
           <>
-            {isTabRoot ? (
+            {isTabRoot && !onBack ? (
               <View style={styles.iconButton} />
             ) : (
-              <BackButton onPress={exitBoardDepth} />
+              <BackButton onPress={onBack ?? exitBoardDepth} />
             )}
             <Text style={styles.appBarTitle}>{display.name}</Text>
             {/* 참여활동은 활동 인증에서만 검색을 제공한다. */}
@@ -1359,10 +1366,10 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
               <View style={styles.emptyBox}>
                 <EmptyCalendarIcon size={32} />
                 <Text style={styles.emptyText}>
-                  {query ? "검색 결과가 없어요" : isMutualAid ? "등록된 상조회 신청이 없어요" : isSuggestion ? "등록된 건의사항이 없어요" : board?.slug === "study-recruit" ? "모집 중인 스터디가 없어요" : isParticipationGuideCards ? (participationGroupKey(board) === "networking" ? "등록된 네트워킹이 없어요" : "등록된 동아리가 없어요") : isAlbum ? "등록된 사진이 없어요" : "아직 게시물이 없어요"}
+                  {query ? "검색 결과가 없어요" : isMutualAid ? "등록된 상조회 신청이 없어요" : isSuggestion ? "등록된 건의사항이 없어요" : board?.slug === "study-recruit" ? "모집 중인 스터디가 없어요" : isParticipationGuideCards ? (participationGroupKey(board) === "networking" ? "등록된 네트워킹이 없어요" : "등록된 동아리가 없어요") : isAlbum ? "등록된 사진이 없어요" : isActivityCards ? "등록된 활동인증이 없어요" : "아직 게시물이 없어요"}
                 </Text>
                 <Text style={styles.emptySubText}>
-                  {query ? "다른 검색어로 다시 시도해보세요" : isMutualAid ? "경조사 발생 시 신청해보세요" : isSuggestion ? "원우회에 건의하고 싶은 내용을 남겨보세요" : board?.slug === "study-recruit" ? "첫 스터디를 모집해보세요" : isParticipationGuideCards ? (participationGroupKey(board) === "networking" ? "새로운 네트워킹이 등록되면 알려드릴게요" : "새로운 동아리가 등록되면 알려드릴게요") : isAlbum ? "행사 사진이 등록되면 알려드릴게요" : "첫 게시글을 남겨보세요"}
+                  {query ? "다른 검색어로 다시 시도해보세요" : isMutualAid ? "경조사 발생 시 신청해보세요" : isSuggestion ? "원우회에 건의하고 싶은 내용을 남겨보세요" : board?.slug === "study-recruit" ? "첫 스터디를 모집해보세요" : isParticipationGuideCards ? (participationGroupKey(board) === "networking" ? "새로운 네트워킹이 등록되면 알려드릴게요" : "새로운 동아리가 등록되면 알려드릴게요") : isAlbum ? "행사 사진이 등록되면 알려드릴게요" : isActivityCards ? "첫 활동을 인증해보세요" : "첫 게시글을 남겨보세요"}
                 </Text>
               </View>
             )

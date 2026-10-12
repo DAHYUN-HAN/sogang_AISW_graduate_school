@@ -1,10 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../../components/AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BackIcon } from "../../../../components/icons";
+import PrivacyConsentSheet from "../../../../components/PrivacyConsentSheet";
 import { useReturnToMyPageDrawer } from "../../../../hooks/useReturnToMyPageDrawer";
 const COLORS = {
   text: "#15171C",
@@ -17,6 +19,7 @@ const COLORS = {
 export default function AccountSettingsScreen() {
   const insets = useSafeAreaInsets();
   const { returnToMyPageDrawer, onLayout } = useReturnToMyPageDrawer("/settings/account");
+  const [privacySheetVisible, setPrivacySheetVisible] = useState(false);
 
   return (
     <View style={styles.screen} onLayout={onLayout}>
@@ -45,7 +48,7 @@ export default function AccountSettingsScreen() {
             <Text style={styles.menuText}>학교 이메일 인증 정보</Text>
             <Ionicons name="chevron-forward" size={15} color={COLORS.subtle} />
           </Pressable>
-          <Pressable onPress={() => router.push("/settings/privacy")} style={styles.menuRow}>
+          <Pressable onPress={() => setPrivacySheetVisible(true)} style={styles.menuRow}>
             <Text style={styles.menuText}>개인정보 수집 및 이용 동의</Text>
             <Ionicons name="chevron-forward" size={15} color={COLORS.subtle} />
           </Pressable>
@@ -61,6 +64,7 @@ export default function AccountSettingsScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <PrivacyConsentSheet visible={privacySheetVisible} onClose={() => setPrivacySheetVisible(false)} />
     </View>
   );
 }

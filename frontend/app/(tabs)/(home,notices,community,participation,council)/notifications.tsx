@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   BackIcon,
+  EmptyCalendarIcon,
   NotificationCommentIcon,
   NotificationNoticeIcon,
   NotificationCouncilIcon,
@@ -165,7 +166,8 @@ export default function NotificationsScreen() {
                   <Text style={styles.emptyText}>알림을 불러오지 못했습니다. 당겨서 다시 시도해주세요.</Text>
                 ) : (
                   <>
-                    <Ionicons name="calendar-outline" size={32} color={COLORS.emptyIcon} />
+                    {/* Figma Notification/Center-Empty: 다른 빈 화면과 같은 빈 달력 */}
+                    <EmptyCalendarIcon size={32} color={COLORS.emptyIcon} />
                     <Text style={styles.emptyTitle}>아직 알림이 없어요</Text>
                     <Text style={styles.emptySub}>새로운 소식이 있으면 알려드릴게요</Text>
                   </>

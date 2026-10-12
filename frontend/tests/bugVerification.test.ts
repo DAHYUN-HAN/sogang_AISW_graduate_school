@@ -10,16 +10,17 @@ const homeSource = readFileSync("app/(tabs)/(home,notices,community,participatio
 const communitySource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/community.tsx", "utf8");
 const loginSource = readFileSync("app/auth/login.tsx", "utf8");
 
+// 2026-10-12 사용자 요청: 탭을 옮기지 않고 홈 위에 새 커뮤니티 화면을 쌓아 < 로 홈에 돌아온다.
 test("#14·15 행사 사진첩 더보기는 커뮤니티를 행사 사진첩 기본 상태로 다시 연다", () => {
   assert.match(
     homeSource,
-    /<SectionHeader\s+title="행사 사진첩"[\s\S]*?requestTabRootReset\("community"\)[\s\S]*?navigateToTabRoot\("community"\)[\s\S]*?\/>/,
+    /<SectionHeader\s+title="행사 사진첩"[\s\S]*?navigation\.dispatch\(StackActions\.push\("community"\)\)[\s\S]*?\/>/,
   );
   assert.doesNotMatch(
     homeSource,
     /title="행사 사진첩"[\s\S]*?onPress=\{\(\) => router\.push\(COMMUNITY_TAB_ROUTE as never\)\}/,
   );
-  assert.match(communitySource, /<BoardPostsScreen initialBoardId=\{initialBoard\.id\} isTabRoot \/>/);
+  assert.match(communitySource, /<BoardPostsScreen initialBoardId=\{initialBoard\.id\} isTabRoot onBack=\{isStackRoot \? undefined : \(\) => router\.back\(\)\} \/>/);
 });
 
 test("#16 전공 커뮤니티 상세는 목록으로 복귀하고 전체 보드 탭을 사용하지 않는다", () => {

@@ -26,11 +26,6 @@ import {
   verificationHasExpired,
 } from "../../utils/authVerificationUi";
 import {
-  CONSENT_DOCUMENT_SECTIONS,
-  PRIVACY_POLICY_SUPPORT_EMAIL,
-  resolvePrivacyPolicyMetadata,
-} from "../../utils/privacyPolicy";
-import {
   registrationVerificationFailure,
   resendAvailableAt,
   resendCountdownLabel,
@@ -38,6 +33,7 @@ import {
 } from "../../utils/signupVerificationUi";
 
 import { BackIcon } from "../../components/icons";
+import PrivacyConsentSheet from "../../components/PrivacyConsentSheet";
 const COLORS = {
   primary: "#2761FF", // primary/500
   primary50: "#EDF2FE",
@@ -87,6 +83,8 @@ export default function RegisterScreen() {
   const verificationExpiresAtRef = useRef(0);
   const resendAvailableAtRef = useRef(0);
   const [verificationMessage, setVerificationMessage] = useState<VerificationMessage>(null);
+  // Figma SignUp-Step2-Resent: 재전송 뒤에는 안내문이 "재발송되었어요"로 바뀌고 남은 시간이 회색이 된다.
+  const [codeResent, setCodeResent] = useState(false);
   const [verificationFailureState, setVerificationFailureState] = useState<VerificationFailureState>(null);
   const [nickname, setNickname] = useState("");
   const [cohort, setCohort] = useState("");
@@ -105,7 +103,6 @@ export default function RegisterScreen() {
   const registrationOptionsQuery = useRegistrationOptionsQuery();
   const majorOptions = registrationOptionsQuery.data?.data.majors ?? [];
   const privacyPolicy = registrationOptionsQuery.data?.data.privacy_policy;
-  const privacyPolicyDisplay = resolvePrivacyPolicyMetadata(privacyPolicy);
 
   const email = composeSchoolEmail(emailId);
 
@@ -138,7 +135,6 @@ export default function RegisterScreen() {
       setErrors({ email: emailError });
       return;
     }
-    const requestStartedAt = Date.now();
     try {
       setIsSubmitting(true);
       setErrors({});
@@ -155,9 +151,11 @@ export default function RegisterScreen() {
       }
       setCode("");
       setVerificationToken("");
-      verificationExpiresAtRef.current = requestStartedAt + response.data.expires_in * 1000;
       const resendIn = response.data.resend_in ?? response.data.expires_in;
+      // 만료와 재전송 가능 시각을 같은 기준(응답 받은 때)으로 잰다. 요청 시작을 기준으로 하면
+      // 메일 발송에 걸린 몇 초만큼 만료가 먼저 와서 회색 "재전송 (00:05)"가 잠깐 보였다.
       const responseReceivedAt = Date.now();
+      verificationExpiresAtRef.current = responseReceivedAt + response.data.expires_in * 1000;
       resendAvailableAtRef.current = resendAvailableAt(responseReceivedAt, resendIn);
       setCountdown(
         Math.max(0, Math.ceil((verificationExpiresAtRef.current - responseReceivedAt) / 1000)),
@@ -168,6 +166,7 @@ export default function RegisterScreen() {
       setStep(1);
       setVerificationFailureState(null);
       setVerificationMessage(resend ? { type: "success", text: "새 인증코드가 발송되었어요." } : null);
+      setCodeResent(resend);
     } catch (error) {
       const errorCode = apiErrorCode(error);
       if (errorCode === "VERIFICATION_RESEND_COOLDOWN") {
@@ -329,8 +328,6 @@ export default function RegisterScreen() {
   const codeError = verificationExpired
     ? "인증 시간이 만료되었어요. 재전송을 눌러주세요."
     : errors.code;
-  // 상태 문구가 이미 떠 있으면 재전송 라벨을 생략하고 남은 시간만 강조한다.
-  const showResendTimerOnly = Boolean(codeError || verificationMessage);
 
   return (
     <View style={styles.screen}>
@@ -377,7 +374,7 @@ export default function RegisterScreen() {
           {step === 1 ? (
             <>
               <Text style={styles.heading}>인증코드를 입력해주세요</Text>
-              <Text style={styles.helper}>{email}로 발송되었어요</Text>
+              <Text style={styles.helper}>{email}로 {codeResent ? "재발송" : "발송"}되었어요</Text>
               <View style={styles.field}>
                 <TextInput
                   keyboardType="number-pad"
@@ -391,11 +388,11 @@ export default function RegisterScreen() {
                   }}
                   placeholder="인증코드 6자리"
                   placeholderTextColor={COLORS.tertiary}
-                  style={[styles.codeInput, codeError ? styles.inputError : null, verificationAttemptsLocked ? styles.verificationLockedInput : null]}
+                  style={[styles.codeInput, codeError ? styles.inputError : null]}
                   value={code}
                 />
               </View>
-              <View style={[styles.statusRow, codeError || verificationMessage ? styles.statusRowTight : null]}>
+              <View style={styles.statusRow}>
                 <View style={styles.statusLeft}>
                   {codeError ? (
                     <View style={styles.errorRow}>
@@ -422,10 +419,11 @@ export default function RegisterScreen() {
                     disabled={isSubmitting || resendCooldown > 0}
                     hitSlop={8}
                     onPress={() => void requestCode(true)}
-                    style={!codeError && !verificationMessage ? styles.resendControlLeading : styles.resendControlTrailing}
+                    style={styles.resendControlTrailing}
                   >
-                    <Text style={[styles.resendLink, showResendTimerOnly ? styles.resendTimer : null]}>
-                      {isSubmitting ? "발송 중" : resendCountdownLabel(resendCooldown, { timerOnly: showResendTimerOnly })}
+                    {/* Figma SignUp-Step2: 처음 발송은 파란 "재전송 (04:59)"를 오른쪽에, 재전송 뒤에는 같은 자리에 회색으로 둔다. */}
+                    <Text style={[styles.resendLink, codeResent && resendCooldown > 0 ? styles.resendLinkDisabled : null]}>
+                      {isSubmitting ? "발송 중" : resendCountdownLabel(resendCooldown)}
                     </Text>
                   </Pressable>
                 )}
@@ -437,7 +435,7 @@ export default function RegisterScreen() {
                   style={[styles.primaryButton, isSubmitting ? styles.disabledButton : null, resendCooldown > 0 ? styles.validationDisabledButton : null]}
                 >
                   <Text style={styles.primaryButtonText}>
-                    {isSubmitting ? "발송 중" : resendCooldown > 0 ? resendCountdownLabel(resendCooldown) : "인증코드 재전송"}
+                    {isSubmitting ? "발송 중" : resendCooldown > 0 ? resendCountdownLabel(resendCooldown) : "재전송"}
                   </Text>
                 </Pressable>
               ) : (
@@ -545,50 +543,8 @@ export default function RegisterScreen() {
         </Pressable>
       </Modal>
 
-      <Modal
-        animationType="slide"
-        onRequestClose={() => setPrivacyModalVisible(false)}
-        transparent
-        visible={privacyModalVisible}
-      >
-        <View style={styles.privacyModalBackdrop}>
-          <View style={styles.privacyModalCard}>
-            <View style={styles.privacyModalHandle} />
-            <View style={styles.privacyModalHeader}>
-              <View style={styles.privacyModalTitleRow}>
-                <Ionicons name="shield-checkmark-outline" size={20} color={COLORS.primary} />
-                <Text style={styles.privacyModalTitle}>이용약관 및 개인정보 처리방침</Text>
-              </View>
-              <Text style={styles.privacyModalInstruction}>내용을 확인하고 언제든 닫을 수 있어요.</Text>
-            </View>
-            <ScrollView contentContainerStyle={styles.privacyModalContent} style={styles.privacyModalScroll}>
-              <View style={styles.privacyPolicyMeta}>
-                <Text style={styles.privacyPolicyMetaText}>버전: {privacyPolicyDisplay.version}</Text>
-                <Text style={styles.privacyPolicyMetaText}>시행일: {privacyPolicyDisplay.effectiveDate}</Text>
-              </View>
-              {CONSENT_DOCUMENT_SECTIONS.map((section, index) => (
-                <View key={`${section.title}-${index}`} style={styles.privacyPolicySection}>
-                  <Text style={styles.privacyPolicySectionTitle}>{section.title}</Text>
-                  <Text style={styles.privacyPolicyBody}>{section.body}</Text>
-                </View>
-              ))}
-              <View style={styles.privacyPolicySection}>
-                <Text style={styles.privacyPolicySectionTitle}>개인정보 문의</Text>
-                <Text style={styles.privacyPolicyBody}>{PRIVACY_POLICY_SUPPORT_EMAIL}</Text>
-              </View>
-            </ScrollView>
-            <View style={styles.privacyModalFooter}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setPrivacyModalVisible(false)}
-                style={styles.primaryButton}
-              >
-                <Text style={styles.primaryButtonText}>닫기</Text>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* 계정 설정과 같은 동의 시트(Figma PrivacyConsentSheet)를 쓴다. */}
+      <PrivacyConsentSheet visible={privacyModalVisible} onClose={() => setPrivacyModalVisible(false)} />
     </View>
   );
 }
@@ -610,18 +566,17 @@ const styles = StyleSheet.create({
   input: { minHeight: 48, outlineStyle: "none" as never, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, backgroundColor: COLORS.bg, color: COLORS.text, fontSize: 14, fontWeight: "400", paddingHorizontal: 16 }, // Figma SignUp-Step3: 48h, border 1, px16, Regular 14
   codeInput: { height: 48, outlineStyle: "none" as never, borderWidth: 1, borderColor: COLORS.border, borderRadius: 8, backgroundColor: COLORS.bg, color: COLORS.text, fontSize: 14, fontWeight: "400", lineHeight: 22, paddingHorizontal: 16 }, // Figma verification code input: 48h, border 1, px16
   inputError: { borderColor: COLORS.danger },
-  profileInputError: { borderColor: COLORS.danger, backgroundColor: "#FFF5F5" },
-  verificationLockedInput: { backgroundColor: "#FFF5F5" },
-  errorRow: { minHeight: 30, flexDirection: "row", alignItems: "center", gap: 4 }, // Figma status/error row: 30h, gap4
-  statusRow: { flexDirection: "row", alignItems: "center", width: "100%", gap: 8 }, // 재전송만 있을 때는 본문 gap 20을 그대로 쓴다
-  // 에러/안내 문구는 코드영역 안에 들어가므로 입력창과 8px만 띄운다(본문 gap 20 - 12).
-  statusRowTight: { marginTop: -12 },
+  // 피그마 SignUp 오류 화면: 오류 칸은 배경 없이 빨간 테두리만 둔다.
+  profileInputError: { borderColor: COLORS.danger },
+  // Figma SignUp-Step3-Error: 칸 아래 7에 오류 문구(12/14), 그 아래 20에 다음 라벨
+  errorRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // Figma SignUp-Step2: 인증코드 칸 아래 6에 재전송·안내 줄을 둔다(본문 gap 20 - 14).
+  statusRow: { flexDirection: "row", alignItems: "center", width: "100%", gap: 8, marginTop: -14 },
   statusLeft: { flexShrink: 1, minWidth: 0 },
-  resendControlLeading: { alignSelf: "flex-start" },
   resendControlTrailing: { marginLeft: "auto" },
-  resendLink: { color: COLORS.primary, fontSize: 13, fontWeight: "400", lineHeight: 18 }, // Figma "재전송 (04:59)": Regular 13/18
-  resendTimer: { fontWeight: "500", lineHeight: 16 }, // Figma "05:00": Medium 13/16
-  errorText: { flexShrink: 1, color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 15 }, // Figma: error/500 Regular 12/15
+  resendLink: { color: COLORS.primary, fontSize: 13, fontWeight: "400", lineHeight: 16 }, // Figma "재전송 (04:59)": Regular 13/16
+  resendLinkDisabled: { color: "#999EA8" }, // Figma SignUp-Step2-Resent: 재전송 뒤 카운트다운은 회색
+  errorText: { flexShrink: 1, color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 14 }, // Figma: error/500 Regular 12/14
   successText: { color: "#3B6D11", fontSize: 12, fontWeight: "400", lineHeight: 15 }, // Figma: success green Regular 12/15
   successRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   passwordHelper: { color: COLORS.subtle, fontSize: 12, fontWeight: "400", lineHeight: 18 }, // Figma: Regular 12
@@ -655,19 +610,4 @@ const styles = StyleSheet.create({
   modalRetry: { alignItems: "flex-start", gap: 8, paddingVertical: 10 },
   modalRetryButton: { borderRadius: 7, backgroundColor: COLORS.primary50, paddingHorizontal: 12, paddingVertical: 8 },
   modalRetryText: { color: COLORS.primary, fontSize: 12, fontWeight: "700" },
-  privacyModalBackdrop: { flex: 1, alignItems: "center", justifyContent: "flex-end", backgroundColor: "rgba(17,24,39,0.42)" },
-  privacyModalCard: { width: "100%", maxWidth: 405, height: "88%", overflow: "hidden", borderTopLeftRadius: 18, borderTopRightRadius: 18, backgroundColor: COLORS.bg, paddingTop: 12 },
-  privacyModalHandle: { width: 36, height: 4, alignSelf: "center", borderRadius: 2, backgroundColor: "#C7CCD4", marginBottom: 14 },
-  privacyModalHeader: { gap: 6, paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: "#EAECEF" },
-  privacyModalTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
-  privacyModalTitle: { flex: 1, color: COLORS.text, fontSize: 18, fontWeight: "600" },
-  privacyModalInstruction: { color: COLORS.tertiary, fontSize: 12, fontWeight: "400", lineHeight: 18 },
-  privacyModalScroll: { flex: 1 },
-  privacyModalContent: { gap: 18, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 28 },
-  privacyPolicyMeta: { gap: 3, borderRadius: 8, backgroundColor: "#F7F8FA", padding: 12 },
-  privacyPolicyMetaText: { color: COLORS.muted, fontSize: 12, fontWeight: "400", lineHeight: 18 },
-  privacyPolicySection: { gap: 5 },
-  privacyPolicySectionTitle: { color: COLORS.text, fontSize: 14, fontWeight: "700", lineHeight: 20 },
-  privacyPolicyBody: { color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 21 },
-  privacyModalFooter: { gap: 8, borderTopWidth: 1, borderTopColor: "#EAECEF", backgroundColor: COLORS.bg, paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
 });

@@ -37,7 +37,8 @@ function harness(returnTo?: string, canGoBack = true) {
     setShowDeleteConfirm: (show: boolean) => actions.push(`confirm:${show}`),
     setShowPostMenu: (show: boolean) => actions.push(`menu:${show}`),
     deletePostMutation: { mutate: (_: undefined, next: typeof callbacks) => { callbacks = next; } },
-    Alert: { alert: () => actions.push("error") },
+    showToast: () => actions.push("error"),
+    TOAST_ERROR_MESSAGES: {},
   }) as () => void;
   return { actions, confirm, succeed: () => callbacks!.onSuccess(), fail: () => callbacks!.onError() };
 }

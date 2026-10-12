@@ -4,7 +4,7 @@ import test from "node:test";
 import { runInNewContext } from "node:vm";
 import { AxiosError, CanceledError } from "axios";
 import ts from "typescript";
-import { isNetworkError } from "../utils/networkError";
+import { isNetworkError, isServerLoadError } from "../utils/networkError";
 
 const disconnected = new AxiosError("Network Error", "ERR_NETWORK");
 
@@ -39,9 +39,9 @@ test("네트워크 오류 UI의 재시도 버튼은 전달된 화면 재요청�
       if (name === "@react-navigation/native") return { useIsFocused: () => true };
       if (name === "../stores/networkStatusStore") return { registerNetworkRetry: () => () => {} };
       if (name === "react-native") return { View: "View", Pressable: "Pressable", StyleSheet: { create: (styles: unknown) => styles } };
-      if (name === "react-native-svg") return { default: "Svg", Path: "Path" };
+      if (name === "react-native-svg") return { default: "Svg", Path: "Path", Circle: "Circle", Rect: "Rect" };
       if (name === "./AppTypography") return { AppText: "Text" };
-      if (name === "../utils/networkError") return { isNetworkError };
+      if (name === "../utils/networkError") return { isNetworkError, isServerLoadError };
       throw new Error(name);
     },
   });
@@ -57,4 +57,23 @@ test("네트워크 오류 UI의 재시도 버튼은 전달된 화면 재요청�
   const fallback = { type: "server-error" };
   assert.equal(exported.NetworkErrorFallback({ error: disconnected, onRetry, children: fallback }).type, exported.default);
   assert.equal(exported.NetworkErrorFallback({ error: undefined, onRetry, children: fallback }).children[0], fallback);
+});
+
+// 2026-10-12 피그마 Screen/Common/LoadError: 서버가 조회에 실패하면 앱 전체를 이 화면으로 덮는다.
+test("서버 조회 실패만 LoadError 대상으로 판별한다", () => {
+  const response = (status: number) => ({ status, data: {}, statusText: "Error", headers: {}, config: {} }) as any;
+  assert.equal(isServerLoadError(new AxiosError("x", "ERR_BAD_RESPONSE", { method: "get" } as any, {}, response(500))), true);
+  assert.equal(isServerLoadError(new AxiosError("x", "ERR_BAD_RESPONSE", { method: "get" } as any, {}, response(503))), true);
+  assert.equal(isServerLoadError(new AxiosError("x", "ERR_BAD_RESPONSE", { method: "post" } as any, {}, response(500))), false);
+  assert.equal(isServerLoadError(new AxiosError("x", "ERR_BAD_RESPONSE", { method: "get" } as any, {}, response(404))), false);
+  assert.equal(isServerLoadError(disconnected), false);
+});
+
+test("LoadError 화면은 피그마 문구를 쓰고 앱 덮개가 서버 실패 때 띄운다", () => {
+  const state = readFileSync("components/NetworkErrorState.tsx", "utf8");
+  assert.match(state, /페이지를 불러오지 못했어요/);
+  assert.match(state, /잠시 후 다시 시도해주세요/);
+  const overlay = readFileSync("components/AppNetworkError.tsx", "utf8");
+  assert.match(overlay, /if \(!disconnected && !serverFailed\) return null;/);
+  assert.match(overlay, /: <LoadErrorState onRetry=/);
 });

@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -19,7 +19,16 @@ class PollQuestionDraft(BaseModel):
     title: str = Field(min_length=1, max_length=100)
     kind: Literal["text", "date"] = "text"
     allow_multiple: bool = False
+    ends_at: datetime | None = None
     options: list[PollOptionDraft] = Field(min_length=2, max_length=20)
+
+    @field_validator("ends_at")
+    @classmethod
+    def utc_card_deadline(cls, value):
+        # Stored like every other timestamp: naive UTC.
+        if value is not None and value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
 
     @model_validator(mode="after")
     def validate_options(self):
@@ -52,7 +61,8 @@ class PollDraft(BaseModel):
 class PollAnswer(BaseModel):
     model_config = ConfigDict(extra="forbid")
     question_id: PositiveId
-    option_ids: list[PositiveId] = Field(min_length=1, max_length=20)
+    # An empty list withdraws this account's answer for the question.
+    option_ids: list[PositiveId] = Field(max_length=20)
 
 
 class PollVote(BaseModel):

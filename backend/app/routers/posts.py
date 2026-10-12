@@ -1424,6 +1424,19 @@ def get_admin_posts(
     )
 
 
+def _deleted_post_or_not_found(db: Session, post_id: int, user: User) -> AppException:
+    """지워진 글이면 게시판을 알려 줘 앱이 살아 있던 글과 같은 제목으로 삭제 화면을 띄운다.
+
+    피그마 Screen/Notice/Detail-Deleted. 읽을 수 없는 게시판이거나 처음부터 없던 글은
+    지금처럼 NOT_FOUND로 둔다.
+    """
+    board_id = db.scalar(select(Post.board_id).where(Post.id == post_id, Post.deleted_at.is_not(None)))
+    board = db.get(Board, board_id) if board_id is not None else None
+    if board is None or (not board.is_active and user.role != "admin") or not can_read_board(user, board.read_permission):
+        return AppException(status_code=404, message="Post not found.", code="NOT_FOUND")
+    return AppException(status_code=404, message="Post deleted.", code="POST_DELETED", data={"board_id": board.id})
+
+
 @router.get("/posts/{post_id}")
 def get_post_detail(
     post_id: int,
@@ -1437,7 +1450,7 @@ def get_post_detail(
         .where(Post.id == post_id, Post.deleted_at.is_(None))
     ).first()
     if row is None:
-        raise AppException(status_code=404, message="Post not found.", code="NOT_FOUND")
+        raise _deleted_post_or_not_found(db, post_id, current_user)
 
     post, nickname, cohort = row
     board = require_post_read(db, post, current_user)

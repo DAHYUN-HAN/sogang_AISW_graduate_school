@@ -3,7 +3,7 @@ import { Animated, StyleSheet, View } from "react-native";
 import { AppText as Text } from "./AppTypography";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { ToastAlertIcon } from "./icons";
+import { ToastAlertIcon, ToastSuccessIcon } from "./icons";
 import { TOAST_DURATION_MS, TOAST_FADE_OUT_MS, toastHoldMs, type ToastState } from "../utils/toast";
 
 type Props = {
@@ -16,6 +16,9 @@ type Props = {
  * 화면 하단에 잠깐 떴다 사라지는 안내. Figma Component/Toast-* 를 옮긴 것으로,
  * 누를 것이 없어 사용자의 입력을 막지 않는다. 어떤 칸이 문제인지는 해당
  * 입력칸의 빨간 테두리가 알려주므로 문구에는 항목명을 넣지 않는다.
+ *
+ * 종류(variant)는 피그마 Spec/앱 알림 → 토스트 전환을 따른다. 오류는 빨간 !,
+ * 성공은 초록 체크와 그림자, 안내(Toast-Info)는 아이콘·그림자 없이 문구만 보인다.
  *
  * durationMs는 뜬 순간부터 사라질 때까지의 전체 시간이다. 오류 알림이라
  * 등장은 즉시이고, 마지막에만 서서히 흐려진다.
@@ -43,6 +46,7 @@ export default function Toast({ toast, onHide, durationMs = TOAST_DURATION_MS }:
   }, [durationMs, onHide, opacity, toastId]);
 
   if (!toast) return null;
+  const variant = toast.variant ?? "error";
 
   return (
     <View
@@ -50,8 +54,9 @@ export default function Toast({ toast, onHide, durationMs = TOAST_DURATION_MS }:
       pointerEvents="none"
       style={[styles.wrap, { paddingBottom: Math.max(insets.bottom, 0) + 24 }]}
     >
-      <Animated.View style={[styles.toast, { opacity }]}>
-        <ToastAlertIcon size={18} />
+      <Animated.View style={[styles.toast, variant === "info" ? styles.toastInfo : null, { opacity }]}>
+        {variant === "error" ? <ToastAlertIcon size={18} /> : null}
+        {variant === "success" ? <ToastSuccessIcon size={18} /> : null}
         <Text style={styles.message}>{toast.message}</Text>
       </Animated.View>
     </View>
@@ -82,6 +87,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 6,
+  },
+  // Figma Toast-Info: 그림자 없음
+  toastInfo: {
+    shadowOpacity: 0,
+    elevation: 0,
   },
   message: {
     flexShrink: 1,

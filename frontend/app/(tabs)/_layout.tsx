@@ -57,9 +57,11 @@ function CategoryHighlightTabBar(props: BottomTabBarProps) {
   const { state } = props;
   const stack = state.routes[state.index]?.state;
   const topScreen = stack?.routes[stack.index ?? stack.routes.length - 1];
+  // 홈 "더보기"로 쌓은 공지사항·커뮤니티 첫 화면은 그 탭을 하이라이트한다.
+  const pushedTabRoot = topScreen && ["notices", "community"].includes(topScreen.name) ? topScreen.name : undefined;
   // 맨 위 화면이 직접 기록한 값만 쓴다. 아직 기록 전(글을 불러오는 중)이면 지금 탭.
-  const highlightTab = topScreen?.key ? highlightTabs[topScreen.key] : undefined;
-  if (!topScreen?.name.startsWith("board/") || !highlightTab) return <BottomTabBar {...props} />;
+  const highlightTab = pushedTabRoot ?? (topScreen?.key ? highlightTabs[topScreen.key] : undefined);
+  if ((!pushedTabRoot && !topScreen?.name.startsWith("board/")) || !highlightTab) return <BottomTabBar {...props} />;
 
   const targetIndex = state.routes.findIndex((route) => route.name === `(${highlightTab})`);
   if (targetIndex < 0) return <BottomTabBar {...props} />;

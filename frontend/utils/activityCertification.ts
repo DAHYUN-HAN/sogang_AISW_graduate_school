@@ -270,19 +270,6 @@ export function withParticipantDuesState(
   ));
 }
 
-export function activityParticipantSelectionError(
-  selectedParticipants: ActivityParticipant[],
-  existingMetadata?: Record<string, unknown> | null,
-): string | null {
-  if (
-    selectedParticipants.some((participant) => participant.legacy)
-    && !isUnchangedPersistedSelection(selectedParticipants, existingMetadata)
-  ) {
-    return "기존 회원 기반 참가자를 변경하려면 원우회비 납부자 명부에서 참가자 전원을 다시 선택해주세요.";
-  }
-  return null;
-}
-
 export function activitySourcePostIdFromMetadata(
   metadata?: Record<string, unknown> | null,
 ): number | null {

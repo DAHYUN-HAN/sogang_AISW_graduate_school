@@ -9,7 +9,7 @@ const passwordResetSource = readFileSync("app/auth/password-reset.tsx", "utf8");
 test("비밀번호 찾기 인증 화면은 재전송 카운트다운 상태를 실제 화면에 연결한다", () => {
   assert.match(passwordResetSource, /import \{ passwordResetProgressDotIndex, passwordResetResendControl \} from "\.\.\/\.\.\/utils\/passwordResetUi"/);
   assert.match(passwordResetSource, /const resendControl = passwordResetResendControl\(\{/);
-  assert.match(passwordResetSource, /<View style=\{styles\.statusRow\}>[\s\S]*<Text style=\{\[styles\.resendLink, resendControl\.disabled \? styles\.resendLinkDisabled : null\]\}>\{resendControl\.label\}<\/Text>/);
+  assert.match(passwordResetSource, /<View style=\{styles\.statusRow\}>[\s\S]*<Text style=\{\[styles\.resendLink, codeResent && resendControl\.disabled \? styles\.resendLinkDisabled : null\]\}>\{resendControl\.label\}<\/Text>/);
   assert.match(passwordResetSource, /\{resendControl\.visible \? \(/);
   assert.match(passwordResetSource, /accessibilityState=\{\{ disabled: resendControl\.disabled \}\}/);
 });

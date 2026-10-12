@@ -28,8 +28,9 @@ export function registrationVerificationFailure(
 }
 
 
+// 이메일(0)·인증코드(1)·기본 정보(2) 단계가 진행 점 세 개에 차례로 대응한다.
 export function signupProgressDotIndex(step: number): number {
-  return Math.max(0, step - 1);
+  return Math.min(Math.max(0, step), 2);
 }
 
 

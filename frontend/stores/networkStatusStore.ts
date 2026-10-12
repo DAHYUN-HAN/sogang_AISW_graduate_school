@@ -1,16 +1,21 @@
 import { create } from "zustand";
 
 // Keep mounted screens and drafts intact while a single app-wide overlay is shown.
+// 인터넷 끊김(disconnected)은 네트워크 오류, 서버 조회 실패(serverFailed)는 LoadError 화면을 띄운다.
 export const useNetworkStatusStore = create<{
   disconnected: boolean;
+  serverFailed: boolean;
   revision: number;
   markDisconnected: () => void;
+  markServerFailed: () => void;
   clearIfUnchanged: (revision: number) => void;
 }>((set) => ({
   disconnected: false,
+  serverFailed: false,
   revision: 0,
   markDisconnected: () => set(state => ({ disconnected: true, revision: state.revision + 1 })),
-  clearIfUnchanged: (revision) => set(state => state.revision === revision ? { disconnected: false } : {}),
+  markServerFailed: () => set(state => ({ serverFailed: true, revision: state.revision + 1 })),
+  clearIfUnchanged: (revision) => set(state => state.revision === revision ? { disconnected: false, serverFailed: false } : {}),
 }));
 
 const retries = new Map<symbol, () => void | Promise<unknown>>();

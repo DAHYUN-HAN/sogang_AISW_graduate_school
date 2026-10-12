@@ -454,6 +454,18 @@ export function NoticeAlertIcon({ size = 14, color = "#854F0B" }: IconProps) {
   );
 }
 
+// 입력칸 아래 오류 문구 앞 경고 아이콘 — 디자인 원본 14x14, stroke 1.3.
+// NoticeAlertIcon과 크기는 같지만 원이 더 크고 선이 굵다.
+export function FieldErrorIcon({ size = 14, color = "#D64545" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 14 14" fill="none">
+      <Path d="M7 13.125C10.3827 13.125 13.125 10.3827 13.125 7C13.125 3.61726 10.3827 0.875 7 0.875C3.61726 0.875 0.875 3.61726 0.875 7C0.875 10.3827 3.61726 13.125 7 13.125Z" stroke={color} strokeWidth={1.3} />
+      <Path d="M7 3.9375V7.6125" stroke={color} strokeWidth={1.3} strokeLinecap="round" />
+      <Path d="M7 10.5875C7.43492 10.5875 7.7875 10.2349 7.7875 9.8C7.7875 9.36508 7.43492 9.0125 7 9.0125C6.56508 9.0125 6.2125 9.36508 6.2125 9.8C6.2125 10.2349 6.56508 10.5875 7 10.5875Z" fill={color} />
+    </Svg>
+  );
+}
+
 // 토스트용 경고 아이콘 — 디자인 원본 18x18. 채워진 원 위에 흰 느낌표라
 // NoticeAlertIcon(테두리만 있는 원)과 다르다. color는 원의 채움색이다.
 export function ToastAlertIcon({ size = 18, color = "#D64545" }: IconProps) {
@@ -466,7 +478,28 @@ export function ToastAlertIcon({ size = 18, color = "#D64545" }: IconProps) {
   );
 }
 
+// 피그마 Component/Toast-Success의 초록 체크.
+export function ToastSuccessIcon({ size = 18, color = "#2E9E5B" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <Path d="M9 18C13.9706 18 18 13.9706 18 9C18 4.02944 13.9706 0 9 0C4.02944 0 0 4.02944 0 9C0 13.9706 4.02944 18 9 18Z" fill={color} />
+      <Path d="M5 9.2L7.6 11.8L13 6" stroke="#FFFFFF" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // 기본 프로필 아바타 — 디자인 원본 80x80 (파란 배경 원 + 흰 실루엣, 카메라 배지는 별도 오버레이).
+// 투표 참여자 행 아바타 — 디자인 원본 44px 원 + 28px 프로필 아이콘.
+export function VoterAvatarIcon({ size = 44 }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 44 44" fill="none">
+      <Circle cx={22} cy={22} r={22} fill="#E6F1FB" />
+      <Path d="M22 22C24.5773 22 26.6667 19.9107 26.6667 17.3333C26.6667 14.756 24.5773 12.6667 22 12.6667C19.4227 12.6667 17.3333 14.756 17.3333 17.3333C17.3333 19.9107 19.4227 22 22 22Z" fill="white" />
+      <Path d="M12.6667 31.3333C12.6667 26.2 16.8667 22 22 22C27.1333 22 31.3333 26.2 31.3333 31.3333" fill="white" />
+    </Svg>
+  );
+}
+
 export function DefaultAvatarIcon({ size = 80 }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 80 80" fill="none">

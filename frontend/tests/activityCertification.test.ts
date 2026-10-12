@@ -10,7 +10,6 @@ import {
   activityBankAccountFieldState,
   activityCertificationBadgeLabel,
   activityCertificationPreview,
-  activityParticipantSelectionError,
   activityParticipantsFromMetadata,
   activitySourcePostFilters,
   activityCertificationCardTitle,
@@ -239,7 +238,6 @@ test("선택을 바꾸지 않은 기존 참가자는 레거시 스냅샷을 그�
   };
   const selectedParticipants = activityParticipantsFromMetadata(existingMetadata);
 
-  assert.equal(activityParticipantSelectionError(selectedParticipants, existingMetadata), null);
   assert.deepEqual(buildActivityCertificationMetadata({
     existingMetadata,
     activityDate: "2026.08.15",
@@ -252,19 +250,6 @@ test("선택을 바꾸지 않은 기존 참가자는 레거시 스냅샷을 그�
     participants: "72기 김서강, 73기 이서강",
     participant_user_ids: "4,7",
   });
-});
-
-test("기존 회원 기반 참가자 구성을 바꾸면 명부에서 전원 재선택하도록 막는다", () => {
-  const existingMetadata = { participants: "기존 참가자", participant_user_ids: "2" };
-  const mixed = [
-    ...activityParticipantsFromMetadata(existingMetadata),
-    { id: 7, name: "김서강", major: "AI", student_number: "A74001" },
-  ];
-
-  assert.match(activityParticipantSelectionError(mixed, existingMetadata) ?? "", /전원을 다시 선택/);
-  assert.equal(activityParticipantSelectionError([
-    { id: 7, name: "김서강", major: "AI", student_number: "A74001" },
-  ], existingMetadata), null);
 });
 
 test("잘못된 활동 소스 ID는 수정 초기값으로 사용하지 않는다", () => {

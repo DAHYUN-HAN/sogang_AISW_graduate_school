@@ -26,5 +26,8 @@ def success_response(data: Any, pagination: dict[str, Any] | None = None) -> dic
     return payload
 
 
-def error_response(message: str, code: str) -> dict[str, Any]:
-    return {"status": "error", "message": message, "code": code}
+def error_response(message: str, code: str, data: Any = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {"status": "error", "message": message, "code": code}
+    if data is not None:
+        payload["data"] = _serialize_utc_datetimes(data)
+    return payload

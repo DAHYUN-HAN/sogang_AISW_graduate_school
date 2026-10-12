@@ -1,7 +1,7 @@
 export type AuthVerificationFailureState = "expired" | "attempts" | null;
 
 export const VERIFICATION_ATTEMPTS_EXCEEDED_MESSAGE =
-  "인증 시도 횟수 초과했어요.\n잠시 후 다시 시도해주세요.";
+  "인증 시도 횟수를 초과했어요.\n잠시 후 다시 시도해주세요.";
 
 export function verificationFailureStateFromErrorCode(
   errorCode: string | undefined,

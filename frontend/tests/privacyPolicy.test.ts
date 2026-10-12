@@ -158,3 +158,12 @@ test("개인정보 전문은 마지막 영역에 도달해야 확인 완료가 �
     false,
   );
 });
+
+// 2026-10-11 사용자 제공 원문: 국외 이전은 1·2 번호 아래 • 항목으로 적는다.
+test("개인정보 국외 이전 조항은 원문과 같은 번호·글머리표를 쓴다", () => {
+  const section = PRIVACY_POLICY_ONLY_SECTIONS.find((item) => item.title === "제4조의2 (개인정보의 국외 이전)");
+  assert.ok(section);
+  assert.match(section.body, /\n1\. Google LLC \(이메일 발송 \/ 미국\)\n• 이전 항목: /);
+  assert.match(section.body, /\n2\. 650 Industries, Inc\.\(Expo\) \(푸시 알림 \/ 미국\)\n• 이전 항목: /);
+  assert.doesNotMatch(section.body, /\n\s*- 이전/);
+});

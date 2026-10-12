@@ -140,8 +140,9 @@ test("달을 넘겨도 달력이 불러오는 중 화면으로 바뀌지 않는�
   // placeholderData로 이전 달 데이터를 들고 있어 isLoading이 다시 켜지지 않는다.
   assert.match(homeSource, /placeholderData: keepPreviousData/);
   assert.match(homeSource, /import \{ keepPreviousData, useQuery \}/);
-  // "불러오는 중" 표시는 첫 로딩에만 쓰는 isLoading에 걸려 있어야 한다.
-  assert.match(homeSource, /\{eventsQuery\.isLoading \? \(/);
+  // 홈 전체 로딩은 첫 로딩에만 켜지는 isLoading으로 판단한다(2026-10-12 칸별 로딩 → 홈 전체 로딩).
+  assert.match(homeSource, /\|\| eventsQuery\.isLoading \|\| albumQuery\.isLoading;/);
+  assert.match(homeSource, /if \(isHomeLoading && !hasHomeNetworkError\) \{\r?\n\s+return <LoadingState /);
 });
 
 test("이전 달 데이터가 남아 있어도 보고 있는 달에 점이 잘못 찍히지 않는다", () => {
