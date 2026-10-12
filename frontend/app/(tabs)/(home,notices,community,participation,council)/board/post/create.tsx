@@ -55,7 +55,6 @@ import { formatBoardDate } from "../../../../../utils/dateFormat";
 import {
   calendarMonthFromDotDate,
   formatDotDate,
-  isActivityCertificationDateAllowed,
   isCalendarDateWithinBounds,
   isCalendarMonthAfterMaximum,
   maximumActivityCertificationDate,
@@ -709,12 +708,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       return;
     }
     if (isActivity) {
-      if (!isActivityCertificationDateAllowed(values.activityDate)) {
-        const message = "오늘 이후 날짜는 선택할 수 없어요.";
-        setError("activityDate", { message: "" });
-        showToast(message);
-        return;
-      }
       const participantError = activityParticipantSelectionError(selectedParticipants, existingPost?.metadata);
       if (participantError) {
         showToast(participantError);

@@ -16,6 +16,12 @@ test("네트워킹 활동 인증 선택 칸은 네트워킹명을 묻는다", ()
   assert.match(create, /return "네트워킹명을 선택하세요";/);
 });
 
+// 2026-10-12 사용자 결정: 달력이 오늘 이후 날짜를 막으니 저장 때 다시 확인하는 토스트는 두지 않는다.
+test("활동 인증은 달력으로만 미래 날짜를 막는다", () => {
+  assert.match(create, /maximumDate=\{maximumActivityCertificationDate\(\)\}/);
+  assert.doesNotMatch(create, /오늘 이후 날짜는 선택할 수 없어요/);
+});
+
 // 2026-10-12 사용자 요청: 피그마 Council/SuggestionEdit와 같게 건의사항 수정 화면을 맞춘다.
 test("건의사항 수정은 익명 안내·한 줄 제목·수정 완료 버튼을 쓴다", () => {
   const edit = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
