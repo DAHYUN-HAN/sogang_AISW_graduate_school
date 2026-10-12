@@ -22,6 +22,11 @@ test("활동 인증은 달력으로만 미래 날짜를 막는다", () => {
   assert.doesNotMatch(create, /오늘 이후 날짜는 선택할 수 없어요/);
 });
 
+// 2026-10-12 사용자 결정: 옮겨 온 활동 인증 글은 수정하지 않으니 참가자 재선택 토스트는 두지 않는다.
+test("활동 인증 저장에 기존 회원 기반 참가자 토스트가 없다", () => {
+  assert.doesNotMatch(create, /기존 회원 기반 참가자를 변경하려면/);
+});
+
 // 2026-10-12 사용자 요청: 피그마 Council/SuggestionEdit와 같게 건의사항 수정 화면을 맞춘다.
 test("건의사항 수정은 익명 안내·한 줄 제목·수정 완료 버튼을 쓴다", () => {
   const edit = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");

@@ -34,7 +34,6 @@ import {
   ACTIVITY_PARTICIPANT_GUIDANCE,
   activityBankAccountFieldState,
   activityParticipantSearchKey,
-  activityParticipantSelectionError,
   activityParticipantTextColor,
   activityParticipantsFromMetadata,
   withParticipantDuesState,
@@ -706,13 +705,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       for (const name of missing) setError(name, { message: "" });
       showToast(TOAST_MESSAGES.requiredFieldError);
       return;
-    }
-    if (isActivity) {
-      const participantError = activityParticipantSelectionError(selectedParticipants, existingPost?.metadata);
-      if (participantError) {
-        showToast(participantError);
-        return;
-      }
     }
     if (isMutualAid && evidenceMode === "link" && !isValidEvidenceLink(evidenceLink)) {
       showToast(TOAST_MESSAGES.linkFormatError);
