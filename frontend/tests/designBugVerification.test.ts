@@ -18,7 +18,7 @@ const boardSource = source("app/(tabs)/(home,notices,community,participation,cou
 const postDetailSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx");
 const postCreateSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx");
 const postEditSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx");
-const mutualAidCompleteSource = source("app/(tabs)/(home,notices,community,participation,council)/council/mutual-aid-complete.tsx");
+const postCompleteSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/complete.tsx");
 const searchSource = source("app/(tabs)/(home,notices,community,participation,council)/search.tsx");
 const loginSource = source("app/auth/login.tsx");
 const councilSource = source("app/(tabs)/(home,notices,community,participation,council)/council.tsx");
@@ -90,8 +90,7 @@ test("상조회 상세는 비고가 없으면 증빙서류가 있어도 마지�
 });
 
 test("#48 완료 화면은 공통 CompletionState를 공유한다", () => {
-  assert.match(postCreateSource, /<CompletionState/);
-  assert.match(mutualAidCompleteSource, /<CompletionState/);
+  assert.match(postCompleteSource, /<CompletionState/);
 });
 
 test("#38·39 기본 프로필과 개인정보 동의 상태는 임의 값을 만들지 않는다", () => {

@@ -1,7 +1,7 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
-import { useIsFocused, useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
+import { CommonActions, useIsFocused, useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { router as expoRouter, usePathname, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Controller, useForm } from "react-hook-form";
@@ -16,7 +16,6 @@ import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { useSwipeBackInScreen } from "../../../../../hooks/useSwipeBackInScreen";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import CalendarMonth from "../../../../../components/CalendarMonth";
-import CompletionState from "../../../../../components/CompletionState";
 import DiscardWriteModal from "../../../../../components/DiscardWriteModal";
 import ClubOperationStatusField from "../../../../../components/ClubOperationStatusField";
 import { operationStatus } from "../../../../../utils/participationGuide";
@@ -45,10 +44,12 @@ import {
 } from "../../../../../utils/activityCertification";
 import {
   navigateAfterPostEdit,
+  postCompletionStack,
   postCreateFormBackDecision,
   postCreateCompletionRoute,
   postCreateFormInstanceKey,
   postEditCompletionDecision,
+  usesPostCompletionScreen,
 } from "../../../../../utils/appRoutes";
 import { formatBoardDate } from "../../../../../utils/dateFormat";
 import {
@@ -327,10 +328,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const [evidenceMode, setEvidenceMode] = useState<"file" | "link" | null>(null);
   const [evidenceLink, setEvidenceLink] = useState("");
   const [activitySourcePostId, setActivitySourcePostId] = useState<number | null>(null);
-  const [createdPostId, setCreatedPostId] = useState<number | null>(null);
-  // 등록·저장에 성공해 떠나는 이동은 막으면 안 된다. 완료 화면을 쓰는
-  // 활동인증·상조회·건의만 createdPostId가 채워지므로, 나머지 게시판과 수정
-  // 저장은 이 표시로 usePreventRemove 잠금을 먼저 푼다.
+  // 등록·저장에 성공해 떠나는 이동은 막으면 안 된다. 이 표시로 usePreventRemove
+  // 잠금을 먼저 풀고, 다음 렌더에서 pendingSubmitNavigation으로 옮긴다.
   const [submitted, setSubmitted] = useState(false);
   const pendingSubmitNavigation = useRef<(() => void) | null>(null);
   const [notice, setNotice] = useState<NoticeModalContent | null>(null);
@@ -749,12 +748,17 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
     createMutation.mutate(payload, {
       onSuccess: (res) => {
-        if (isActivity || isMutualAid || isSuggestion) {
-          setCreatedPostId(res.data.id);
-          return;
+        const createdPostId = res.data.id;
+        if (usesPostCompletionScreen(boardType)) {
+          // 글쓰기 자리에 확인의 도착지와 완료 화면을 한 번에 놓는다.
+          pendingSubmitNavigation.current = () => navigation.dispatch((state) => {
+            const routes = postCompletionStack(state.routes, boardType, createdPostId, boardId);
+            return CommonActions.reset({ ...state, routes, index: routes.length - 1 } as never);
+          });
+        } else {
+          const route = postCreateCompletionRoute(boardType, createdPostId, boardId, params.returnTo);
+          pendingSubmitNavigation.current = () => router.replace(route as never);
         }
-        const route = postCreateCompletionRoute(boardType, res.data.id, boardId, params.returnTo);
-        pendingSubmitNavigation.current = () => router.replace(route as never);
         setSubmitted(true);
       },
       onError: handleMutationError,
@@ -939,14 +943,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   }, [boardId, boardType, params.editOrigin, params.fromBoardId, params.postId, params.returnTo, router]);
 
   const handleCreateBack = useCallback(() => {
-    if (createdPostId) {
-      const route = postCreateCompletionRoute(boardType, createdPostId, boardId, params.returnTo);
-      // 상조회·건의 완료 뒤에는 그 게시판 목록이 아래에 있으면 거기까지 돌아가 같은
-      // 목록이 두 번 쌓이지 않게 한다. 없으면 dismissTo가 이 화면을 목록으로 바꾼다.
-      if (route.startsWith("/board/post/")) router.replace(route as never);
-      else router.dismissTo(route as never);
-      return;
-    }
     if (selectionSheet) {
       setSelectionSheet(null);
       return;
@@ -961,7 +957,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       return;
     }
     leaveCreateScreen();
-  }, [boardId, boardType, createdPostId, datePickerOpen, hasUnsavedChanges, leaveCreateScreen, params.returnTo, selectionSheet, router]);
+  }, [datePickerOpen, hasUnsavedChanges, leaveCreateScreen, selectionSheet]);
 
   // iOS 가장자리 스와이프는 UIKit이 직접 pop 해서 위 핸들러들을 타지 않는다.
   // usePreventRemove가 native-stack의 preventNativeDismiss를 켜 그 제스처까지
@@ -972,13 +968,13 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   // 하단 탭을 눌러 떠나려는 경우. 확인 후에 이 함수를 불러 그 탭으로 옮긴다.
   const pendingTabLeave = useRef<(() => void) | null>(null);
 
-  usePreventRemove(hasUnsavedChanges && !createdPostId && !submitted && !removeConfirmed && !datePickerOpen, ({ data }) => {
+  usePreventRemove(hasUnsavedChanges && !submitted && !removeConfirmed && !datePickerOpen, ({ data }) => {
     pendingRemoveAction.current = data.action;
     setDiscardPromptOpen(true);
   });
 
-  // 완료 화면과 펼친 날짜 선택은 안드로이드 뒤로가기처럼 handleCreateBack이 먼저 처리한다.
-  useSwipeBackInScreen(Boolean(createdPostId) || datePickerOpen, handleCreateBack);
+  // 펼친 날짜 선택은 안드로이드 뒤로가기처럼 handleCreateBack이 먼저 처리한다.
+  useSwipeBackInScreen(datePickerOpen, handleCreateBack);
 
   useEffect(() => {
     if (!submitted) return;
@@ -991,7 +987,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
   // 탭바는 이 화면의 부모라 handleCreateBack을 타지 않는다. 가로채기를 걸어
   // 헤더·안드로이드 뒤로가기와 같은 확인창을 거치게 한다.
-  const blocksLeaving = hasUnsavedChanges && !createdPostId && !removeConfirmed;
+  const blocksLeaving = hasUnsavedChanges && !submitted && !removeConfirmed;
   useEffect(() => {
     if (!blocksLeaving) return undefined;
     setWriteLeaveGuard((proceed) => {
@@ -1078,15 +1074,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           <Text style={styles.editRetryButtonText}>신청 상세로 돌아가기</Text>
         </Pressable>
       </View>
-    );
-  }
-
-  if ((isActivity || isMutualAid || isSuggestion) && createdPostId) {
-    return (
-      <CompletionState
-        title={isSuggestion ? "건의사항이 등록되었어요!" : isMutualAid ? "신청이 완료되었어요!" : "활동 인증이 등록됐어요!"}
-        onConfirm={handleCreateBack}
-      />
     );
   }
 

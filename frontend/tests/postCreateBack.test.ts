@@ -42,7 +42,7 @@ const code = ts.transpileModule(`${backStatements.map((node) => node.getText(sou
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
 
-function harness(options: { platform?: string; returnTo?: string; canGoBack?: boolean; postId?: string; editOrigin?: string; createdPostId?: number; boardType?: string; selectionSheet?: string; datePickerOpen?: boolean; hasUnsavedChanges?: boolean; submitted?: boolean } = {}) {
+function harness(options: { platform?: string; returnTo?: string; canGoBack?: boolean; postId?: string; editOrigin?: string; boardType?: string; selectionSheet?: string; datePickerOpen?: boolean; hasUnsavedChanges?: boolean; submitted?: boolean } = {}) {
   const routes: string[] = [];
   const cleared: string[] = [];
   const state = { selectionSheet: options.selectionSheet ?? null, datePickerOpen: options.datePickerOpen ?? false, discardPromptOpen: false, removeConfirmed: false };
@@ -56,7 +56,6 @@ function harness(options: { platform?: string; returnTo?: string; canGoBack?: bo
   const context = {
     boardId: 7,
     boardType: options.boardType ?? "resource",
-    createdPostId: options.createdPostId ?? null,
     params: { returnTo: options.returnTo, postId: options.postId, editOrigin: options.editOrigin, fromBoardId: "7" },
     router: {
       canGoBack: () => options.canGoBack ?? true,
@@ -184,22 +183,6 @@ test("웹과 iOS는 Android 구독 없이 기존 헤더 복귀를 유지한다",
   }
 });
 
-test("등록 완료 화면의 Android Back도 기존 확인 버튼의 완료 경로로 이동한다", () => {
-  const h = harness({ boardType: "suggestion", createdPostId: 42 });
-  h.focus();
-  assert.equal(h.hardware(), true);
-  assert.deepEqual(h.navigation, [`dismissTo:${postCreateCompletionRoute("suggestion", 42, 7)}`]);
-});
-
-test("등록 완료 후 남아 있는 선택기 상태는 확인과 Back 복귀를 막지 않는다", () => {
-  const h = harness({ boardType: "activity_certification", createdPostId: 42, datePickerOpen: true, selectionSheet: "activity" });
-  h.focus();
-  h.hardware();
-  h.header();
-  const route = `replace:${postCreateCompletionRoute("activity_certification", 42, 7)}`;
-  assert.deepEqual(h.navigation, [route, route]);
-});
-
 test("게시판 선택창이 펼쳐져 있으면 먼저 닫고 다음 Back에서 목록으로 돌아간다", () => {
   const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, selectionSheet: "board" });
   h.focus();
@@ -263,14 +246,6 @@ test("변경사항이 있어도 선택창과 날짜 선택기를 확인창보다
   }
 });
 
-test("등록 완료 후에는 변경사항이 남아 있어도 확인창 없이 완료 경로로 간다", () => {
-  const h = harness({ boardType: "suggestion", createdPostId: 42, hasUnsavedChanges: true });
-  h.focus();
-  assert.equal(h.hardware(), true);
-  assert.equal(h.state.discardPromptOpen, false);
-  assert.deepEqual(h.navigation, [`dismissTo:${postCreateCompletionRoute("suggestion", 42, 7)}`]);
-});
-
 test("iOS 스와이프로 나가려 해도 확인창을 먼저 띄운다", () => {
   // UIKit이 직접 pop 해서 헤더·Android 핸들러를 타지 않는다. usePreventRemove가
   // native-stack의 preventNativeDismiss를 켜 그 제스처까지 막는다.
@@ -294,13 +269,8 @@ test("작성 중인 내용이 없으면 스와이프를 막지 않는다", () =>
 });
 
 test("등록에 성공하면 잠금이 풀려 확인창 없이 이동한다", () => {
-  // 완료 화면을 쓰지 않는 게시판은 createdPostId가 비어 있어, 이 표시가 없으면
-  // 등록 직후의 router.replace까지 붙잡혀 작성 취소 확인창이 떴다.
+  // 이 표시가 없으면 등록 직후의 이동(글 상세 교체·완료 화면 스택)까지 붙잡혀
+  // 작성 취소 확인창이 떴다.
   const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true, submitted: true });
-  assert.equal(h.preventRemove()?.prevent, false);
-});
-
-test("등록을 마친 뒤에는 스와이프를 막지 않는다", () => {
-  const h = harness({ returnTo: COMMUNITY_TAB_ROUTE, hasUnsavedChanges: true, createdPostId: 11 });
   assert.equal(h.preventRemove()?.prevent, false);
 });

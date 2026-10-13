@@ -324,6 +324,48 @@ export function postCreateCompletionRoute(
   return postDetailRoute(createdPostId, boardId, returnTo);
 }
 
+// 등록하면 완료 화면을 보여 주는 게시판.
+export function usesPostCompletionScreen(boardType: string | undefined) {
+  return boardType === "suggestion" || boardType === "mutual_aid" || boardType === "activity_certification";
+}
+
+type StackRouteInput = { name: string; params?: object };
+
+// 등록 직후 글쓰기 화면 자리에 놓을 스택. 완료 화면 바로 아래에 "확인"의 도착지
+// (postCreateCompletionRoute와 같은 곳)를 깔아 두어, 확인·안드로이드 뒤로가기·iOS
+// 스와이프가 모두 완료 화면만 빼서 같은 화면으로 돌아가게 한다.
+// - 건의사항·상조회: 그 게시판 목록. 아래에 있으면 거기까지 비워 같은 목록이 두 번
+//   쌓이지 않게 하고, 없으면 목록을 깐다.
+// - 활동 인증: 방금 쓴 글 상세. 그 아래는 글쓰기 전 화면이다.
+export function postCompletionStack<R extends StackRouteInput>(
+  routes: R[],
+  boardType: string | undefined,
+  createdPostId: number,
+  boardId: number,
+): (R | StackRouteInput)[] {
+  const below: (R | StackRouteInput)[] = routes.slice(0, -1);
+  const complete = {
+    name: "board/post/complete",
+    params: { boardType: boardType ?? "", boardId: String(boardId), postId: String(createdPostId) },
+  };
+  if (boardType === "activity_certification") {
+    const detail = {
+      name: "board/post/[postId]",
+      params: { postId: String(createdPostId), fromBoardId: String(boardId), returnTo: PARTICIPATION_TAB_ROUTE },
+    };
+    return [...below, detail, complete];
+  }
+  let listIndex = -1;
+  below.forEach((route, index) => {
+    const params = route.params as { boardId?: unknown } | undefined;
+    if (route.name === "board/[boardId]" && Number(params?.boardId) === boardId) listIndex = index;
+  });
+  const list = listIndex >= 0
+    ? below.slice(0, listIndex + 1)
+    : [...below, { name: "board/[boardId]", params: { boardId: String(boardId) } }];
+  return [...list, complete];
+}
+
 export function postDetailBackDecision(
   board: BoardRouteInfo | null | undefined,
   canGoBack: boolean,
