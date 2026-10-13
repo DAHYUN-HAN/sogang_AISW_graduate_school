@@ -33,7 +33,7 @@ function render(errors: Record<string, unknown>) {
     isNetworkError, enabledRefetch, refreshQueries, styles: { content: {}, networkErrorContent: { flexGrow: 1, backgroundColor: "#FFFFFF" }, networkErrorBody: { backgroundColor: "#FFFFFF" } },
     COLORS: { primary: "#2761FF" }, SHOW_HOME_POPULAR_POSTS: false, tree: undefined,
   };
-  for (const name of ["ScrollView", "RefreshControl", "View", "Text", "IconButton", "BellIcon", "ProfileIcon", "NetworkErrorState", "ActivityIndicator", "HomeErrorState", "HomeBannerCarousel", "SectionHeader", "NoticeList", "CalendarCard", "HomeSectionGate", "HomePopularPostsSection", "AlbumStrip", "Pressable", "ForwardIcon", "Toast"]) bindings[name] = name;
+  for (const name of ["ScrollView", "RefreshControl", "View", "Text", "IconButton", "BellIcon", "ProfileIcon", "NetworkErrorState", "ActivityIndicator", "HomeErrorState", "HomeBannerCarousel", "SectionHeader", "NoticeList", "CalendarCard", "HomeSectionGate", "HomePopularPostsSection", "AlbumStrip", "Pressable", "ForwardIcon", "Toast", "MyPageDrawer"]) bindings[name] = name;
   runInNewContext(js, bindings);
   const nodes: Element[] = [];
   function walk(value: any) { if (Array.isArray(value)) value.forEach(walk); else if (value && typeof value === "object" && "children" in value) { nodes.push(value); value.children.forEach(walk); } }

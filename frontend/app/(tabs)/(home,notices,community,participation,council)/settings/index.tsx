@@ -38,7 +38,23 @@ const MENU_ITEMS = [
   { title: "계정 설정", href: "/settings/account" },
 ] as const;
 
+// 마이페이지 화면. 홈에서는 홈 위를 덮는 서랍(components/MyPageDrawer)으로 열고, 이
+// 경로는 아래 화면이 없을 때(웹 새로고침·직접 링크)만 열린다.
 export default function SettingsScreen() {
+  const goBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else navigateToTabRoot("home");
+  }, []);
+
+  return (
+    <EdgeSwipeBack onBack={goBack}>
+      <MyPageContent onBack={goBack} />
+    </EdgeSwipeBack>
+  );
+}
+
+// 마이페이지 내용. 헤더 뒤로가기는 여는 쪽이 정한 onBack을 탄다.
+export function MyPageContent({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
   const { data, error, isLoading, refetch } = useMeQuery();
   useLoadErrorOverlay(error, () => void refetch());
@@ -56,13 +72,6 @@ export default function SettingsScreen() {
     }, [showToast]),
   );
 
-  // 마이페이지는 왼쪽에서 들어오는 화면이라 헤더·안드로이드·iOS 스와이프 모두 이 뒤로가기로
-  // 왼쪽으로 빠져나간다(PLAN.md 2026-10-13).
-  const goBack = useCallback(() => {
-    if (router.canGoBack()) router.back();
-    else navigateToTabRoot("home");
-  }, []);
-
   const logout = async () => {
     const pushToken = await getStoredPushToken().catch(() => null);
     if (pushToken) {
@@ -77,12 +86,11 @@ export default function SettingsScreen() {
   };
 
   return (
-    <EdgeSwipeBack onBack={goBack}>
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
         <Pressable
           accessibilityLabel="뒤로"
-          onPress={goBack}
+          onPress={onBack}
           style={styles.iconButton}
         >
           <BackIcon size={22} color={COLORS.text} />
@@ -134,7 +142,6 @@ export default function SettingsScreen() {
       </ScrollView>
       <Toast toast={toast} onHide={hideToast} />
     </View>
-    </EdgeSwipeBack>
   );
 }
 

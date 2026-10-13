@@ -7,6 +7,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
+import MyPageDrawer from "../../../components/MyPageDrawer";
 import NetworkErrorState, { useLoadErrorOverlay } from "../../../components/NetworkErrorState";
 import { isNetworkError } from "../../../utils/networkError";
 
@@ -794,6 +795,9 @@ export default function HomeScreen() {
   const [month, setMonth] = useState(() => currentKoreaMonth());
   const [pickedDay, setPickedDay] = useState<PickedCalendarDay | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
+  // 마이페이지는 홈 위를 덮는 서랍으로 연다(components/MyPageDrawer).
+  const [myPageOpen, setMyPageOpen] = useState(false);
+  const closeMyPage = useCallback(() => setMyPageOpen(false), []);
   // 홈 탭은 떠나도 마운트가 유지돼서 보던 달과 고른 날짜가 그대로 남는다.
   // 다른 탭에 갔다 오거나 하단 홈 탭을 누르면 이번 달·오늘로 되돌리고, 달력에서
   // 연 글을 보고 뒤로가기로 돌아오면 보던 달과 날짜를 그대로 둔다.
@@ -950,7 +954,7 @@ export default function HomeScreen() {
           <IconButton label="알림" onPress={() => router.push("/notifications" as never)}>
             <BellIcon size={24} hasBadge={hasUnreadNotifications} />
           </IconButton>
-          <IconButton label="마이페이지" onPress={() => router.push((isAuthenticated ? "/settings" : "/auth/login") as never)}>
+          <IconButton label="마이페이지" onPress={() => (isAuthenticated ? setMyPageOpen(true) : router.push("/auth/login" as never))}>
             <ProfileIcon size={24} />
           </IconButton>
         </View>
@@ -1039,6 +1043,7 @@ export default function HomeScreen() {
       )}
     </ScrollView>
     <Toast toast={toast} onHide={hideToast} />
+    <MyPageDrawer open={myPageOpen} onClose={closeMyPage} />
     </View>
   );
 }
