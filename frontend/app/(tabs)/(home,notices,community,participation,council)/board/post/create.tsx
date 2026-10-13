@@ -13,10 +13,10 @@ import { z } from "zod";
 
 import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon, NoticeAlertIcon, ParticipantAddIcon } from "../../../../../components/icons";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
-import { useSwipeBackInScreen } from "../../../../../hooks/useSwipeBackInScreen";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import CalendarMonth from "../../../../../components/CalendarMonth";
 import DiscardWriteModal from "../../../../../components/DiscardWriteModal";
+import EdgeSwipeBack from "../../../../../components/EdgeSwipeBack";
 import ClubOperationStatusField from "../../../../../components/ClubOperationStatusField";
 import { operationStatus } from "../../../../../utils/participationGuide";
 import LoadingState from "../../../../../components/LoadingState";
@@ -959,22 +959,18 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     leaveCreateScreen();
   }, [datePickerOpen, hasUnsavedChanges, leaveCreateScreen, selectionSheet]);
 
-  // iOS 가장자리 스와이프는 UIKit이 직접 pop 해서 위 핸들러들을 타지 않는다.
-  // usePreventRemove가 native-stack의 preventNativeDismiss를 켜 그 제스처까지
-  // 막아주므로, 확인창을 헤더·안드로이드 뒤로가기와 같은 지점으로 모은다.
+  // 헤더·안드로이드 뒤로가기가 아닌 이동(다른 코드의 pop 등)도 작성 취소 확인을 거친다.
+  // iOS 가장자리 스와이프는 이것으로 막으면 튕기므로 아래 EdgeSwipeBack이 맡는다.
   const navigation = useNavigation();
   const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const pendingRemoveAction = useRef<NavigationAction | null>(null);
   // 하단 탭을 눌러 떠나려는 경우. 확인 후에 이 함수를 불러 그 탭으로 옮긴다.
   const pendingTabLeave = useRef<(() => void) | null>(null);
 
-  usePreventRemove(hasUnsavedChanges && !submitted && !removeConfirmed && !datePickerOpen, ({ data }) => {
+  usePreventRemove(hasUnsavedChanges && !submitted && !removeConfirmed, ({ data }) => {
     pendingRemoveAction.current = data.action;
     setDiscardPromptOpen(true);
   });
-
-  // 펼친 날짜 선택은 안드로이드 뒤로가기처럼 handleCreateBack이 먼저 처리한다.
-  useSwipeBackInScreen(datePickerOpen, handleCreateBack);
 
   useEffect(() => {
     if (!submitted) return;
@@ -988,6 +984,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   // 탭바는 이 화면의 부모라 handleCreateBack을 타지 않는다. 가로채기를 걸어
   // 헤더·안드로이드 뒤로가기와 같은 확인창을 거치게 한다.
   const blocksLeaving = hasUnsavedChanges && !submitted && !removeConfirmed;
+  // 펼친 날짜 선택이나 입력 중인 내용이 있으면 iOS 가장자리 스와이프도 안드로이드
+  // 뒤로가기처럼 handleCreateBack을 탄다(날짜 선택 닫기, 작성 취소 확인).
+  const swipeHandledInScreen = datePickerOpen || blocksLeaving;
   useEffect(() => {
     if (!blocksLeaving) return undefined;
     setWriteLeaveGuard((proceed) => {
@@ -1078,7 +1077,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   }
 
   return (
-    <View style={styles.screen}>
+    <EdgeSwipeBack active={swipeHandledInScreen} onBack={handleCreateBack} style={styles.screen}>
       {/* Figma Verify-PhotoPreview: 활동 인증 상단바에는 구분선이 없다 */}
       {/* Figma 상조회 신청 TopBar: padding 18/16/14, 구분선 없음, 닫기 20×20(stroke 1.8), 제목 18/21, 우측 spacer 20. */}
       <View style={[styles.appBar, isActivity ? styles.appBarNoDivider : null, isMutualAid ? styles.appBarMutualAid : null, { paddingTop: Math.max(insets.top, 10) + (isMutualAid ? 18 : 0) }]}>
@@ -2062,7 +2061,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       />
       <NoticeModal notice={notice} onClose={() => setNotice(null)} />
       <Toast toast={toast} onHide={hideToast} />
-    </View>
+    </EdgeSwipeBack>
   );
 }
 

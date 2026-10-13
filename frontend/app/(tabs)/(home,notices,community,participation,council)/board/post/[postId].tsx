@@ -8,6 +8,7 @@ import { NetworkErrorFallback } from "../../../../../components/NetworkErrorStat
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import CommentItem from "../../../../../components/CommentItem";
+import EdgeSwipeBack from "../../../../../components/EdgeSwipeBack";
 import NoticePollCard from "../../../../../components/NoticePollCard";
 import { noticeBodyBlocks } from "../../../../../utils/noticeBody";
 import ActivityCertificationMediaImage from "../../../../../components/ActivityCertificationMediaImage";
@@ -20,7 +21,6 @@ import NaturalAspectMediaImage from "../../../../../components/NaturalAspectMedi
 import { AttachDocIcon, AttachLinkIcon, BackIcon, BookmarkIcon, CalendarSmallIcon, DownloadIcon, EmptyCalendarIcon, ExternalLinkIcon, FlagIcon, ImagePlaceholderIcon, MoreIcon, PencilIcon, SendIcon, SliderNextIcon, SliderPrevIcon, TrashIcon } from "../../../../../components/icons";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { useBoardTabHighlight } from "../../../../../hooks/useBoardTabHighlight";
-import { useSwipeBackInScreen } from "../../../../../hooks/useSwipeBackInScreen";
 import { useToast } from "../../../../../hooks/useToast";
 import { resolveMediaAccessUrl, useMediaAccessUrl } from "../../../../../hooks/useMediaAccessUrl";
 import type { MediaReference } from "../../../../../utils/mediaAccess";
@@ -423,10 +423,9 @@ export default function PostDetailScreen() {
     });
   }, [board, deleteCommentMutation.isPending, deletePostMutation.isPending, params.fromBoardId, params.returnTo, pendingDeleteCommentId, reportTarget, showDeleteConfirm, showPostMenu, router]);
 
-  useSwipeBackInScreen(
-    pendingDeleteCommentId !== null || showDeleteConfirm || Boolean(reportTarget) || showPostMenu,
-    handlePostBack,
-  );
+  // ⋯ 메뉴·삭제·신고·댓글 삭제 확인창이 열려 있으면 iOS 가장자리 스와이프도
+  // 안드로이드 뒤로가기처럼 그것부터 닫는다.
+  const hasOpenOverlay = pendingDeleteCommentId !== null || showDeleteConfirm || Boolean(reportTarget) || showPostMenu;
 
   useFocusEffect(
     useCallback(() => {
@@ -966,7 +965,7 @@ export default function PostDetailScreen() {
   ) : null;
 
   return (
-    <View style={styles.screen}>
+    <EdgeSwipeBack active={hasOpenOverlay} onBack={handlePostBack} style={styles.screen}>
       {viewerIndex !== null && viewerImages.length > 0 ? (
         <ImageViewerModal key={postId} images={viewerImages} initialIndex={viewerIndex} onClose={() => setViewerIndex(null)} />
       ) : null}
@@ -1637,7 +1636,7 @@ export default function PostDetailScreen() {
         </Pressable>
       ) : null}
       <Toast toast={toast} onHide={hideToast} />
-    </View>
+    </EdgeSwipeBack>
   );
 }
 

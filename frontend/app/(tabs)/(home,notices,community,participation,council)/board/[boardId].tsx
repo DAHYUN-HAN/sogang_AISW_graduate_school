@@ -7,6 +7,7 @@ import { AppText as Text, AppTextInput as TextInput } from "../../../../componen
 import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import EdgeSwipeBack from "../../../../components/EdgeSwipeBack";
 import ImageViewerModal from "../../../../components/ImageViewerModal";
 import MediaImage, { MediaImageBackground } from "../../../../components/MediaImage";
 import { BackIcon, EmptyCalendarIcon, LedgerIcon, SearchBackIcon, SearchIcon } from "../../../../components/icons";
@@ -22,7 +23,6 @@ import type { Board, PostListItem } from "../../../../types";
 import { boardParentRoute, boardRoute, councilCardRoute, participationGroupDefaultSlug, postCreateRouteFromBoardList, postDetailRoute, type PostDetailReturnRoute } from "../../../../utils/appRoutes";
 import { replaceWithRoute } from "../../../../utils/tabNavigation";
 import { useBoardTabHighlight } from "../../../../hooks/useBoardTabHighlight";
-import { useSwipeBackInScreen } from "../../../../hooks/useSwipeBackInScreen";
 import { useToast } from "../../../../hooks/useToast";
 import { TOAST_INFO_MESSAGES } from "../../../../utils/toast";
 import {
@@ -1109,11 +1109,11 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
     }, [closeSearch, exitBoardDepth, isTabRoot, showSearch, sortMenuOpen])
   );
 
-  // 탭 첫 화면으로 박힌 목록은 스와이프할 아래 화면이 없다.
-  useSwipeBackInScreen(!isTabRoot && (sortMenuOpen || showSearch), () => {
+  // 정렬 메뉴·검색창이 열려 있으면 iOS 가장자리 스와이프도 안드로이드처럼 그것부터 닫는다.
+  const closeBoardOverlay = useCallback(() => {
     if (sortMenuOpen) setSortMenuOpen(false);
     else closeSearch();
-  });
+  }, [closeSearch, sortMenuOpen]);
 
   const handleFilterPress = (item: string) => {
     const groupKey = participationGroupKey(board);
@@ -1215,7 +1215,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
   }
 
   return (
-    <View style={styles.screen}>
+    <EdgeSwipeBack active={sortMenuOpen || showSearch} onBack={closeBoardOverlay} style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
         {showSearch ? (
           <>
@@ -1403,7 +1403,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
           <Ionicons name="add" size={22} color="#FFFFFF" />
         </Pressable>
       ) : null}
-    </View>
+    </EdgeSwipeBack>
   );
 }
 

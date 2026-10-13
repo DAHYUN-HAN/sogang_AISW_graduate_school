@@ -35,7 +35,8 @@ test("마이페이지의 헤더 뒤로가기와 가장자리 스와이프는 같
 
 test("가장자리 스와이프는 iOS에서만, 왼쪽 가장자리에서 오른쪽으로 쓸었을 때만 실행한다", () => {
   const source = read("components/EdgeSwipeBack.tsx");
-  assert.match(source, /\.enabled\(Platform\.OS === "ios"\)/);
+  assert.match(source, /const enabled = Platform\.OS === "ios" && active;/);
+  assert.match(source, /\.enabled\(enabled\)/);
   assert.match(source, /\.hitSlop\(\{ left: 0, width: EDGE_WIDTH \}\)/);
   assert.match(source, /event\.translationX >= TRIGGER_DISTANCE \|\| event\.velocityX >= TRIGGER_VELOCITY/);
 });

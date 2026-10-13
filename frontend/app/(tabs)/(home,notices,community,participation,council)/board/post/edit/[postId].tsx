@@ -12,9 +12,9 @@ import { z } from "zod";
 
 import { setWriteLeaveGuard } from "../../../../../../stores/writeLeaveGuard";
 import { useBoardsQuery } from "../../../../../../hooks/useApi";
-import { useSwipeBackInScreen } from "../../../../../../hooks/useSwipeBackInScreen";
 import { navigateToRoute, replaceWithRoute } from "../../../../../../utils/tabNavigation";
 import { usePostDetail, useUpdatePost } from "../../../../../../hooks/usePosts";
+import EdgeSwipeBack from "../../../../../../components/EdgeSwipeBack";
 import LoadingState from "../../../../../../components/LoadingState";
 import ClubOperationStatusField from "../../../../../../components/ClubOperationStatusField";
 import { operationStatus } from "../../../../../../utils/participationGuide";
@@ -265,21 +265,18 @@ export default function PostEditScreen() {
     return () => subscription.remove();
   }, [requestClose]));
 
-  // iOS 가장자리 스와이프는 UIKit이 직접 pop 해서 위 핸들러를 타지 않는다.
-  // usePreventRemove가 native-stack의 preventNativeDismiss를 켜 그것까지 막는다.
+  // 헤더·안드로이드 뒤로가기가 아닌 이동(다른 코드의 pop 등)도 수정 취소 확인을 거친다.
+  // iOS 가장자리 스와이프는 이것으로 막으면 튕기므로 아래 EdgeSwipeBack이 맡는다.
   const navigation = useNavigation();
   const [removeConfirmed, setRemoveConfirmed] = useState(false);
   const pendingRemoveAction = useRef<NavigationAction | null>(null);
   // 하단 탭을 눌러 떠나려는 경우. 확인 후에 이 함수를 불러 그 탭으로 옮긴다.
   const pendingTabLeave = useRef<(() => void) | null>(null);
 
-  usePreventRemove(hasUnsavedChanges && !submitted && !removeConfirmed && !isBoardMenuOpen, ({ data }) => {
+  usePreventRemove(hasUnsavedChanges && !submitted && !removeConfirmed, ({ data }) => {
     pendingRemoveAction.current = data.action;
     setDiscardPromptOpen(true);
   });
-
-  // 게시판 메뉴가 펼쳐져 있으면 안드로이드처럼 메뉴부터 닫는다.
-  useSwipeBackInScreen(isBoardMenuOpen, requestClose);
 
   useEffect(() => {
     if (!submitted) return;
@@ -293,6 +290,9 @@ export default function PostEditScreen() {
   // 탭바는 이 화면의 부모라 requestClose를 타지 않는다. 가로채기를 걸어
   // 헤더·안드로이드 뒤로가기와 같은 확인창을 거치게 한다.
   const blocksLeaving = hasUnsavedChanges && !submitted && !removeConfirmed;
+  // 게시판 메뉴나 바뀐 내용이 있으면 iOS 가장자리 스와이프도 안드로이드 뒤로가기처럼
+  // requestClose를 탄다(메뉴 닫기, 수정 취소 확인).
+  const swipeHandledInScreen = isBoardMenuOpen || blocksLeaving;
   useEffect(() => {
     if (!blocksLeaving) return undefined;
     setWriteLeaveGuard((proceed) => {
@@ -519,7 +519,7 @@ export default function PostEditScreen() {
   const boardLabel = post.category?.trim() || board?.name || "게시판";
 
   return (
-    <View style={styles.screen}>
+    <EdgeSwipeBack active={swipeHandledInScreen} onBack={requestClose} style={styles.screen}>
       {navigationHeader}
 
       <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroller} contentContainerStyle={styles.content}>
@@ -820,7 +820,7 @@ export default function PostEditScreen() {
       />
       <NoticeModal notice={notice} onClose={() => setNotice(null)} />
       <Toast toast={toast} onHide={hideToast} />
-    </View>
+    </EdgeSwipeBack>
   );
 }
 
