@@ -122,8 +122,9 @@ export function MyPageContent({ onBack }: { onBack: () => void }) {
         <View style={styles.divider} />
 
         <View style={styles.menuList}>
-          {MENU_ITEMS.map((item, index) => (
-            <Pressable key={item.title} onPress={() => router.push(item.href as never)} style={[styles.menuRow, index === MENU_ITEMS.length - 1 ? styles.menuRowLast : null]}>
+          {/* 계정 설정 화면의 회원 탈퇴처럼, 마지막 메뉴 아래에도 구분선을 그어 로그아웃과 나눈다. */}
+          {MENU_ITEMS.map((item) => (
+            <Pressable key={item.title} onPress={() => router.push(item.href as never)} style={styles.menuRow}>
               <Text style={styles.menuText}>{item.title}</Text>
               <ChevronRightIcon size={15} color={COLORS.subtle} />
             </Pressable>
@@ -232,9 +233,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: COLORS.border,
     paddingVertical: 13,
-  },
-  menuRowLast: {
-    borderBottomWidth: 0,
   },
   menuText: {
     color: COLORS.text,
