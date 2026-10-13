@@ -5,12 +5,15 @@ import {
   noticeAttachmentFrameAspectRatio,
   postDetailImagePresentation,
   shouldOpenPostAttachment,
+  VERTICAL_IMAGE_FRAME_ASPECT_RATIO,
 } from "../utils/postDetailImagePresentation";
 
-test("공지 첨부 이미지는 원본 방향에 따라 가로 4:3 또는 세로 4:5 프레임을 사용한다", () => {
+test("공지 첨부 이미지는 원본 방향에 따라 가로 4:3 또는 세로 320x452 프레임을 사용한다", () => {
+  // Figma Detail-ImageVertical-4x5: 이름과 달리 세로형 틀은 320x452다.
+  assert.equal(VERTICAL_IMAGE_FRAME_ASPECT_RATIO, 320 / 452);
   assert.equal(noticeAttachmentFrameAspectRatio(16 / 9), 4 / 3);
   assert.equal(noticeAttachmentFrameAspectRatio(1), 4 / 3);
-  assert.equal(noticeAttachmentFrameAspectRatio(3 / 4), 4 / 5);
+  assert.equal(noticeAttachmentFrameAspectRatio(3 / 4), 320 / 452);
   assert.equal(noticeAttachmentFrameAspectRatio(null), 4 / 3);
 });
 

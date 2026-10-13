@@ -65,6 +65,7 @@ import {
   noticeAttachmentFrameAspectRatio,
   postDetailImagePresentation,
   shouldOpenPostAttachment,
+  VERTICAL_IMAGE_FRAME_ASPECT_RATIO,
 } from "../../../../../utils/postDetailImagePresentation";
 import { imageDimensionsFromLoadEvent } from "../../../../../utils/imageDimensions";
 import { postDetailFocusDecision } from "../../../../../utils/postDetailCache";
@@ -213,7 +214,7 @@ function BackButton({ onPress }: { onPress: () => void }) {
 }
 
 // Figma Detail-Image(Horizontal|Vertical)-Reordered: 참여활동 대표 이미지는
-// 가로형이면 320x240(4:3), 세로형이면 320x400(4:5) 고정 박스에 cover로 채운다.
+// 가로형이면 320x240(4:3), 세로형이면 320x452 고정 박스에 cover로 채운다.
 function ParticipationHeroImage({ media }: { media: MediaReference }) {
   const [aspect, setAspect] = useState<number | null>(null);
   const { uri } = useMediaAccessUrl(media);
@@ -234,7 +235,7 @@ function ParticipationHeroImage({ media }: { media: MediaReference }) {
   }, [uri]);
 
   return (
-    <View style={[styles.participationHeroBox, { aspectRatio: aspect !== null && aspect < 1 ? 4 / 5 : 4 / 3 }]}>
+    <View style={[styles.participationHeroBox, { aspectRatio: aspect !== null && aspect < 1 ? VERTICAL_IMAGE_FRAME_ASPECT_RATIO : 4 / 3 }]}>
       <MediaImage media={media} resizeMode="cover" style={styles.participationHeroImage} />
     </View>
   );

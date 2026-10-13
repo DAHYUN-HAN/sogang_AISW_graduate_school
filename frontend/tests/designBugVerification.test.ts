@@ -62,7 +62,7 @@ test("#5·6·7·11·18 공지와 스터디의 태그 문구 및 상태를 실제
   assert.match(postDetailSource, /metadata\.recruitment_status/);
 });
 
-test("#41·45 공지 상세 이미지는 가로 4:3·세로 4:5 고정 프레임이며 누르면 공용 사진 보기를 연다", () => {
+test("#41·45 공지 상세 이미지는 가로 4:3·세로 320x452 고정 프레임이며 누르면 공용 사진 보기를 연다", () => {
   assert.match(postDetailSource, /const isNotice = board\?\.board_type === "notice" \|\| post\?\.is_notice === true/);
   assert.match(postDetailSource, /function NoticeAttachmentImage/);
   assert.match(postDetailSource, /noticeAttachmentFrameAspectRatio\(sourceAspectRatio\)/);

@@ -59,14 +59,14 @@ test("참여활동 상세는 PR 순서를 유지하고 활동 인증 이미지�
   assert.match(detail, /\{isAdminParticipationGuide \? participationImagesSection : null\}/);
   assert.match(detail, /const participationImagesSection =/);
   assert.match(detail, /function ParticipationHeroImage/);
-  assert.match(detail, /aspectRatio: aspect !== null && aspect < 1 \? 4 \/ 5 : 4 \/ 3/);
+  assert.match(detail, /aspectRatio: aspect !== null && aspect < 1 \? VERTICAL_IMAGE_FRAME_ASPECT_RATIO : 4 \/ 3/);
   assert.match(detail, /activityImageLayoutFromMetadata\(board\?\.metadata\?\.activity_image_layout\)/);
   assert.match(detail, /<ActivityCertificationMediaImage[\s\S]*?layout=\{activityImageLayout\}/);
   assert.match(detail, /isPhotoAlbum \? styles\.visualHeroAlbum : null/);
   assert.doesNotMatch(detail, /const hasExpandableHero = isActivityCertification/);
 });
 
-test("공지 이미지는 가로 4:3·세로 4:5 프레임만 사용하고 PR 첨부 타이포를 유지한다", () => {
+test("공지 이미지는 가로 4:3·세로 320x452 프레임만 사용하고 PR 첨부 타이포를 유지한다", () => {
   assert.match(detail, /function NoticeAttachmentImage/);
   assert.match(detail, /noticeAttachmentFrameAspectRatio\(sourceAspectRatio\)/);
   assert.doesNotMatch(detail, /사진 전체보기/);
