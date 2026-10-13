@@ -6,6 +6,8 @@ the user's supplied profile-row design; contact/company/roster fields remain
 excluded, and nonparticipant summaries retain their previous minimal fields.
 Every participant query retains authenticated parent-notice authorization.
 
+2026-10-13 mutual-aid evidence visibility: restores the PR #23 (2026-09-21) policy that the 2026-10-08 hardening reverted because these documents still described the older administrator-only rule. Evidence files and `metadata.proof_url` follow the request's read policy, so every member who can read a mutual-aid request sees its evidence in list/detail responses and media access. Editing evidence remains limited to the processing request owner or an administrator.
+
 2026-10-08 WP5/WP8/WP9 hardening: irreversible account deletion reloads the user after acquiring its row lock, so an administrator password reset invalidates a credential cached earlier in that request. Mutual-aid evidence serialization and media access enforce the existing processing-author/admin policy, including legacy public assets. Administrator web confirmation queues and delayed alert callbacks belong to one authenticated session and are discarded on session replacement/logout without executing their actions.
 
 API requests retain their originating login generation in memory. A late 401 from an earlier login cannot replay a mutation with replacement credentials or clear the replacement session. Re-dispatch checks the same generation; refresh single-flight keys include generation and token. Normal token rotation and same-principal profile updates preserve the login generation, while logout/new login changes it. This adds no HTTP header or backend API field.
@@ -133,7 +135,7 @@ Implementation:
 | Profile edit | No | Own only | Own/all if later needed |
 | Notification settings | No | Own only | Own only |
 | Read mutual-aid requests/comments | No | Yes | Yes |
-| Read/open/download mutual-aid evidence | No | Own readable processing request only | Yes |
+| Read/open/download mutual-aid evidence | No | Any readable request | Yes |
 | Issue media access URL | No | Authorized media only | All |
 
 ## 6. Board Write Policy
@@ -155,10 +157,10 @@ Rules:
 - Cohort-leader registration is stored through the admin-only board management API; members can read the configured cohort introductions but cannot create or edit them.
 - Past-council records use a separate admin-only board metadata area. FAQ remains a separate dedicated table/API; neither mutation path is available to members.
 - Suggestions remain anonymous in member and admin presentation. Only the admin reply endpoint can set an official answer and `answered` requires reply text.
-- Mutual-aid submission content and status are readable by authenticated members. Ordinary member list/detail responses omit evidence. An explicit `GET /api/posts/{id}?for_edit=true` authorizes the processing request owner or administrator before returning evidence files, filenames and `metadata.proof_url`. Other members cannot request this edit response; evidence metadata/access lookup returns `404 NOT_FOUND` for peers or non-processing requesters, including legacy non-private evidence.
+- Mutual-aid submission content, status and evidence are readable by authenticated members who can read the request. List/detail responses include evidence files and `metadata.proof_url`, and evidence media access follows the request's read policy, including legacy non-private evidence. `GET /api/posts/{id}?for_edit=true` still authorizes only the processing request owner or administrator.
 - A requester may edit a mutual-aid submission only while it is `processing`. They may delete a `processing` or `rejected` submission, but never a `completed` submission; the API enforces the state rule even when called directly.
 - Draft and hidden posts are author/admin only across the same paths, while `deleted` status is admin-only; changing a previously readable post to an unpublished state removes it from other members' activity history and media authorization.
-- The backend does not mount the upload directory. It issues short-lived signed media URLs only after an authenticated metadata/access request passes object-level policy. Ordinary post attachments inherit post read policy; mutual-aid evidence is available to administrators or the readable processing request owner. Signed URLs already issued retain their original expiration; editing does not introduce token revocation. Removing an attachment detaches its post relation without physically deleting bytes.
+- The backend does not mount the upload directory. It issues short-lived signed media URLs only after an authenticated metadata/access request passes object-level policy. Ordinary post attachments inherit post read policy; mutual-aid evidence follows the request's read policy. Signed URLs already issued retain their original expiration; editing does not introduce token revocation. Removing an attachment detaches its post relation without physically deleting bytes.
 
 ## 7. Anonymous Writing
 
@@ -226,7 +228,7 @@ Rules:
 - Both paths are rate-limited. Verification codes are hashed, have attempt and expiry limits, and are never returned by the API or logged.
 - The operation hard-deletes account PII, sessions/tokens, user-specific activity, and unattached owned uploads in one database transaction with staged-file rollback protection.
 - Every authored post/comment remains regardless of status or board type. Before the user row is removed, missing writing-time name/cohort snapshots are filled and `author_id` is cleared. Every connected owned media asset remains with its `owner_id` cleared; filenames and bytes are unchanged.
-- Anonymous and forced-anonymous content remains anonymous to non-admin readers. Administrators may resolve its live author or historical snapshot. Mutual-aid evidence remains administrator-only after account deletion.
+- Anonymous and forced-anonymous content remains anonymous to non-admin readers. Administrators may resolve its live author or historical snapshot. Mutual-aid evidence keeps the request's read policy after account deletion.
 - Administrators must transfer operational responsibility and be demoted by another administrator before self-deletion.
 - The completion receipt is deliberately non-identifying. There is no fixed application-level legal retention claim; any receipt or backup interval requires explicit privacy-owner approval.
 

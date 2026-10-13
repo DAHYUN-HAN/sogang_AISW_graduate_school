@@ -61,8 +61,6 @@ def _safe_metadata(
     if not normalized:
         return None
     metadata = dict(normalized)
-    if board.board_type == "mutual_aid" and not include_sensitive:
-        metadata.pop("proof_url", None)
     if board.board_type == "activity_certification" and not (include_sensitive or include_bank_account):
         metadata.pop("bank_account", None)
     if board.slug == "study-activity" and not include_sensitive:
@@ -646,10 +644,6 @@ def _serialize_post_list_item(
     activity_source_title: str | None = None,
 ) -> dict:
     content_preview = post_content_preview(_visible_post_content(post, board), board.slug)
-    if board.board_type == "mutual_aid" and current_user.role != "admin":
-        attachment_count = 0
-        thumbnail_media_id = None
-        thumbnail_url = None
     return {
         "id": post.id,
         "board_id": post.board_id,
@@ -923,8 +917,6 @@ def _post_attachments(
     *,
     include_evidence: bool = False,
 ) -> list[dict]:
-    if board.board_type == "mutual_aid" and not (include_evidence or current_user.role == "admin"):
-        return []
     rows = db.execute(
         select(PostAttachment, MediaAsset)
         .join(MediaAsset, MediaAsset.id == PostAttachment.media_id)
@@ -943,6 +935,7 @@ def _post_attachments(
         for _, media in rows
         if include_evidence
         or not media.is_private
+        or board.board_type == "mutual_aid"
         or media.owner_id == current_user.id
         or current_user.role == "admin"
     ]
