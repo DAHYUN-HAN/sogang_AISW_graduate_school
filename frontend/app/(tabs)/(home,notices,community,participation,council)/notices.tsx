@@ -1,5 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
-import { BackIcon, EmptyCalendarIcon } from "../../../components/icons";
+import { BackIcon, EmptyCalendarIcon, SearchIcon } from "../../../components/icons";
 import { router } from "expo-router";
 import { useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from "react-native";
@@ -50,8 +49,6 @@ const COLORS = {
   cyan700: "#14788A",
 };
 
-type IconName = keyof typeof Ionicons.glyphMap;
-
 // 게시판 목록은 받았지만 공지 게시판이 하나도 없을 때도 조회 실패와 같이 LoadError로 덮는다.
 const MISSING_NOTICE_BOARDS = new Error("notice boards are missing");
 
@@ -59,13 +56,6 @@ function flattenBoards(groups?: { boards: Board[] }[]) {
   return groups?.flatMap((group) => group.boards) ?? [];
 }
 
-function IconButton({ icon, onPress, label }: { icon: IconName; onPress: () => void; label: string }) {
-  return (
-    <Pressable accessibilityLabel={label} onPress={onPress} style={styles.iconButton}>
-      <Ionicons name={icon} size={24} color={COLORS.text} />
-    </Pressable>
-  );
-}
 
 function LoadingRows() {
   return <LoadingState compact />;
@@ -153,7 +143,10 @@ function NoticesContent() {
           </Pressable>
         )}
         <Text style={styles.appBarTitle}>공지사항</Text>
-        <IconButton icon="search-outline" label="검색" onPress={() => router.push("/search?scope=notices" as never)} />
+        {/* 돋보기는 다른 게시판과 같은 피그마 아이콘(20px 상자, 모양 15px)을 쓴다. */}
+        <Pressable accessibilityLabel="검색" onPress={() => router.push("/search?scope=notices" as never)} style={styles.iconButton}>
+          <SearchIcon size={20} color={COLORS.text} />
+        </Pressable>
       </View>
 
       <View style={styles.filterWrap}>
