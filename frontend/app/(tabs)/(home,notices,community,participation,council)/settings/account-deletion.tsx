@@ -8,7 +8,6 @@ import KeyboardViewport from "../../../../components/KeyboardViewport";
 
 import { userApi } from "../../../../services/api";
 import { useUserStore } from "../../../../stores/userStore";
-import { accountDeletionErrorMessage } from "../../../../utils/accountDeletion";
 import { apiErrorCode, apiErrorStatus } from "../../../../utils/authValidation";
 import { clearStoredPushToken } from "../../../../utils/pushTokenStorage";
 
@@ -22,9 +21,10 @@ const COLORS = {
   bg: "#FFFFFF",
   panel: "#F8FAFC",
   danger: "#D64545", // Figma: 탈퇴하기 활성 버튼/오류
-  dangerBg: "#FFF4F4",
   disabled: "#D1D5DB",
 };
+
+const ACCOUNT_DELETION_SUBMIT_ERROR = "계정을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.";
 
 export default function AccountDeletionScreen() {
   const insets = useSafeAreaInsets();
@@ -71,7 +71,8 @@ export default function AccountDeletionScreen() {
       if (status === 403 || code === "FORBIDDEN") {
         setPasswordError("비밀번호가 일치하지 않아요.");
       } else {
-        setRequestError(accountDeletionErrorMessage(status ?? (code ? undefined : 0), code));
+        // Figma Screen/MyPage/AccountDelete-PasswordModal-SubmitError: 비밀번호 틀림 말고는 이유와 관계없이 한 문구.
+        setRequestError(ACCOUNT_DELETION_SUBMIT_ERROR);
       }
     } finally {
       setIsSubmitting(false);
@@ -143,20 +144,6 @@ export default function AccountDeletionScreen() {
           <Text style={styles.confirmText}>안내사항을 모두 확인했어요</Text>
         </Pressable>
 
-        {requestError ? (
-          <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorBox}>
-            <Text style={styles.errorBoxText}>{requestError}</Text>
-            <Pressable
-              accessibilityLabel="계정 삭제 다시 시도"
-              accessibilityRole="button"
-              disabled={!canSubmit}
-              onPress={() => void deleteAccount()}
-            >
-              <Text style={styles.retryText}>다시 시도</Text>
-            </Pressable>
-          </View>
-        ) : null}
-
         <Pressable
           accessibilityHint="비밀번호를 확인한 뒤 계정과 개인정보를 삭제합니다."
           accessibilityLabel="계정 삭제"
@@ -182,7 +169,7 @@ export default function AccountDeletionScreen() {
       <Modal transparent animationType="fade" visible={passwordModalVisible} onRequestClose={() => setPasswordModalVisible(false)}>
         <KeyboardViewport>
           <Pressable onPress={() => setPasswordModalVisible(false)} style={styles.modalBackdrop}>
-            {/* Figma: Screen/MyPage/AccountDelete-PasswordModal, -Error */}
+            {/* Figma: Screen/MyPage/AccountDelete-PasswordModal, -Error, -SubmitError */}
             <Pressable onPress={(event) => event.stopPropagation()} style={styles.modalCard}>
               <Text accessibilityRole="header" style={styles.modalTitle}>비밀번호 확인</Text>
               <Text style={styles.modalBody}>본인 확인을 위해 비밀번호를 입력해주세요.</Text>
@@ -316,14 +303,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.text,
   },
   confirmText: { flex: 1, color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 16 },
-  errorBox: {
-    borderRadius: 8,
-    backgroundColor: COLORS.dangerBg,
-    padding: 12,
-    gap: 7,
-  },
-  errorBoxText: { color: COLORS.danger, fontSize: 13, lineHeight: 19 },
-  retryText: { color: COLORS.danger, fontSize: 13, fontWeight: "700" },
   deleteButton: {
     height: 48,
     alignItems: "center",

@@ -2,7 +2,7 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../../components/AppTypography";
-import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
+import { useLoadErrorOverlay } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useMeQuery } from "../../../../hooks/useApi";
@@ -40,7 +40,8 @@ const MENU_ITEMS = [
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { data, isError, error, isLoading, refetch } = useMeQuery();
+  const { data, error, isLoading, refetch } = useMeQuery();
+  useLoadErrorOverlay(error, () => void refetch());
   const refreshToken = useUserStore((state) => state.refreshToken);
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const clearSession = useUserStore((state) => state.clearSession);
@@ -91,13 +92,6 @@ export default function SettingsScreen() {
       </View>
 
       <ScrollView style={styles.scroller} contentContainerStyle={styles.content}>
-        {isError ? (
-          <NetworkErrorFallback error={error} onRetry={() => void refetch()}>
-            <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.loadErrorBox}>
-              <Text style={styles.loadErrorText}>프로필을 불러오지 못했습니다. 다시 시도</Text>
-            </Pressable>
-          </NetworkErrorFallback>
-        ) : null}
         <Pressable onPress={() => router.push("/settings/profile")} style={styles.profileRow}>
           {isLoading ? (
             <View style={styles.avatar}>
@@ -180,19 +174,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: 36,
-  },
-  loadErrorBox: {
-    borderRadius: 8,
-    backgroundColor: "#FFF1F2",
-    padding: 12,
-    marginHorizontal: 16,
-    marginBottom: 8,
-  },
-  loadErrorText: {
-    color: COLORS.danger,
-    fontSize: 13,
-    fontWeight: "700",
-    textAlign: "center",
   },
   // Figma 프로필래퍼: padding 0/16/16, 구분선은 별도 전폭 1px.
   profileRow: {

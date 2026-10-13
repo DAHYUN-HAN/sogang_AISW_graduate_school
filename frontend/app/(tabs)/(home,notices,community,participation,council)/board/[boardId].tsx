@@ -1,10 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { StackActions, useNavigation } from "@react-navigation/native";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
-import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
+import { useLoadErrorOverlay } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import EdgeSwipeBack from "../../../../components/EdgeSwipeBack";
@@ -67,16 +68,13 @@ const COLORS = {
   divider: "#EEF0F3",
   surface: "#FFFFFF",
   page: "#FFFFFF",
-  danger: "#B91C1C",
-  danger50: "#FFF1F2",
 };
 
+// 목록은 받았지만 이 게시판이 없을 때도 조회 실패와 같이 LoadError로 덮는다.
+const MISSING_BOARD = new Error("board is missing from the board list");
+
 const BOARD_DISPLAY: Record<string, { name: string; description?: string }> = {
-  "all-notices": { name: "공지사항" },
-  "academic-notices": { name: "공지사항" },
-  "event-notices": { name: "공지사항" },
   "academic-calendar": { name: "일정" },
-  "webinar-notices": { name: "공지사항" },
   "event-album": { name: "커뮤니티" },
   "lecture-reviews": { name: "커뮤니티" },
   "exam-archive": { name: "커뮤니티" },
@@ -101,7 +99,6 @@ const BOARD_DISPLAY: Record<string, { name: string; description?: string }> = {
   accounting: { name: "회계장부" },
 };
 
-const NOTICE_FILTERS = ["전체", "학사공지", "행사공지"];
 const STUDY_FILTERS = ["모집", "활동 인증"];
 const PARTICIPATION_FILTERS = ["안내", "활동 인증"];
 const PARTICIPATION_GROUPS = [
@@ -170,7 +167,6 @@ function getBoardDisplay(board?: Board | null) {
 function filterOptions(board?: Board | null) {
   if (!board) return ["전체"];
   const groupKey = participationGroupKey(board);
-  if (board.board_type === "notice") return NOTICE_FILTERS;
   if (board.board_type === "resource") return RESOURCE_FILTERS;
   if (groupKey === "study") return STUDY_FILTERS;
   if (board.board_type === "activity_certification") return PARTICIPATION_FILTERS;
@@ -380,10 +376,8 @@ function CohortLeaderScreen({
   posts,
   isLoading,
   isError,
-  error,
   refreshing,
   onRefresh,
-  onRetry,
   onBack,
   topInset,
 }: {
@@ -391,10 +385,8 @@ function CohortLeaderScreen({
   posts: PostListItem[];
   isLoading: boolean;
   isError: boolean;
-  error?: unknown;
   refreshing: boolean;
   onRefresh: () => void;
-  onRetry: () => void;
   onBack: () => void;
   topInset: number;
 }) {
@@ -417,14 +409,7 @@ function CohortLeaderScreen({
           onRefresh={onRefresh}
           contentContainerStyle={[styles.executiveContent, leaders.length === 0 ? styles.emptyContent : null]}
           ListEmptyComponent={
-            isError ? (
-              <NetworkErrorFallback error={error} onRetry={onRetry}>
-                <Pressable onPress={onRetry} style={styles.errorBox}>
-                  <Text style={styles.errorTitle}>기장단 정보를 불러오지 못했습니다.</Text>
-                  <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
-                </Pressable>
-              </NetworkErrorFallback>
-            ) : (
+            isError ? null : (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyText}>기장단 정보가 없습니다.</Text>
               </View>
@@ -672,43 +657,19 @@ function ExecutiveIntroScreen({ board, topInset, onBack }: { board?: Board | nul
         <View style={styles.executiveEmptyState}>
           <Ionicons name="people-outline" size={32} color="#AAB2BF" />
           <Text style={styles.executiveEmptyTitle}>등록된 원우회 소개가 없어요</Text>
-          <Text style={styles.executiveEmptyDescription}>관리자에서 대표 이미지와 소개를 등록해주세요</Text>
         </View>
       )}
     </View>
   );
 }
 
-function BoardFeedFooter({
-  state,
-  onRetry,
-}: {
-  state: "loading" | "retry" | "idle";
-  onRetry: () => void;
-}) {
-  if (state === "idle") return null;
-  if (state === "loading") {
-    return (
-      <View style={styles.feedFooter}>
-        <ActivityIndicator color={COLORS.primary} />
-      </View>
-    );
-  }
+// 다음 쪽을 받는 중에만 표시한다. 실패는 앱 전체 LoadError가 덮는다.
+function BoardFeedFooter({ state }: { state: "loading" | "retry" | "idle" }) {
+  if (state !== "loading") return null;
   return (
-    <Pressable onPress={onRetry} style={styles.feedFooter}>
-      <Text style={styles.feedFooterRetry}>다음 게시글을 불러오지 못했습니다. 탭해서 다시 시도하세요.</Text>
-    </Pressable>
-  );
-}
-
-function FeedRefreshErrorBanner({ onRetry }: { onRetry: () => void }) {
-  return (
-    <Pressable onPress={onRetry} style={styles.feedRefreshError}>
-      <Ionicons name="refresh-outline" size={16} color={COLORS.danger} />
-      <Text style={styles.feedRefreshErrorText}>
-        새로고침하지 못했습니다. 탭해서 다시 시도하세요.
-      </Text>
-    </Pressable>
+    <View style={styles.feedFooter}>
+      <ActivityIndicator color={COLORS.primary} />
+    </View>
   );
 }
 
@@ -716,11 +677,8 @@ function CouncilActivityHistoryScreen({
   posts,
   isLoading,
   isError,
-  error,
   refreshing,
-  refreshError,
   onRefresh,
-  onRetry,
   hasNextPage,
   isFetchingNextPage,
   isFetchNextPageError,
@@ -733,11 +691,8 @@ function CouncilActivityHistoryScreen({
   posts: PostListItem[];
   isLoading: boolean;
   isError: boolean;
-  error?: unknown;
   refreshing: boolean;
-  refreshError: boolean;
   onRefresh: () => void;
-  onRetry: () => void;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   isFetchNextPageError: boolean;
@@ -754,7 +709,6 @@ function CouncilActivityHistoryScreen({
         <Text style={styles.appBarTitle}>원우회 활동내역</Text>
         <View style={styles.iconButton} />
       </View>
-      {refreshError ? <FeedRefreshErrorBanner onRetry={onRefresh} /> : null}
       {isLoading ? (
         <LoadingState />
       ) : (
@@ -777,18 +731,10 @@ function CouncilActivityHistoryScreen({
           ListFooterComponent={
             <BoardFeedFooter
               state={boardFeedFooterState({ isFetchingNextPage, isFetchNextPageError })}
-              onRetry={onLoadMore}
             />
           }
           ListEmptyComponent={
-            isError ? (
-              <NetworkErrorFallback error={error} onRetry={onRetry}>
-                <Pressable onPress={onRetry} style={styles.errorBox}>
-                  <Text style={styles.errorTitle}>활동내역을 불러오지 못했습니다.</Text>
-                  <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
-                </Pressable>
-              </NetworkErrorFallback>
-            ) : (
+            isError ? null : (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyText}>활동내역이 없습니다.</Text>
               </View>
@@ -979,9 +925,16 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const user = useUserStore((state) => state.user);
 
-  const { data: boardsRes } = useBoardsQuery();
+  const { data: boardsRes, isLoading: boardsLoading, error: boardsLoadError, refetch: refetchBoards } = useBoardsQuery();
   const boards = useMemo(() => flattenBoards(boardsRes?.data), [boardsRes?.data]);
   const board = useMemo(() => boards.find((item) => item.id === boardId), [boardId, boards]);
+  // 공지 게시판은 공지사항 화면이 보여 준다. /board/{공지 게시판} 주소로 들어오면 이 화면을 공지사항으로
+  // 바꿔 끼운다. 홈 "더보기"처럼 지금 탭 스택에 쌓이고, 탭 바는 공지사항이 켜진다.
+  const navigation = useNavigation();
+  const isNoticeBoard = board?.board_type === "notice";
+  useEffect(() => {
+    if (isNoticeBoard) navigation.dispatch(StackActions.replace("notices"));
+  }, [isNoticeBoard, navigation]);
   useBoardTabHighlight(board);
   const detailReturnRoute = isTabRoot ? boardParentRoute(board) : boardRoute(boardId);
   const display = getBoardDisplay(board);
@@ -994,7 +947,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
   const isParticipationGuideCards = Boolean(participationGroupKey(board)) && !isActivityCards && !isStudyRecruit;
   const tabs = sectionTabs(board, boards);
   const canWriteBoard = !board || board.write_permission !== "admin" || user?.role === "admin";
-  const canShowCreateButton = canWriteBoard && board?.board_type !== "notice" && board?.board_type !== "album" && (!isParticipationGuideCards || board?.slug === "study-recruit");
+  const canShowCreateButton = canWriteBoard && board?.board_type !== "album" && (!isParticipationGuideCards || board?.slug === "study-recruit");
   const isResourceBoard = board?.board_type === "resource";
   const feedMode = boardFeedMode({
     activeBoardId: boardId,
@@ -1036,6 +989,19 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
   const isFetchingNextPage = activePostsQuery?.isFetchingNextPage === true;
   const isFetchNextPageError = activePostsQuery?.isFetchNextPageError === true;
   const feedFooterState = activePostsQuery ? boardFeedFooterState(activePostsQuery) : "idle";
+  // 게시판 목록·첫 쪽·다음 쪽·당겨서 새로고침 중 무엇이 실패해도 화면 안 오류 상자 대신 앱 전체 LoadError로 덮는다.
+  // 목록은 받았는데 이 게시판이 없을 때도 같다.
+  const missingBoard = !boardsLoading && !boardsLoadError && boardsRes !== undefined && !board;
+  const boardLoadError = boardsLoadError
+    ?? (isError ? activePostsQuery?.error : null)
+    ?? refreshFirstPageError
+    ?? (missingBoard ? MISSING_BOARD : null);
+  useLoadErrorOverlay(boardLoadError, () => {
+    if (boardsLoadError || missingBoard) void refetchBoards();
+    else if (refreshFirstPageError) void feedController.refreshFirstPage();
+    else if (isFetchNextPageError) void feedController.loadMore();
+    else void feedController.retry();
+  });
 
   useEffect(() => {
     if (initialBoardId) {
@@ -1156,6 +1122,10 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
     ) as never);
   };
 
+  if (isNoticeBoard) {
+    return <LoadingState />;
+  }
+
   if (board?.slug === "accounting") {
     return <AccountingExternalScreen board={board} topInset={insets.top} onBack={exitBoardDepth} />;
   }
@@ -1171,10 +1141,8 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         posts={posts}
         isLoading={isLoading}
         isError={isError}
-        error={activePostsQuery?.error}
         refreshing={isRefreshingFirstPage}
         onRefresh={() => void feedController.refreshFirstPage()}
-        onRetry={() => void feedController.retry()}
         topInset={insets.top}
         onBack={exitBoardDepth}
       />
@@ -1197,11 +1165,8 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         posts={posts}
         isLoading={isLoading}
         isError={isError}
-        error={activePostsQuery?.error}
         refreshing={isRefreshingFirstPage}
-        refreshError={refreshFirstPageError !== null}
         onRefresh={() => void feedController.refreshFirstPage()}
-        onRetry={() => void feedController.retry()}
         hasNextPage={hasNextPage}
         isFetchingNextPage={isFetchingNextPage}
         isFetchNextPageError={isFetchNextPageError}
@@ -1338,10 +1303,6 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         </>
       ) : null}
 
-      {refreshFirstPageError ? (
-        <FeedRefreshErrorBanner onRetry={() => void feedController.refreshFirstPage()} />
-      ) : null}
-
       {isLoading ? (
         <LoadingState />
       ) : (
@@ -1359,14 +1320,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
           ]}
           columnWrapperStyle={isAlbum ? styles.albumRow : undefined}
           ListEmptyComponent={
-            isError ? (
-              <NetworkErrorFallback error={activePostsQuery?.error} onRetry={() => void feedController.retry()}>
-                <Pressable onPress={() => void feedController.retry()} style={styles.errorBox}>
-                  <Text style={styles.errorTitle}>게시글을 불러오지 못했습니다.</Text>
-                  <Text style={styles.errorText}>탭해서 다시 시도하세요.</Text>
-                </Pressable>
-              </NetworkErrorFallback>
-            ) : (
+            isError ? null : (
               <View style={styles.emptyBox}>
                 <EmptyCalendarIcon size={32} />
                 <Text style={styles.emptyText}>
@@ -1394,7 +1348,7 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
             void feedController.loadMore();
           }}
           onEndReachedThreshold={0.5}
-          ListFooterComponent={<BoardFeedFooter state={feedFooterState} onRetry={() => void feedController.loadMore()} />}
+          ListFooterComponent={<BoardFeedFooter state={feedFooterState} />}
         />
       )}
 
@@ -1589,29 +1543,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
-  },
-  feedFooterRetry: {
-    color: COLORS.danger,
-    fontSize: 12,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  feedRefreshError: {
-    minHeight: 42,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: "#FECACA",
-    backgroundColor: COLORS.danger50,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  feedRefreshErrorText: {
-    flex: 1,
-    color: COLORS.danger,
-    fontSize: 12,
-    fontWeight: "700",
   },
   albumContent: {
     paddingHorizontal: 16,
@@ -1876,13 +1807,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
     marginTop: 8,
   },
-  executiveEmptyDescription: {
-    color: "#8A919C",
-    fontSize: 13,
-    fontWeight: "400",
-    lineHeight: 18,
-    marginTop: 8,
-  },
   councilActivityRow: {
     minHeight: 60,
     justifyContent: "center",
@@ -2009,25 +1933,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 18,
     marginTop: 8,
-  },
-  errorBox: {
-    margin: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    backgroundColor: COLORS.danger50,
-    padding: 16,
-  },
-  errorTitle: {
-    color: COLORS.danger,
-    fontSize: 15,
-    fontWeight: "900",
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: 12,
-    fontWeight: "800",
-    marginTop: 5,
   },
   fab: {
     // Figma: FAB 52px, + 아이콘 22px

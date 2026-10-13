@@ -34,6 +34,7 @@ import {
 
 import { BackIcon } from "../../components/icons";
 import PrivacyConsentSheet from "../../components/PrivacyConsentSheet";
+import { useLoadErrorOverlay } from "../../components/NetworkErrorState";
 const COLORS = {
   primary: "#2761FF", // primary/500
   primary50: "#EDF2FE",
@@ -100,6 +101,8 @@ export default function RegisterScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const registrationOptionsQuery = useRegistrationOptionsQuery();
+  // 전공 목록·개인정보 처리방침을 받지 못하면(4xx 포함) 앱 전체 LoadError로 덮는다.
+  useLoadErrorOverlay(registrationOptionsQuery.error, () => void registrationOptionsQuery.refetch());
   const majorOptions = registrationOptionsQuery.data?.data.majors ?? [];
   const privacyPolicy = registrationOptionsQuery.data?.data.privacy_policy;
 
@@ -530,14 +533,6 @@ export default function RegisterScreen() {
               </Pressable>
             ))}
             {registrationOptionsQuery.isLoading ? <Text style={styles.modalStateText}>전공 목록을 불러오는 중이에요.</Text> : null}
-            {registrationOptionsQuery.isError ? (
-              <View style={styles.modalRetry}>
-                <Text style={styles.errorText}>전공 목록을 불러오지 못했어요.</Text>
-                <Pressable accessibilityRole="button" onPress={() => void registrationOptionsQuery.refetch()} style={styles.modalRetryButton}>
-                  <Text style={styles.modalRetryText}>다시 시도</Text>
-                </Pressable>
-              </View>
-            ) : null}
           </Pressable>
         </Pressable>
       </Modal>
@@ -606,7 +601,4 @@ const styles = StyleSheet.create({
   modalOptionText: { color: COLORS.text, fontSize: 15, fontWeight: "400" }, // Figma: Regular 15
   modalOptionTextSelected: { color: COLORS.primary, fontWeight: "500" }, // Figma: selected = primary Medium
   modalStateText: { color: COLORS.muted, fontSize: 13, fontWeight: "700", paddingVertical: 14 },
-  modalRetry: { alignItems: "flex-start", gap: 8, paddingVertical: 10 },
-  modalRetryButton: { borderRadius: 7, backgroundColor: COLORS.primary50, paddingHorizontal: 12, paddingVertical: 8 },
-  modalRetryText: { color: COLORS.primary, fontSize: 12, fontWeight: "700" },
 });

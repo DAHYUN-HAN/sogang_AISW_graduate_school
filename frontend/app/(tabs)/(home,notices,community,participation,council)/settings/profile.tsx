@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
-import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
+import { useLoadErrorOverlay } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../../../components/LoadingState";
@@ -51,6 +51,11 @@ export default function ProfileSettingsScreen() {
     refetchOnWindowFocus: false,
   });
   const majorOptions = registrationOptionsQuery.data?.data.majors ?? [];
+  // 프로필·전공 목록을 받지 못하면(4xx 포함) 앱 전체 LoadError로 덮는다.
+  useLoadErrorOverlay(profileQuery.error ?? registrationOptionsQuery.error, () => {
+    if (profileQuery.isError) void profileQuery.refetch();
+    if (registrationOptionsQuery.isError) void registrationOptionsQuery.refetch();
+  });
   const [fields, setFields] = useState<FieldValues>({
     nickname: "",
     cohort: "",
@@ -162,16 +167,7 @@ export default function ProfileSettingsScreen() {
 
       {profileQuery.isLoading ? (
         <LoadingState />
-      ) : profileQuery.isError ? (
-        <NetworkErrorFallback error={profileQuery.error} onRetry={() => void profileQuery.refetch()}>
-          <View style={styles.center}>
-            <Text style={styles.loadErrorText}>프로필을 불러오지 못했습니다.</Text>
-            <Pressable accessibilityRole="button" onPress={() => void profileQuery.refetch()} style={styles.retryButton}>
-              <Text style={styles.retryButtonText}>다시 시도</Text>
-            </Pressable>
-          </View>
-        </NetworkErrorFallback>
-      ) : (
+      ) : profileQuery.isError ? null : (
         <ScrollView keyboardShouldPersistTaps="handled" style={styles.scroller} contentContainerStyle={styles.content}>
         <View style={styles.avatarSection}>
           <Pressable disabled={isUploadingImage} onPress={() => setPhotoSheetVisible(true)} style={styles.avatarButton}>
@@ -216,14 +212,6 @@ export default function ProfileSettingsScreen() {
               </Text>
               <Ionicons name="chevron-down" size={18} color={COLORS.subtle} />
             </Pressable>
-            {registrationOptionsQuery.isError ? (
-              <View style={styles.inlineError}>
-                <Text style={styles.errorText}>전공 목록을 불러오지 못했습니다.</Text>
-                <Pressable accessibilityRole="button" onPress={() => void registrationOptionsQuery.refetch()} style={styles.inlineRetryButton}>
-                  <Text style={styles.inlineRetryText}>다시 시도</Text>
-                </Pressable>
-              </View>
-            ) : null}
           </View>
 
           <View style={styles.fieldGroup}>
@@ -312,27 +300,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.bg,
   },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  loadErrorText: {
-    color: COLORS.muted,
-    fontSize: 14,
-  },
-  retryButton: {
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
-  },
   appBar: {
     minHeight: 62,
     flexDirection: "row",
@@ -402,9 +369,6 @@ const styles = StyleSheet.create({
     borderColor: "#FFFFFF",
   },
   errorText: { color: COLORS.danger, fontSize: 12, fontWeight: "800", marginTop: 10 },
-  inlineError: { alignItems: "flex-start", gap: 8 },
-  inlineRetryButton: { borderRadius: 7, backgroundColor: COLORS.primary50, paddingHorizontal: 12, paddingVertical: 8 },
-  inlineRetryText: { color: COLORS.primary, fontSize: 12, fontWeight: "700" },
   form: {
     gap: 14,
   },

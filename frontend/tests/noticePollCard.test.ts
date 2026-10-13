@@ -28,6 +28,7 @@ function harness(initialPoll: NoticePoll, failures = 0, holdVote = false) {
   const pages = [{status: "success", data: [member], pagination: {page: 1, size: 20, total_pages: 2, total: 21}}];
   const cacheActions: {action: string; key?: unknown}[] = [];
   let cardKeys: (string | null)[] = [];
+  let saveErrors = 0;
   const compiled = ts.transpileModule(readFileSync(path, "utf8"), {compilerOptions: {
     jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
   }}).outputText;
@@ -67,6 +68,7 @@ function harness(initialPoll: NoticePoll, failures = 0, holdVote = false) {
     if (id.endsWith("/MediaImage")) return {__esModule: true, default: "MediaImage"};
     if (id.endsWith("/PersonListCard")) return {__esModule: true, default: "PersonListCard"};
     if (id.endsWith("/icons")) return {VoterAvatarIcon: "VoterAvatarIcon"};
+    if (id.endsWith("/NetworkErrorState")) return {useLoadErrorOverlay: () => {}};
     return nativeRequire(id);
   };
   new Function("module", "exports", "require", compiled)(module, module.exports, loader);
@@ -83,10 +85,10 @@ function harness(initialPoll: NoticePoll, failures = 0, holdVote = false) {
       }
       nodes.push(node); walk(node.props.children);
     };
-    walk(module.exports.default({postId: 50, poll}));
+    walk(module.exports.default({postId: 50, poll, onSaveError: () => {saveErrors++;}}));
     return nodes;
   };
-  return {render, submissions, queryKeys, cacheActions, infiniteOptions, participantCalls, release: () => release(), pages, keys: () => cardKeys, update: (next: NoticePoll) => {poll = next;}};
+  return {render, saveErrors: () => saveErrors, submissions, queryKeys, cacheActions, infiniteOptions, participantCalls, release: () => release(), pages, keys: () => cardKeys, update: (next: NoticePoll) => {poll = next;}};
 }
 
 
@@ -195,12 +197,13 @@ test("a pending vote keeps the choice and prevents repeated requests", async () 
   assert.ok(label(view.render(), "장소 다시 투표하기"));
 });
 
-test("failed votes expose the API reason and keep the choice for another try", async () => {
+test("failed votes ask the screen for a toast and keep the choice for another try", async () => {
   const view = harness(fixture, 1);
   label(view.render(), "장소 · 학교").props.onPress();
   await label(view.render(), "장소 투표하기").props.onPress();
   let nodes = view.render();
-  assert.ok(nodes.some(node => node.props.accessibilityRole === "alert" && node.props.children === "연결을 확인한 뒤 다시 시도해 주세요."));
+  assert.equal(view.saveErrors(), 1);
+  assert.equal(nodes.some(node => node.props.accessibilityRole === "alert"), false);
   assert.equal(label(nodes, "장소 · 학교").props.accessibilityState.checked, true);
   assert.equal(label(nodes, "장소 투표하기").props.disabled, false);
   await label(nodes, "장소 투표하기").props.onPress();

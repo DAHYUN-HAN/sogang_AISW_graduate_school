@@ -35,25 +35,6 @@ export function isAccountDeletionCodeValid(value: string) {
   return /^\d{6}$/.test(value.trim());
 }
 
-export function accountDeletionErrorMessage(status?: number, code?: string) {
-  if (code === "ADMIN_ACCOUNT_DELETION_FORBIDDEN") {
-    return "관리자 계정은 운영 권한과 책임을 다른 관리자에게 이전하고 일반 회원으로 변경한 뒤 삭제할 수 있습니다.";
-  }
-  if (status === 401) {
-    return "로그인 세션이 만료되었습니다. 다시 로그인한 뒤 시도해주세요.";
-  }
-  if (status === 403 || code === "FORBIDDEN") {
-    return "현재 비밀번호가 일치하지 않습니다.";
-  }
-  if (status === 429 || code === "RATE_LIMITED") {
-    return "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.";
-  }
-  if (status === 0) {
-    return "서버에 연결하지 못했습니다. 네트워크를 확인하고 다시 시도해주세요.";
-  }
-  return "계정 삭제 요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.";
-}
-
 export function publicAccountDeletionErrorMessage(status?: number, code?: string) {
   if (code === "ADMIN_ACCOUNT_DELETION_FORBIDDEN") {
     return "관리자 계정은 운영 권한과 책임을 이전하고 일반 회원으로 변경한 뒤 삭제할 수 있습니다.";

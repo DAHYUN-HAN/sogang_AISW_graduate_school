@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useMemo } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
-import { NetworkErrorFallback } from "../../../components/NetworkErrorState";
+import { useLoadErrorOverlay } from "../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../../components/LoadingState";
@@ -86,8 +86,9 @@ function MenuRow({ item, board }: { item: MenuItem; board?: Board }) {
 
 export default function CouncilScreen() {
   const insets = useSafeAreaInsets();
-  const { data, isLoading, isError, error, refetch } = useBoardsQuery();
+  const { data, isLoading, error, refetch } = useBoardsQuery();
   const boards = useMemo(() => flattenBoards(data?.data), [data?.data]);
+  useLoadErrorOverlay(error, () => void refetch());
 
   if (isLoading) {
     return <LoadingState />;
@@ -102,17 +103,6 @@ export default function CouncilScreen() {
       </View>
 
       <ScrollView style={styles.scroller} contentContainerStyle={styles.content}>
-        {isError ? (
-          <NetworkErrorFallback error={error} onRetry={() => void refetch()}>
-            <View style={styles.messageBox}>
-              <Text style={styles.errorText}>원우회 정보를 불러오지 못했습니다.</Text>
-              <Pressable accessibilityRole="button" onPress={() => void refetch()} style={styles.retryButton}>
-                <Text style={styles.retryButtonText}>다시 시도</Text>
-              </Pressable>
-            </View>
-          </NetworkErrorFallback>
-        ) : null}
-
         <View style={styles.menuList}>
           {MENU_ITEMS.map((item) => (
             <MenuRow key={item.title} item={item} board={boardBySlugs(boards, item.slugs)} />
@@ -177,30 +167,5 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontSize: 14,
     fontWeight: "400",
-  },
-  messageBox: {
-    gap: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#FECACA",
-    backgroundColor: "#FFF1F2",
-    padding: 14,
-    marginBottom: 14,
-  },
-  errorText: {
-    color: "#B91C1C",
-    fontWeight: "800",
-  },
-  retryButton: {
-    alignSelf: "flex-start",
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
   },
 });

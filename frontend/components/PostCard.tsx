@@ -35,7 +35,6 @@ const TYPE_LABELS: Record<string, string> = {
   faq: "FAQ",
   organization_intro: "소개",
   suggestion: "건의",
-  notice: "공지",
   calendar: "일정",
   guide: "가이드",
   resource: "자료",
@@ -67,14 +66,7 @@ function normalizeCategory(post: PostListItem, boardType?: string, boardSlug?: s
     const recruitmentStatus = String(post.metadata?.recruitment_status ?? raw ?? "").toLowerCase();
     return recruitmentStatus.includes("closed") || recruitmentStatus.includes("마감") ? "마감" : "진행중";
   }
-  if (raw) {
-    const lower = raw.toLowerCase();
-    if (lower.includes("event") || lower.includes("webinar") || raw.includes("행사") || raw.includes("특강")) return "행사공지";
-    if (lower.includes("academic") || raw.includes("학사")) return "학사공지";
-    if (lower.includes("other") || lower.includes("general") || raw.includes("기타")) return "기타공지";
-    if (raw.includes("전체")) return "공지";
-    return raw.length <= 8 ? raw : "공지";
-  }
+  if (raw) return raw;
   return boardType ? (TYPE_LABELS[boardType] ?? boardType) : "게시글";
 }
 
@@ -128,7 +120,7 @@ export default function PostCard({ post, onPress, boardType, boardSlug, isLast }
         <View style={[styles.pill, { backgroundColor: tone.bg }]}>
           <Text style={[styles.pillText, { color: tone.fg }]}>{label}</Text>
         </View>
-        {post.is_pinned || post.is_notice ? (
+        {post.is_pinned ? (
           <View style={styles.pinPill}>
             <BookmarkIcon filled size={11} color={COLORS.primary} />
             <Text style={styles.pinText}>고정</Text>

@@ -78,3 +78,17 @@ test("LoadError 재시도가 성공하면 서버 조회 실패 상태도 지운�
   await retryNetworkReads(async () => {}, async () => {});
   assert.equal(useNetworkStatusStore.getState().serverFailed, false);
 });
+
+test("화면 첫 조회 실패는 4xx도 LoadError로 보되 인터넷 끊김·401·취소는 뺀다", async () => {
+  const { AxiosError, CanceledError } = await import("axios");
+  const { isLoadFailure } = await import("../utils/networkError");
+  const response = (status: number) => new AxiosError("bad", "ERR_BAD_REQUEST", { method: "get" } as any, {}, { status } as any);
+  assert.equal(isLoadFailure(response(404)), true);
+  assert.equal(isLoadFailure(response(403)), true);
+  assert.equal(isLoadFailure(response(500)), true);
+  assert.equal(isLoadFailure(new Error("board is missing")), true);
+  assert.equal(isLoadFailure(response(401)), false);
+  assert.equal(isLoadFailure(new AxiosError("offline", "ERR_NETWORK")), false);
+  assert.equal(isLoadFailure(new CanceledError()), false);
+  assert.equal(isLoadFailure(null), false);
+});

@@ -526,10 +526,6 @@ export const searchApi = {
     const response = await api.get<ApiSuccess<SearchResult[]>>("/search", { params });
     return response.data;
   },
-  recent: async () => {
-    const response = await api.get<ApiSuccess<{ keyword: string; searched_at: string }[]>>("/search/recent");
-    return response.data;
-  },
 };
 
 export const commentApi = {

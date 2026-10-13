@@ -34,6 +34,7 @@ export const TOAST_ERROR_MESSAGES = {
   notificationSettings: "설정을 저장하지 못했어요. 잠시 후 다시 시도해주세요.",
   passwordChange: "비밀번호를 변경하지 못했어요. 잠시 후 다시 시도해주세요.",
   photoUpload: "사진을 업로드하지 못했어요. 잠시 후 다시 시도해주세요.",
+  pollVote: "투표를 저장하지 못했어요. 잠시 후 다시 시도해주세요.",
 } as const;
 
 /** 성공 · Toast-Success 재사용 */
@@ -45,6 +46,7 @@ export const TOAST_SUCCESS_MESSAGES = {
 /** 안내 · Toast-Info */
 export const TOAST_INFO_MESSAGES = {
   alreadyReported: "이미 신고한 글이에요.",
+  alreadyReportedComment: "이미 신고한 댓글이에요.",
   applicationLinkMissing: "아직 신청 링크가 등록되지 않았어요.",
   attachmentOpenFailed: "첨부파일을 열 수 없어요.",
   ledgerLinkMissing: "아직 회계장부 링크가 등록되지 않았어요.",

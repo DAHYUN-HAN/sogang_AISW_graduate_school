@@ -12,7 +12,6 @@ export type CommentActionState = {
   showSave: boolean;
   showCancel: boolean;
   showReport: boolean;
-  reportLabel: "신고" | "신고됨";
   reportAction: CommentReportAction;
 };
 
@@ -20,12 +19,10 @@ export function getCommentActionState({
   depth,
   isMine,
   isEditing,
-  isReported,
 }: {
   depth: number;
   isMine: boolean;
   isEditing: boolean;
-  isReported: boolean;
 }): CommentActionState {
   return {
     showReply: depth === 0 && !isEditing,
@@ -34,8 +31,8 @@ export function getCommentActionState({
     showSave: isMine && isEditing,
     showCancel: isMine && isEditing,
     showReport: !isMine,
-    reportLabel: isReported ? "신고됨" : "신고",
-    reportAction: isReported || isMine ? "none" : "open",
+    // 이미 신고한 댓글도 "신고"로 두고, 다시 누르면 화면이 "이미 신고한 댓글이에요." 토스트를 띄운다.
+    reportAction: isMine ? "none" : "open",
   };
 }
 

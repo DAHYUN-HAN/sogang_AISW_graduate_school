@@ -654,6 +654,11 @@ export default function PostDetailScreen() {
 
   const startReport = (target: ReportTarget) => {
     if (!requireLogin()) return;
+    // 이번에 신고한 댓글을 다시 누르면 신고 창 없이 바로 알린다. 예전에 신고한 댓글은 서버가 중복으로 알려 준다.
+    if (target.type === "comment" && reportedTargets[`comment:${target.id}`]) {
+      showToast(TOAST_INFO_MESSAGES.alreadyReportedComment, "info");
+      return;
+    }
     setReportTarget(target);
     setReportReason(REPORT_REASONS[0].value);
     setReportDetail("");
@@ -673,8 +678,9 @@ export default function PostDetailScreen() {
       setReportedTargets((current) => ({ ...current, [`${reportTarget.type}:${reportTarget.id}`]: true }));
       setReportTarget(null);
       setReportDetail("");
-      if (response.data.duplicate) showToast(TOAST_INFO_MESSAGES.alreadyReported, "info");
-      else showToast(TOAST_SUCCESS_MESSAGES.reportSubmitted, "success");
+      if (!response.data.duplicate) showToast(TOAST_SUCCESS_MESSAGES.reportSubmitted, "success");
+      else if (reportTarget.type === "comment") showToast(TOAST_INFO_MESSAGES.alreadyReportedComment, "info");
+      else showToast(TOAST_INFO_MESSAGES.alreadyReported, "info");
     } catch {
       showToast(TOAST_ERROR_MESSAGES.report);
     } finally {
@@ -1253,7 +1259,7 @@ export default function PostDetailScreen() {
           </View>
         ) : null}
 
-                {post.poll && isNotice ? <NoticePollCard key={`${userId}:${post.id}`} postId={post.id} /> : null}
+                {post.poll && isNotice ? <NoticePollCard key={`${userId}:${post.id}`} postId={post.id} onSaveError={() => showToast(TOAST_ERROR_MESSAGES.pollVote)} /> : null}
 
         {isAdminParticipationGuide ? (
           isRecruitmentClosed ? (
@@ -1429,7 +1435,6 @@ export default function PostDetailScreen() {
                   }
                 }}
                 onReport={startReport}
-                reportedTargets={reportedTargets}
                 // 스터디 모집 댓글에는 답글(대댓글)을 제공하지 않는다.
                 onReply={
                   isStudyRecruit

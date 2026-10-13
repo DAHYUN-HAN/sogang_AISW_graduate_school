@@ -7,7 +7,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Linking, type LayoutChangeEvent, type NativeScrollEvent, type NativeSyntheticEvent, PanResponder, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { AppText as Text } from "../../../components/AppTypography";
-import NetworkErrorState, { NetworkErrorFallback } from "../../../components/NetworkErrorState";
+import NetworkErrorState, { useLoadErrorOverlay } from "../../../components/NetworkErrorState";
 import { isNetworkError } from "../../../utils/networkError";
 
 import { calendarMonthStyles } from "../../../components/CalendarMonth";
@@ -295,18 +295,10 @@ function HomeEmptyState({ type }: { type: "notices" | "popular" | "album" }) {
   );
 }
 
-function HomeErrorState({ label, error, onRetry }: { label: string; error?: unknown; onRetry: () => void }) {
-  return (
-    <NetworkErrorFallback error={error} onRetry={onRetry}>
-      <View style={styles.emptyState}>
-        <Ionicons name="cloud-offline-outline" size={30} color="#AAB2BF" />
-        <Text style={styles.emptyStateTitle}>{label}을 불러오지 못했습니다.</Text>
-        <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>다시 시도</Text>
-        </Pressable>
-      </View>
-    </NetworkErrorFallback>
-  );
+// 한 칸만 실패해도(4xx 포함) 홈 전체를 앱 전체 LoadError로 덮는다. 칸 자리에는 아무것도 그리지 않는다.
+function HomeErrorState({ error, onRetry }: { error?: unknown; onRetry: () => void }) {
+  useLoadErrorOverlay(error, onRetry);
+  return null;
 }
 
 function HomeBanner({
@@ -466,7 +458,7 @@ function NoticeList({
   onRetry: () => void;
 }) {
   if (isError) {
-    return <HomeErrorState error={error} label="공지사항" onRetry={onRetry} />;
+    return <HomeErrorState error={error} onRetry={onRetry} />;
   }
 
   const rows = posts;
@@ -716,7 +708,7 @@ function HomePopularPostsSection({
           <Text style={styles.emptyText}>인기 글을 불러오는 중이에요</Text>
         </View>
       ) : boardsError || popularQuery.isError ? (
-        <HomeErrorState error={boardsLoadError ?? popularQuery.error} label="인기 게시글" onRetry={() => void Promise.all([refetchBoards(), popularQuery.refetch()])} />
+        <HomeErrorState error={boardsLoadError ?? popularQuery.error} onRetry={() => void Promise.all([refetchBoards(), popularQuery.refetch()])} />
       ) : rows.length === 0 ? (
         <HomeEmptyState type="popular" />
       ) : (
@@ -971,7 +963,7 @@ export default function HomeScreen() {
       ) : (
         <>
           {bannersQuery.isError ? (
-            <HomeErrorState error={bannersQuery.error} label="홈 배너" onRetry={() => void bannersQuery.refetch()} />
+            <HomeErrorState error={bannersQuery.error} onRetry={() => void bannersQuery.refetch()} />
           ) : (
             <HomeBannerCarousel banners={banners} />
           )}
@@ -993,7 +985,7 @@ export default function HomeScreen() {
 
           <SectionHeader title="서강생활 일정" />
           {eventsQuery.isError ? (
-            <HomeErrorState error={eventsQuery.error} label="일정" onRetry={() => void eventsQuery.refetch()} />
+            <HomeErrorState error={eventsQuery.error} onRetry={() => void eventsQuery.refetch()} />
           ) : (
             <CalendarCard
               events={events}
@@ -1022,7 +1014,7 @@ export default function HomeScreen() {
             }}
           />
           {boardsError || albumQuery.isError ? (
-            <HomeErrorState error={boardsLoadError ?? albumQuery.error} label="행사 사진첩" onRetry={() => void Promise.all([refetchBoards(), albumQuery.refetch()])} />
+            <HomeErrorState error={boardsLoadError ?? albumQuery.error} onRetry={() => void Promise.all([refetchBoards(), albumQuery.refetch()])} />
           ) : (
             <AlbumStrip posts={albumPosts} />
           )}
@@ -1213,18 +1205,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 18,
     marginTop: 8,
-  },
-  retryButton: {
-    borderRadius: 8,
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    marginTop: 12,
-  },
-  retryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "700",
   },
   noticeList: {
     borderRadius: 0,

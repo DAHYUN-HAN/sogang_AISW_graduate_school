@@ -9,7 +9,7 @@ import {
 
 test("내 최상위 댓글은 답글·수정·삭제만 제공하고 신고는 숨긴다", () => {
   assert.deepEqual(
-    getCommentActionState({ depth: 0, isMine: true, isEditing: false, isReported: false }),
+    getCommentActionState({ depth: 0, isMine: true, isEditing: false }),
     {
       showReply: true,
       showEdit: true,
@@ -17,7 +17,6 @@ test("내 최상위 댓글은 답글·수정·삭제만 제공하고 신고는 �
       showSave: false,
       showCancel: false,
       showReport: false,
-      reportLabel: "신고",
       reportAction: "none",
     },
   );
@@ -25,7 +24,7 @@ test("내 최상위 댓글은 답글·수정·삭제만 제공하고 신고는 �
 
 test("댓글 수정 중에는 저장과 취소만 표시한다", () => {
   assert.deepEqual(
-    getCommentActionState({ depth: 0, isMine: true, isEditing: true, isReported: false }),
+    getCommentActionState({ depth: 0, isMine: true, isEditing: true }),
     {
       showReply: false,
       showEdit: false,
@@ -33,7 +32,6 @@ test("댓글 수정 중에는 저장과 취소만 표시한다", () => {
       showSave: true,
       showCancel: true,
       showReport: false,
-      reportLabel: "신고",
       reportAction: "none",
     },
   );
@@ -41,7 +39,7 @@ test("댓글 수정 중에는 저장과 취소만 표시한다", () => {
 
 test("다른 작성자의 대댓글은 추가 답글 없이 신고할 수 있다", () => {
   assert.deepEqual(
-    getCommentActionState({ depth: 1, isMine: false, isEditing: false, isReported: false }),
+    getCommentActionState({ depth: 1, isMine: false, isEditing: false }),
     {
       showReply: false,
       showEdit: false,
@@ -49,17 +47,15 @@ test("다른 작성자의 대댓글은 추가 답글 없이 신고할 수 있다
       showSave: false,
       showCancel: false,
       showReport: true,
-      reportLabel: "신고",
       reportAction: "open",
     },
   );
 });
 
-test("신고 완료 댓글은 재신고 동작을 제공하지 않는다", () => {
-  const state = getCommentActionState({ depth: 0, isMine: false, isEditing: false, isReported: true });
+test("이미 신고한 댓글도 신고 버튼을 열어 두고 화면이 중복 안내를 맡는다", () => {
+  const state = getCommentActionState({ depth: 0, isMine: false, isEditing: false });
 
-  assert.equal(state.reportLabel, "신고됨");
-  assert.equal(state.reportAction, "none");
+  assert.equal(state.reportAction, "open");
 });
 
 test("수정 내용은 공백을 제거하고 빈 값과 저장 중 제출을 막는다", () => {

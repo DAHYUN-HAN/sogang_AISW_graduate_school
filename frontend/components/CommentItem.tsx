@@ -21,7 +21,6 @@ type Props = {
   onEdit?: (commentId: number, content: string) => Promise<void> | void;
   onDelete?: (commentId: number) => void;
   onReport?: (target: CommentReportTarget) => void;
-  reportedTargets?: Record<string, boolean>;
   /** 첫 대댓글은 부모 댓글의 하단 여백(12)까지 더해 20px 아래에 놓인다. */
   isFirstReply?: boolean;
   /** 스터디 모집처럼 대댓글도 스레드 구분선도 없는 목록. 댓글 하나가 padding-bottom 12만 갖는다. */
@@ -40,7 +39,6 @@ export default function CommentItem({
   onEdit,
   onDelete,
   onReport,
-  reportedTargets = {},
   isFirstReply = false,
   flat = false,
 }: Props) {
@@ -48,12 +46,10 @@ export default function CommentItem({
   const [draft, setDraft] = useState(comment.content);
   const [isSaving, setIsSaving] = useState(false);
   const isMine = currentUserId === comment.author_id;
-  const isReported = reportedTargets[`comment:${comment.id}`];
   const actionState = getCommentActionState({
     depth,
     isMine,
     isEditing,
-    isReported: Boolean(isReported),
   });
   const hasActionRow = (actionState.showReply && Boolean(onReply))
     || actionState.showEdit
@@ -116,13 +112,13 @@ export default function CommentItem({
           >
             <Text
               style={{
-                color: actionState.reportAction === "none" ? "#15803D" : "#A6ACB7",
+                color: "#A6ACB7",
                 fontSize: 11,
                 lineHeight: 13,
                 fontWeight: "400",
               }}
             >
-              {actionState.reportLabel}
+              신고
             </Text>
           </Pressable>
         ) : null}
@@ -231,7 +227,6 @@ export default function CommentItem({
           onEdit={onEdit}
           onReply={onReply}
           onReport={onReport}
-          reportedTargets={reportedTargets}
         />
       ))}
     </View>

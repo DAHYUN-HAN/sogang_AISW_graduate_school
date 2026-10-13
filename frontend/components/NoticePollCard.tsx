@@ -6,6 +6,7 @@ import { AppText as Text } from "./AppTypography";
 import MediaImage from "./MediaImage";
 import PersonListCard from "./PersonListCard";
 import { VoterAvatarIcon } from "./icons";
+import { useLoadErrorOverlay } from "./NetworkErrorState";
 import { pollApi } from "../services/api";
 import { useUserStore } from "../stores/userStore";
 import type { NoticePoll, NoticePollQuestion } from "../types";
@@ -21,19 +22,19 @@ function Button({label, onPress, disabled = false}: {label: string; onPress: () 
   </Pressable>;
 }
 
-export default function NoticePollCard({postId}: {postId: number; poll?: NoticePoll}) {
+// 투표를 처음 불러오지 못하면 앱 전체 LoadError로 덮고, 투표 저장 실패는 onSaveError로 화면이 토스트를 띄운다.
+export default function NoticePollCard({postId, onSaveError}: {postId: number; poll?: NoticePoll; onSaveError: () => void}) {
   const userId = useUserStore(state => state.userId);
   const client = useQueryClient();
   const query = useQuery({queryKey: pollCacheKey(userId, postId), queryFn: () => pollApi.get(postId),
     enabled: userId !== null, refetchInterval: 30_000});
-  if (!query.data) return <View style={styles.container}>{query.isError ? <>
-    <Text style={styles.error}>투표를 불러오지 못했습니다.</Text><Button label="투표 다시 불러오기" onPress={() => {void query.refetch();}} />
-  </> : <ActivityIndicator color="#2761FF" />}</View>;
+  useLoadErrorOverlay(query.data ? null : query.error, () => {void query.refetch();});
+  if (!query.data) return query.isError ? null : <View style={styles.container}><ActivityIndicator color="#2761FF" /></View>;
   const poll = query.data.data;
   return <View style={styles.cards}>{poll.questions.map(question =>
     <QuestionCard key={`${userId}:${postId}:${JSON.stringify([question.id, question.title, question.kind, question.allow_multiple,
       question.options.map(o => [o.id, o.label, o.media_id]), question.is_closed ?? poll.is_closed])}`}
-      poll={poll} question={question} postId={postId} userId={userId}
+      poll={poll} question={question} postId={postId} userId={userId} onSaveError={onSaveError}
       refresh={async () => {await query.refetch();}} onSaved={async next => {
         await client.cancelQueries({queryKey: pollCacheKey(userId, postId), exact: true});
         client.setQueryData(pollCacheKey(userId, postId), {status: "success", data: next});
@@ -45,8 +46,8 @@ export default function NoticePollCard({postId}: {postId: number; poll?: NoticeP
       }} />)}</View>;
 }
 
-function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postId: number; userId: number | null; poll: NoticePoll;
-  question: NoticePollQuestion; onSaved: (poll: NoticePoll) => Promise<void>; refresh: () => Promise<void>}) {
+function QuestionCard({postId, userId, poll, question, onSaved, onSaveError, refresh}: {postId: number; userId: number | null; poll: NoticePoll;
+  question: NoticePollQuestion; onSaved: (poll: NoticePoll) => Promise<void>; onSaveError: () => void; refresh: () => Promise<void>}) {
   const endsAt = question.ends_at ? parseApiDate(question.ends_at)?.getTime() ?? null : null;
   const [now, setNow] = useState(() => Date.now());
   const serverClosed = question.is_closed ?? poll.is_closed;
@@ -61,7 +62,6 @@ function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postI
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
   const [people, setPeople] = useState(false);
   const sending = useRef(false);
   const mounted = useRef(true);
@@ -85,21 +85,20 @@ function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postI
   const choose = (optionId: number) => {
     if (!selecting || saving) return;
     setDraft(current => current === optionId ? null : optionId);
-    setError("");
   };
   const submit = async () => {
     if (sending.current || !canSubmit) return;
     if (draft === savedId) {setEditing(false); return;}
     if (draft !== null && !validPollAnswers(poll, {[question.id]: [draft]})) return;
-    sending.current = true; setSaving(true); setError("");
+    sending.current = true; setSaving(true);
     try {
       const response = await pollApi.vote(postId, poll.revision, [{question_id: question.id, option_ids: draft === null ? [] : [draft]}]);
       if (!mounted.current) return;
       await onSaved(response.data);
       if (mounted.current) {setEditing(false); setDraft(null);}
-    } catch (issue) {
+    } catch {
       if (mounted.current) {
-        setError((issue as {response?: {data?: {message?: string}}}).response?.data?.message ?? "투표를 저장하지 못했습니다. 다시 시도해 주세요.");
+        onSaveError();
         await refresh();
       }
     } finally {sending.current = false; if (mounted.current) setSaving(false);}
@@ -144,10 +143,9 @@ function QuestionCard({postId, userId, poll, question, onSaved, refresh}: {postI
       disabled={!canSubmit} onPress={submit} style={[styles.voteButton, canSubmit ? styles.voteButtonActive : styles.voteButtonDisabled]}>
       <Text style={[styles.voteLabel, canSubmit && styles.voteLabelActive]}>투표하기</Text>
     </Pressable> : canVote ? <Pressable accessibilityRole="button" accessibilityLabel={`${question.title} 다시 투표하기`}
-      onPress={() => {setEditing(true); setDraft(savedId); setError("");}} style={[styles.voteButton, styles.revoteButton]}>
+      onPress={() => {setEditing(true); setDraft(savedId);}} style={[styles.voteButton, styles.revoteButton]}>
       <Text style={styles.revoteLabel}>다시 투표하기</Text>
     </Pressable> : null}
-    {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     <View style={styles.footer}>
       <Text style={styles.participants}>{count}명 참여</Text>
       <Pressable accessibilityRole="button" accessibilityLabel={`참여자 보기 · ${count}명 참여`}
