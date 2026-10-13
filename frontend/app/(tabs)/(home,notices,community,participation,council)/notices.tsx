@@ -48,8 +48,6 @@ const COLORS = {
   page: "#FFFFFF",
   danger: "#B91C1C",
   danger50: "#FFF1F2",
-  pink50: "#FFEAF1",
-  pink700: "#B91C4C",
   cyan50: "#E6F9FB",
   cyan700: "#14788A",
 };

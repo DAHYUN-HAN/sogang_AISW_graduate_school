@@ -43,7 +43,6 @@ const COLORS = {
   tertiary: "#8A919C", // gray/500, text/tertiary
   border: "#E1E4E9", // border/default
   danger: "#D64545", // error/500 (Figma)
-  success: "#22A163",
   bg: "#FFFFFF",
 };
 

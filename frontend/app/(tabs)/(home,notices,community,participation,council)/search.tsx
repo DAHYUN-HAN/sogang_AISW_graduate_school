@@ -27,8 +27,6 @@ const COLORS = {
   divider: "#EEF0F3",
   bg: "#FFFFFF",
   danger: "#DC2626",
-  pink50: "#FFEAF1",
-  pink700: "#B91C4C",
 };
 
 type NoticeFilter = "all" | "academic" | "event" | "other";

@@ -23,8 +23,6 @@ const COLORS = {
   muted: "#6B7280",
   subtle: "#8A919C",
   divider: "#EEF0F3",
-  pink50: "#FFEAF1",
-  pink700: "#B91C4C",
   yellow50: "#FFF6DC",
   yellow700: "#9A6B00",
   green50: "#EAF8EF",
