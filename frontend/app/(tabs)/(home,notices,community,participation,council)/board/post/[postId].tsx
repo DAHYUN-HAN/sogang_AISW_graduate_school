@@ -93,8 +93,8 @@ const COLORS = {
   cyan700: "#14788A",
   green50: "#EAF8EF",
   green700: "#1F7A46",
-  pink50: "#FFEAF1",
-  pink700: "#B91C4C",
+  pink50: "#FBEAF0",
+  pink700: "#993556",
   yellow50: "#FFF6DC",
   yellow700: "#9A6B00",
 };
@@ -1102,7 +1102,8 @@ export default function PostDetailScreen() {
                   style={[
                     styles.infoRow,
                     isMutualAidRequest ? styles.mutualAidInfoRow : null,
-                    isMutualAidRequest && !hasMutualAidNote && !mutualAidProofUrl && !hasMutualAidEvidenceFiles && index === visibleDetailRows.length - 1
+                    // Figma: 증빙서류는 별도 항목이라 바로 위 행에도 구분선을 긋지 않는다.
+                    isMutualAidRequest && !hasMutualAidNote && index === visibleDetailRows.length - 1
                       ? styles.mutualAidInfoRowLast
                       : null,
                   ]}
@@ -2512,23 +2513,24 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginTop: 9,
   },
+  // Figma MutualAidDetail-V2-Rejected 반려사유: 상태칩과 같은 분홍(pink50)·자주(pink700), gap 6, 부제 13 Medium, 본문 14 Regular(행간 기본).
   mutualAidRejectionBox: {
     borderRadius: 12,
     backgroundColor: COLORS.pink50,
     padding: 16,
-    marginTop: 24,
-    gap: 8,
+    // Figma: 증빙서류 항목(아래 여백 14) 다음 정보목록 아래 여백 16 뒤에 박스가 온다.
+    marginTop: 16,
+    gap: 6,
   },
   mutualAidRejectionTitle: {
     color: COLORS.pink700,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
   },
   mutualAidRejectionBody: {
     color: COLORS.text,
     fontSize: 14,
     fontWeight: "400",
-    lineHeight: 22,
   },
   adminReplyBox: {
     gap: 10,

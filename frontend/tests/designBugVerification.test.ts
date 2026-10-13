@@ -83,6 +83,11 @@ test("#29·31 상조회 입력 안내는 일반 굵기이고 상세 비고는 �
   assert.match(postCreateSource, /input:[\s\S]*fontWeight: "400"/);
 });
 
+test("상조회 상세는 비고가 없으면 증빙서류가 있어도 마지막 정보 행 아래에 구분선이 없다", () => {
+  // 디자이너: 증빙서류는 별도 항목이라 바로 위에 구분선을 긋지 않는다(피그마 MutualAidDetail-V2-Link).
+  assert.match(postDetailSource, /isMutualAidRequest && !hasMutualAidNote && index === visibleDetailRows\.length - 1/);
+});
+
 test("#48 완료 화면은 공통 CompletionState를 공유한다", () => {
   assert.match(postCreateSource, /<CompletionState/);
   assert.match(mutualAidCompleteSource, /<CompletionState/);

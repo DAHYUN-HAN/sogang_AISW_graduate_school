@@ -65,7 +65,10 @@ test("#53 댓글 입력창은 Enter로 댓글을 등록한다", () => {
 
 test("#32 회원 화면은 반려 사유를 분홍색 박스로 표시한다", () => {
   assert.match(postDetailSource, /post\.mutual_aid\?\.rejection_reason && !isAdmin/);
-  assert.match(postDetailSource, /mutualAidRejectionBox:[\s\S]*backgroundColor: COLORS\.pink50/);
+  // 피그마 MutualAidDetail-V2-Rejected: 상태칩과 같은 분홍(#FBEAF0)·자주(#993556)를 COLORS 토큰으로 쓰고, 부제는 13.
+  assert.match(postDetailSource, /pink50: "#FBEAF0",\s+pink700: "#993556",/);
+  assert.match(postDetailSource, /mutualAidRejectionBox: \{[^}]*backgroundColor: COLORS\.pink50,[^}]*marginTop: 16,[^}]*gap: 6,/);
+  assert.match(postDetailSource, /mutualAidRejectionTitle: \{[^}]*color: COLORS\.pink700,[^}]*fontSize: 13,/);
 });
 
 test("#177 시험족보 목록은 작성자를 표시하고 기존 익명 게시판 정책은 유지한다", () => {
