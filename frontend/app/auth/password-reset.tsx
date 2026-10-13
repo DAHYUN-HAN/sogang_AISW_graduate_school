@@ -10,6 +10,7 @@ import { authApi } from "../../services/api";
 import {
   apiErrorCode,
   composeSchoolEmail,
+  displaySchoolEmail,
   emailIdError,
   passwordError,
 } from "../../utils/authValidation";
@@ -313,7 +314,7 @@ export default function PasswordResetScreen() {
           {mode === "code" ? (
             <>
               <Text style={[styles.heading, styles.headingCode]}>인증코드를 입력해주세요</Text>
-              <Text style={[styles.helper, styles.helperCode]}>{email}로 {codeResent ? "재발송" : "발송"}되었어요</Text>
+              <Text style={[styles.helper, styles.helperCode]}>{displaySchoolEmail(emailId)}로 {codeResent ? "재발송" : "발송"}되었어요</Text>
               {/* Figma 코드영역: 입력 44h + 타이머행, gap 8 */}
               <View style={styles.codeGroup}>
               <View style={styles.field}>

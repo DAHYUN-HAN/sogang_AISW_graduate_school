@@ -14,6 +14,7 @@ import {
   apiErrorCode,
   apiRetryAfterSeconds,
   composeSchoolEmail,
+  displaySchoolEmail,
   emailIdError,
   isEmailDeliveryConfirmed,
   passwordConfirmationError,
@@ -376,7 +377,7 @@ export default function RegisterScreen() {
           {step === 1 ? (
             <>
               <Text style={styles.heading}>인증코드를 입력해주세요</Text>
-              <Text style={styles.helper}>{email}로 {codeResent ? "재발송" : "발송"}되었어요</Text>
+              <Text style={styles.helper}>{displaySchoolEmail(emailId)}로 {codeResent ? "재발송" : "발송"}되었어요</Text>
               <View style={styles.field}>
                 <TextInput
                   keyboardType="number-pad"
