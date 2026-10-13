@@ -95,6 +95,17 @@ const COLORS = {
   green700: "#1F7A46",
   pink50: "#FBEAF0",
   pink700: "#993556",
+  lime50: "#EAF3DE",
+  lime700: "#3B6D11",
+  amber50: "#FAEEDA",
+  amber700: "#854F0B",
+  blue50: "#E6F1FB",
+  blue700: "#0C447C",
+  gray50: "#F1F3F5",
+  indigo50: "#EEEDFE",
+  indigo700: "#3C3489",
+  purple50: "#F0EEF9",
+  purple700: "#6543A2",
   yellow50: "#FFF6DC",
   yellow700: "#9A6B00",
 };
@@ -145,18 +156,18 @@ function categoryLabel(value?: string | null, fallback = "게시글") {
 }
 
 function categoryTone(label: string) {
-  if (label.includes("반려")) return { bg: "#FBEAF0", fg: "#993556" };
+  if (label.includes("반려")) return { bg: COLORS.pink50, fg: COLORS.pink700 };
   if (label.includes("종합")) return { bg: COLORS.yellow50, fg: COLORS.yellow700 };
-  if (label.includes("행사") || label.includes("시험") || label.includes("족보")) return { bg: "#FBEAF0", fg: "#993556" };
-  if (label.includes("진행중")) return { bg: "#EAF3DE", fg: "#3B6D11" };
-  if (label === "마감") return { bg: "#F1F3F5", fg: COLORS.muted };
-  if (label.includes("졸업") || label.includes("논문")) return { bg: "#EAF3DE", fg: "#3B6D11" };
+  if (label.includes("행사") || label.includes("시험") || label.includes("족보")) return { bg: COLORS.pink50, fg: COLORS.pink700 };
+  if (label.includes("진행중")) return { bg: COLORS.lime50, fg: COLORS.lime700 };
+  if (label === "마감") return { bg: COLORS.gray50, fg: COLORS.muted };
+  if (label.includes("졸업") || label.includes("논문")) return { bg: COLORS.lime50, fg: COLORS.lime700 };
   if (label.includes("인증") || label.includes("완료")) return { bg: COLORS.green50, fg: COLORS.green700 };
   if (label.includes("대기")) return { bg: COLORS.yellow50, fg: COLORS.yellow700 };
   if (label.includes("건의") || label.includes("답변")) return { bg: COLORS.cyan50, fg: COLORS.cyan700 };
-  if (label.includes("후기")) return { bg: "#EEEDFE", fg: "#3C3489" };
-  if (label.includes("기타")) return { bg: "#F0EEF9", fg: "#6543A2" };
-  return { bg: "#E6F1FB", fg: "#0C447C" };
+  if (label.includes("후기")) return { bg: COLORS.indigo50, fg: COLORS.indigo700 };
+  if (label.includes("기타")) return { bg: COLORS.purple50, fg: COLORS.purple700 };
+  return { bg: COLORS.blue50, fg: COLORS.blue700 };
 }
 
 function isAdminParticipationGuideBoard(board?: { slug?: string } | null) {
@@ -493,14 +504,14 @@ export default function PostDetailScreen() {
       : categoryLabel(post.category, isAdminParticipationGuide ? "모집중" : board?.board_type === "notice" ? "공지" : board?.name ?? "게시글");
   const tone = isSuggestionRequest
     ? post.suggestion?.status === "answered"
-      ? { bg: "#EAF3DE", fg: "#3B6D11" }
-      : { bg: "#FAEEDA", fg: "#854F0B" }
+      ? { bg: COLORS.lime50, fg: COLORS.lime700 }
+      : { bg: COLORS.amber50, fg: COLORS.amber700 }
     : isMutualAidRequest
       ? post.mutual_aid?.status === "completed"
-        ? { bg: "#EAF3DE", fg: "#3B6D11" }
+        ? { bg: COLORS.lime50, fg: COLORS.lime700 }
         : post.mutual_aid?.status === "rejected"
-          ? { bg: "#FBEAF0", fg: "#993556" }
-          : { bg: "#E6F1FB", fg: "#0C447C" }
+          ? { bg: COLORS.pink50, fg: COLORS.pink700 }
+          : { bg: COLORS.blue50, fg: COLORS.blue700 }
       : categoryTone(label);
   const applicationUrl = participationApplicationUrl(metadata);
   const isRecruitmentClosed =
@@ -2210,7 +2221,7 @@ const styles = StyleSheet.create({
     color: "#1F4E8C",
   },
   subjectSatisfaction: {
-    color: "#3B6D11",
+    color: COLORS.lime700,
   },
   metaMutualAid: {
     color: "#A6ACB7", // Figma: Regular 12/14

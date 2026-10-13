@@ -56,7 +56,8 @@ test("#5·6·7·11·18 공지와 스터디의 태그 문구 및 상태를 실제
   assert.match(searchSource, /label: "행사공지"/);
   assert.match(searchSource, /label: "기타공지"/);
   assert.match(postCardSource, /resourceCategoryLabel/);
-  assert.match(postDetailSource, /label\.includes\("기타"\).*#F0EEF9.*#6543A2/);
+  assert.match(postDetailSource, /label\.includes\("기타"\).*COLORS\.purple50.*COLORS\.purple700/);
+  assert.match(postDetailSource, /purple50: "#F0EEF9",\s+purple700: "#6543A2",/);
   assert.match(postCardSource, /post\.metadata\?\.recruitment_status/);
   assert.match(postDetailSource, /metadata\.recruitment_status/);
 });
