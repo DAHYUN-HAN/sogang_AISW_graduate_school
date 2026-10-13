@@ -19,7 +19,7 @@ import { useAggregatePosts, useBoardPosts } from "../../../../hooks/usePosts";
 import { API_ORIGIN } from "../../../../services/api";
 import { useUserStore } from "../../../../stores/userStore";
 import type { Board, PostListItem } from "../../../../types";
-import { boardParentRoute, boardRoute, handleNestedBoardHardwareBack, participationGroupDefaultSlug, postCreateRouteFromBoardList, postDetailRoute, type PostDetailReturnRoute } from "../../../../utils/appRoutes";
+import { boardParentRoute, boardRoute, councilCardRoute, participationGroupDefaultSlug, postCreateRouteFromBoardList, postDetailRoute, type PostDetailReturnRoute } from "../../../../utils/appRoutes";
 import { replaceWithRoute } from "../../../../utils/tabNavigation";
 import { useBoardTabHighlight } from "../../../../hooks/useBoardTabHighlight";
 import { useSwipeBackInScreen } from "../../../../hooks/useSwipeBackInScreen";
@@ -385,7 +385,6 @@ function CohortLeaderScreen({
   onRefresh,
   onRetry,
   onBack,
-  onNestedBackHandlerChange,
   topInset,
 }: {
   board?: Board | null;
@@ -397,48 +396,19 @@ function CohortLeaderScreen({
   onRefresh: () => void;
   onRetry: () => void;
   onBack: () => void;
-  onNestedBackHandlerChange: (handler: (() => void) | null) => void;
   topInset: number;
 }) {
-  const [selected, setSelected] = useState<CohortLeaderSummary | null>(null);
   const leaders = useMemo(() => cohortLeaderSummaries(posts, board?.metadata), [board?.metadata, posts]);
-
-  useEffect(() => {
-    setSelected(null);
-  }, [posts]);
-
-  const headerTitle = selected ? `${selected.cohort} 기장단` : "기수별 기장단 소개";
-  const handleBack = useCallback(() => {
-    if (selected) {
-      setSelected(null);
-      return;
-    }
-    onBack();
-  }, [onBack, selected]);
-
-  useEffect(() => {
-    onNestedBackHandlerChange(handleBack);
-    return () => onNestedBackHandlerChange(null);
-  }, [handleBack, onNestedBackHandlerChange]);
-  useSwipeBackInScreen(Boolean(selected), handleBack);
 
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <BackButton onPress={handleBack} />
-        <Text style={styles.appBarTitle}>{headerTitle}</Text>
+        <BackButton onPress={onBack} />
+        <Text style={styles.appBarTitle}>기수별 기장단 소개</Text>
         <View style={styles.iconButton} />
       </View>
       {isLoading ? (
         <LoadingState />
-      ) : selected ? (
-        <CouncilIntroductionDetail
-          id={selected.id}
-          photoUrls={selected.photoUrls}
-          bannerImageUrl={selected.bannerImageUrl}
-          greeting={selected.greeting}
-          intro={selected.intro}
-        />
       ) : (
         <FlatList
           data={leaders}
@@ -461,7 +431,7 @@ function CohortLeaderScreen({
             )
           }
           renderItem={({ item }) => (
-            <PersonListCard onPress={() => setSelected(item)} badge={item.cohort} captionFirst
+            <PersonListCard onPress={() => openCouncilCard(board, item.id)} badge={item.cohort} captionFirst
               caption={item.members[0]?.role || "임원진"}
               name={`${item.members[0]?.name || "등록된 임원 없음"}${item.members.length > 1 ? ` 외 ${item.members.length - 1}명` : ""}`} />
           )}
@@ -582,48 +552,88 @@ function PastCouncilScreen({
   board,
   topInset,
   onBack,
-  onNestedBackHandlerChange,
 }: {
   board?: Board | null;
   topInset: number;
   onBack: () => void;
-  onNestedBackHandlerChange: (handler: (() => void) | null) => void;
 }) {
   const councils = useMemo(() => pastCouncilsFromMetadata(board?.metadata), [board?.metadata]);
-  const [selected, setSelected] = useState<PastCouncilSummary | null>(null);
-  const handleBack = useCallback(() => selected ? setSelected(null) : onBack(), [onBack, selected]);
-  useEffect(() => {
-    onNestedBackHandlerChange(handleBack);
-    return () => onNestedBackHandlerChange(null);
-  }, [handleBack, onNestedBackHandlerChange]);
-  useSwipeBackInScreen(Boolean(selected), handleBack);
   return (
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(topInset, 10) }]}>
-        <BackButton onPress={handleBack} />
-        <Text style={styles.appBarTitle}>{selected ? `${selected.cohort} 원우회 임원진` : "역대 원우회"}</Text>
+        <BackButton onPress={onBack} />
+        <Text style={styles.appBarTitle}>역대 원우회</Text>
         <View style={styles.iconButton} />
       </View>
-      {selected ? (
+      <FlatList
+        data={councils}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={[styles.executiveContent, councils.length === 0 ? styles.emptyContent : null]}
+        ListEmptyComponent={<View style={styles.emptyBox}><Text style={styles.emptyText}>등록된 역대 원우회가 없습니다.</Text></View>}
+        renderItem={({ item }) => (
+          <PersonListCard onPress={() => openCouncilCard(board, item.id)} badge={item.cohort} captionFirst
+            caption={item.members[0]?.role || "임원진"}
+            name={`${item.members[0]?.name || "등록된 임원 없음"}${item.members.length > 1 ? ` 외 ${item.members.length - 1}명` : ""}`} />
+        )}
+      />
+    </View>
+  );
+}
+
+// 기수 상세는 목록 위에 쌓이는 별도 화면이다. 같은 화면 안에서 바꿔 보여 주면
+// iOS 가장자리 스와이프가 목록이 아니라 그 아래 원우회 화면으로 빠져 버린다.
+function openCouncilCard(board: Board | null | undefined, cardId: string) {
+  if (board) router.push(councilCardRoute(board.id, cardId) as never);
+}
+
+// 기수별 기장단 소개·역대 원우회의 기수 상세. 목록과 같은 데이터에서 카드를 다시 찾는다.
+export function CouncilCardDetailScreen() {
+  const params = useLocalSearchParams<{ boardId: string; cardId: string }>();
+  const insets = useSafeAreaInsets();
+  const boardId = Number(params.boardId);
+  const { data: boardsRes } = useBoardsQuery();
+  const board = useMemo(() => flattenBoards(boardsRes?.data).find((item) => item.id === boardId), [boardId, boardsRes?.data]);
+  useBoardTabHighlight(board);
+  const isPastCouncil = board?.slug === "gsa-past-councils";
+  // 기장단은 관리자 카드가 없으면 게시글로 카드를 만든다. 목록과 같은 조건이라 캐시를 같이 쓴다.
+  const postsQuery = useBoardPosts(boardId, { q: undefined, category: undefined, sort: "latest" }, Boolean(board) && !isPastCouncil);
+  const posts = postsQuery.items;
+  const card = useMemo(() => {
+    if (!board) return undefined;
+    const cards: (CohortLeaderSummary | PastCouncilSummary)[] = isPastCouncil ? pastCouncilsFromMetadata(board.metadata) : cohortLeaderSummaries(posts, board.metadata);
+    return cards.find((item) => item.id === params.cardId);
+  }, [board, isPastCouncil, params.cardId, posts]);
+  const isLoading = !board || (!isPastCouncil && postsQuery.isLoading);
+  const listTitle = isPastCouncil ? "역대 원우회" : "기수별 기장단 소개";
+  const title = card ? (isPastCouncil ? `${card.cohort} 원우회 임원진` : `${card.cohort} 기장단`) : listTitle;
+  const goBack = () => {
+    if (router.canGoBack()) router.back();
+    else replaceWithRoute(boardRoute(boardId));
+  };
+
+  return (
+    <View style={styles.screen}>
+      <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
+        <BackButton onPress={goBack} />
+        <Text style={styles.appBarTitle}>{title}</Text>
+        <View style={styles.iconButton} />
+      </View>
+      {card ? (
         <CouncilIntroductionDetail
-          id={selected.id}
-          photoUrls={selected.photoUrls}
-          bannerImageUrl={selected.bannerImageUrl}
-          greeting={selected.greeting}
-          intro={selected.intro}
+          id={card.id}
+          photoUrls={card.photoUrls}
+          bannerImageUrl={card.bannerImageUrl}
+          greeting={card.greeting}
+          intro={card.intro}
         />
+      ) : isLoading ? (
+        <LoadingState />
       ) : (
-        <FlatList
-          data={councils}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={[styles.executiveContent, councils.length === 0 ? styles.emptyContent : null]}
-          ListEmptyComponent={<View style={styles.emptyBox}><Text style={styles.emptyText}>등록된 역대 원우회가 없습니다.</Text></View>}
-          renderItem={({ item }) => (
-            <PersonListCard onPress={() => setSelected(item)} badge={item.cohort} captionFirst
-              caption={item.members[0]?.role || "임원진"}
-              name={`${item.members[0]?.name || "등록된 임원 없음"}${item.members.length > 1 ? ` 외 ${item.members.length - 1}명` : ""}`} />
-          )}
-        />
+        <View style={[styles.executiveContent, styles.emptyContent]}>
+          <View style={styles.emptyBox}>
+            <Text style={styles.emptyText}>{isPastCouncil ? "등록된 역대 원우회가 없습니다." : "기장단 정보가 없습니다."}</Text>
+          </View>
+        </View>
       )}
     </View>
   );
@@ -966,7 +976,6 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
   const [filterOwnerBoardId, setFilterOwnerBoardId] = useState<number | null>(null);
   const requestedBoardFilterRef = useRef<ResourceFilter | undefined>(undefined);
-  const nestedBackHandlerRef = useRef<(() => void) | null>(null);
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const user = useUserStore((state) => state.user);
 
@@ -1080,10 +1089,6 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
     setQueryInput("");
   }, []);
 
-  const registerNestedBackHandler = useCallback((handler: (() => void) | null) => {
-    nestedBackHandlerRef.current = handler;
-  }, []);
-
   useFocusEffect(
     useCallback(() => {
       if (Platform.OS !== "android") return undefined;
@@ -1097,7 +1102,8 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
           return true;
         }
         if (isTabRoot) return false;
-        return handleNestedBoardHardwareBack(nestedBackHandlerRef.current, exitBoardDepth);
+        exitBoardDepth();
+        return true;
       });
       return () => subscription.remove();
     }, [closeSearch, exitBoardDepth, isTabRoot, showSearch, sortMenuOpen])
@@ -1171,7 +1177,6 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         onRetry={() => void feedController.retry()}
         topInset={insets.top}
         onBack={exitBoardDepth}
-        onNestedBackHandlerChange={registerNestedBackHandler}
       />
     );
   }
@@ -1182,7 +1187,6 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
         board={board}
         topInset={insets.top}
         onBack={exitBoardDepth}
-        onNestedBackHandlerChange={registerNestedBackHandler}
       />
     );
   }

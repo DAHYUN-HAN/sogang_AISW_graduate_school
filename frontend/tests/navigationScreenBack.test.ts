@@ -141,15 +141,15 @@ test("board root: sort closes first, search closes/clears next, then tab Back fa
   assert.equal(h.back(), false);
 });
 
-test("nested board: search closes before the nested profile/board navigation", () => {
-  let childBacks = 0;
-  const h = harness("board/[boardId]", { isTabRoot: false, showSearch: true, nestedBackHandlerRef: { current: () => childBacks++ } });
+// 기수 상세는 별도 화면으로 쌓이므로 게시판 목록의 뒤로가기는 검색창을 닫은 뒤 바로 나간다.
+test("nested board: search closes before leaving the board", () => {
+  const h = harness("board/[boardId]", { isTabRoot: false, showSearch: true });
   const blur = h.focus();
   assert.equal(h.back(), true);
-  assert.equal(childBacks, 0);
+  assert.deepEqual(h.navigation, []);
   blur(); h.focus();
-  h.back();
-  assert.equal(childBacks, 1);
+  assert.equal(h.back(), true);
+  assert.deepEqual(h.navigation, ["back"]);
 });
 
 test("edit board menu closes before navigating to the post", () => {

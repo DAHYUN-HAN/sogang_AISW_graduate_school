@@ -70,6 +70,11 @@ export function boardRoute(boardId: number) {
   return `/board/${boardId}` as const;
 }
 
+// 기수별 기장단 소개·역대 원우회의 기수 상세. 카드 id에 한글 기수가 들어가 인코딩한다.
+export function councilCardRoute(boardId: number, cardId: string) {
+  return `/board/${boardId}/council/${encodeURIComponent(cardId)}`;
+}
+
 /**
  * 알림을 눌렀을 때 열 화면. 열 것이 없으면 null이라 부르는 쪽이 머물러 있는다.
  *
