@@ -165,7 +165,8 @@ const styles = StyleSheet.create({
   row: {
     borderBottomWidth: 0.5,
     borderBottomColor: "#E1E4E9",
-    backgroundColor: "#FFFFFF",
+    // 배경을 칠하지 않는다. 칸 높이가 소수 픽셀이면 다음 칸이 1px 겹쳐 그려지는데, 흰 배경이
+    // 있으면 앞 칸의 구분선을 덮어 구분선이 두 글마다 하나씩만 보였다. 목록 바탕이 이미 흰색이다.
     // Figma: 구분선이 좌우 16px 안쪽에만 그려지도록 padding 대신 margin.
     marginHorizontal: 16,
     paddingVertical: 14,
