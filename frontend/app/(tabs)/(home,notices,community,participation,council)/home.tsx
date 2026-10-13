@@ -16,7 +16,6 @@ import HomeSectionGate from "../../../components/HomeSectionGate";
 import LoadingState from "../../../components/LoadingState";
 import Toast from "../../../components/Toast";
 import { BackIcon, BellIcon, EmptyCalendarIcon, ForwardIcon, ProfileIcon } from "../../../components/icons";
-import { useMyPageDrawer } from "../../../components/MyPageDrawer";
 import { useBoardsQuery } from "../../../hooks/useApi";
 import { useToast } from "../../../hooks/useToast";
 import { API_ORIGIN, bannerApi, eventApi, notificationApi, postApi } from "../../../services/api";
@@ -800,7 +799,6 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const user = useUserStore((state) => state.user);
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
-  const { openDrawer } = useMyPageDrawer();
   const [month, setMonth] = useState(() => currentKoreaMonth());
   const [pickedDay, setPickedDay] = useState<PickedCalendarDay | null>(null);
   const [pullRefreshing, setPullRefreshing] = useState(false);
@@ -960,7 +958,7 @@ export default function HomeScreen() {
           <IconButton label="알림" onPress={() => router.push("/notifications" as never)}>
             <BellIcon size={24} hasBadge={hasUnreadNotifications} />
           </IconButton>
-          <IconButton label="마이페이지" onPress={() => (isAuthenticated ? openDrawer() : router.push("/auth/login" as never))}>
+          <IconButton label="마이페이지" onPress={() => router.push((isAuthenticated ? "/settings" : "/auth/login") as never)}>
             <ProfileIcon size={24} />
           </IconButton>
         </View>

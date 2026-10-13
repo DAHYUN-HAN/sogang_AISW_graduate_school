@@ -1,12 +1,9 @@
 import { Stack } from "expo-router";
 
-// 서랍이 덮은 채로 열리는 마이페이지 화면이라 자리에서 바로 드러나게 한다.
-const DRAWER_COVERED_SCREENS = new Set([
-  "settings/profile",
-  "settings/notifications",
-  "settings/account",
-  "settings/activity",
-]);
+// 마이페이지는 왼쪽에서 들어와 왼쪽으로 나간다. iOS 기본 스와이프는 화면을 오른쪽으로
+// 밀어 내므로 끄고, 화면 안의 EdgeSwipeBack이 안드로이드 뒤로가기와 같은 pop을 태운다
+// (PLAN.md 2026-10-13). 하위 화면은 기본 스와이프로 마이페이지에 돌아온다.
+const MY_PAGE_SCREEN_OPTIONS = { animation: "slide_from_left", gestureEnabled: false } as const;
 
 // 탭 스택마다 첫 화면을 명시한다. 그룹 이름과 같은 파일이 첫 화면이 되기를 기대할 수
 // 있지만 실제 앱에서는 지정되지 않아 정렬상 맨 앞 화면(faq 등)이 첫 화면으로 떴다.
@@ -32,7 +29,7 @@ export default function TabStackLayout() {
       screenOptions={({ route }) => ({
         headerShown: false,
         contentStyle: { backgroundColor: "#FFFFFF" },
-        ...(DRAWER_COVERED_SCREENS.has(route.name) ? { animation: "none" as const } : null),
+        ...(route.name === "settings/index" ? MY_PAGE_SCREEN_OPTIONS : null),
       })}
     />
   );

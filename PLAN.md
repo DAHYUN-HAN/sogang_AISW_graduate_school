@@ -135,7 +135,16 @@ The five bottom tabs no longer share a hidden `board` tab. `app/(tabs)/(home,not
 - A post opened from a push notification opens on the Home stack as Home → Notifications → post, matching the previous Android Back order.
 - The bottom-tab highlight keeps the previous rule for board lists and posts: they highlight their board's category tab (a Community post opened from Home highlights Community) even though Back returns to Home. Other screens highlight the tab that owns the stack.
 - The member account-deletion screen keeps the bottom tab bar, matching the shipped app. The 2026-08-16 rule to hide it there had never taken effect (the old highlight tab bar rendered the last visible tab's options) and was removed rather than activated by this restructure.
-- My Page screens are pushed with the drawer still covering them; the drawer is lifted only after native-stack reports `transitionEnd`, so the underlying tab does not flash (600 ms fallback; web does not wait).
+- My Page is a tab-stack screen, not a drawer (see the 2026-10-13 decision below).
+
+### Navigation decision: My Page is a tab-stack screen (2026-10-13)
+
+My Page used to be a full-screen drawer drawn over the whole tab navigator, with its sub-screens (profile, my posts/bookmarks, notification settings, account settings) pushed onto the current tab stack under the drawer. It is now the `settings/index` screen pushed onto the current tab stack, so the stack reads e.g. Home → My Page → My Posts.
+
+- Why: on iOS, `usePreventRemove` cannot stop a native edge swipe on a pushed screen. react-native-screens lets the swipe finish, re-attaches the screen, and only then calls the JS handler, so swiping back from My Posts showed Home for a moment before the drawer re-appeared. The drawer could not sit under the sub-screen because it was drawn above the navigator.
+- My Page keeps the bottom tab bar, like its sub-screens and the account-deletion screen. Figma has no tab bar on My Page; this is an intentional difference so the tab bar stays put during the swipe.
+- My Page still enters from the left (`slide_from_left`) and leaves to the left on header Back and Android Back.
+- On iOS, My Page disables the native swipe and uses a left-edge gesture that runs the same Back on release, so it leaves to the left like Android instead of sliding right under the finger. Sub-screens keep the native swipe and slide back to My Page.
 
 Phase 2 converted the Notion planning into concrete API, DB, auth, route, and implementation documents. Phase 3 and Phase 4 should now be treated as development sprints.
 

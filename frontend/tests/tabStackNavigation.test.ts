@@ -80,7 +80,8 @@ test("탭마다 스택을 갖도록 화면들이 공용 그룹 한 곳에 있고
   assert.doesNotMatch(tabsLayout, /href:\s*null/);
   const groupLayout = readFileSync(`${GROUP}/_layout.tsx`, "utf8");
   assert.match(groupLayout, /<Stack\b/);
-  assert.doesNotMatch(groupLayout, /gestureEnabled: false/);
+  // iOS 기본 스와이프를 끄는 화면은 마이페이지 하나뿐이다(PLAN.md 2026-10-13).
+  assert.equal(groupLayout.match(/gestureEnabled: false/g)?.length, 1);
 });
 
 test("탭 첫 화면 이동은 (tabs) → 탭 → 첫 화면 순으로 pop을 켜 보낸다", () => {
@@ -218,7 +219,7 @@ test("열린 것이 없거나 iOS가 아니면 스와이프를 막지 않는다"
 
 // <Stack.Screen>으로 화면을 나열하면 expo-router가 그 화면들을 목록 맨 앞에 두어 탭 스택의
 // 첫 화면이 마이페이지로 바뀐다(로그인 직후·앱 시작 시 마이페이지가 먼저 뜨던 버그).
-test("탭 스택 레이아웃은 화면을 직접 나열하지 않고, 마이페이지 화면만 전환 애니메이션을 끈다", () => {
+test("탭 스택 레이아웃은 화면을 직접 나열하지 않고, 마이페이지만 왼쪽에서 들어온다", () => {
   const source = readFileSync(`${GROUP}/_layout.tsx`, "utf8");
   assert.doesNotMatch(source, /<Stack\.Screen\s+name=/);
   // 첫 화면을 명시하지 않으면 실제 앱에서 정렬상 맨 앞 화면(faq)이 홈 탭 첫 화면이 됐다.
@@ -238,13 +239,15 @@ test("탭 스택 레이아웃은 화면을 직접 나열하지 않고, 마이페
     compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React, jsxFactory: "element" },
   }).outputText;
   const element = runInNewContext(code, { Stack: "Stack", element: (_type: unknown, props: unknown) => props })() as {
-    screenOptions: (input: { route: { name: string } }) => { animation?: string; headerShown?: boolean };
+    screenOptions: (input: { route: { name: string } }) => { animation?: string; gestureEnabled?: boolean; headerShown?: boolean };
   };
-  for (const name of ["settings/profile", "settings/notifications", "settings/account", "settings/activity"]) {
-    assert.equal(element.screenOptions({ route: { name } }).animation, "none", name);
-  }
-  for (const name of ["home", "board/post/[postId]", "search", "settings/password"]) {
+  const myPage = element.screenOptions({ route: { name: "settings/index" } });
+  assert.equal(myPage.animation, "slide_from_left");
+  assert.equal(myPage.gestureEnabled, false);
+  // 하위 화면은 기본 전환과 기본 스와이프로 마이페이지 위에 쌓였다 돌아간다.
+  for (const name of ["home", "board/post/[postId]", "search", "settings/password", "settings/profile", "settings/notifications", "settings/account", "settings/activity"]) {
     assert.equal(element.screenOptions({ route: { name } }).animation, undefined, name);
+    assert.equal(element.screenOptions({ route: { name } }).gestureEnabled, undefined, name);
     assert.equal(element.screenOptions({ route: { name } }).headerShown, false);
   }
 });

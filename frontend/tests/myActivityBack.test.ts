@@ -42,10 +42,7 @@ for (const type of ["posts", "bookmarks", "comments"]) {
       "../../../../components/LoadingState": { default: "LoadingState" },
       "../../../../components/NetworkErrorState": { NetworkErrorFallback: "NetworkErrorFallback" },
       "../../../../components/icons": { BackIcon: "BackIcon" },
-      "../../../../hooks/useReturnToMyPageDrawer": { useReturnToMyPageDrawer: (route: string) => {
-        assert.equal(route, "/settings/activity");
-        return { returnToMyPageDrawer: () => calls.push("return-to-drawer"), onLayout: () => calls.push("layout") };
-      } },
+      "../../../../utils/tabNavigation": { backToMyPage: () => calls.push("back-to-my-page") },
       "../../../../services/api": {}, "../../../../utils/appRoutes": appRoutes,
       "../../../../utils/dateFormat": { formatBoardDate: () => "26.09.10(목)" },
       "../../../../utils/userActivityPresentation": { userActivityCategoryLabel: () => "기타공지" },
@@ -60,9 +57,7 @@ for (const type of ["posts", "bookmarks", "comments"]) {
     } });
     const tree = exports.default();
     (findBack(tree)!.props.onPress as () => void)();
-    assert.deepEqual(calls, ["return-to-drawer"]);
-    (tree.props.onLayout as () => void)();
-    assert.deepEqual(calls, ["return-to-drawer", "layout"]);
+    assert.deepEqual(calls, ["back-to-my-page"]);
     calls.length = 0;
     const renderItem = findList(tree)!.props.renderItem as (args: { item: Record<string, unknown> }) => Element;
     const row = renderItem({ item: { type: "post", post_id: 123, title: "게시글" } });

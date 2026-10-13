@@ -1,16 +1,21 @@
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../../../components/AppTypography";
 import { NetworkErrorFallback } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useMeQuery } from "../../../../hooks/useApi";
+import { useToast } from "../../../../hooks/useToast";
+import EdgeSwipeBack from "../../../../components/EdgeSwipeBack";
 import ProfileAvatar from "../../../../components/ProfileAvatar";
+import Toast from "../../../../components/Toast";
 import { formatCohortName } from "../../../../utils/userLabel";
 import { authApi, notificationApi } from "../../../../services/api";
 import { useUserStore } from "../../../../stores/userStore";
 import { clearStoredPushToken, getStoredPushToken } from "../../../../utils/pushTokenStorage";
 import { navigateToTabRoot } from "../../../../utils/tabNavigation";
+import { takeQueuedToast } from "../../../../utils/toast";
 
 import { BackIcon, ChevronRightIcon } from "../../../../components/icons";
 const COLORS = {
@@ -40,6 +45,22 @@ export default function SettingsScreen() {
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const clearSession = useUserStore((state) => state.clearSession);
   const me = data?.data;
+  const { toast, showToast, hideToast } = useToast();
+
+  // 프로필 수정에서 저장하면 그 화면을 닫고 여기로 돌아온다. 맡겨 둔 성공 토스트를 띄운다.
+  useFocusEffect(
+    useCallback(() => {
+      const queued = takeQueuedToast();
+      if (queued) showToast(queued.message, queued.variant);
+    }, [showToast]),
+  );
+
+  // 마이페이지는 왼쪽에서 들어오는 화면이라 헤더·안드로이드·iOS 스와이프 모두 이 뒤로가기로
+  // 왼쪽으로 빠져나간다(PLAN.md 2026-10-13).
+  const goBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else navigateToTabRoot("home");
+  }, []);
 
   const logout = async () => {
     const pushToken = await getStoredPushToken().catch(() => null);
@@ -55,14 +76,12 @@ export default function SettingsScreen() {
   };
 
   return (
+    <EdgeSwipeBack onBack={goBack}>
     <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
         <Pressable
           accessibilityLabel="뒤로"
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else navigateToTabRoot("home");
-          }}
+          onPress={goBack}
           style={styles.iconButton}
         >
           <BackIcon size={22} color={COLORS.text} />
@@ -119,7 +138,9 @@ export default function SettingsScreen() {
           </Pressable>
         )}
       </ScrollView>
+      <Toast toast={toast} onHide={hideToast} />
     </View>
+    </EdgeSwipeBack>
   );
 }
 

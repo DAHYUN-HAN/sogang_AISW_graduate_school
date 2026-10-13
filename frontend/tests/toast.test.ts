@@ -173,9 +173,9 @@ test("저장하고 옮겨 간 화면은 맡겨 둔 토스트를 한 번만 띄�
   queueToastForNextScreen(TOAST_SUCCESS_MESSAGES.profileSaved, "success");
   assert.deepEqual(takeQueuedToast(), { message: "프로필을 저장했어요.", variant: "success" });
   assert.equal(takeQueuedToast(), null);
-  const drawer = readFileSync("components/MyPageDrawer.tsx", "utf8");
-  assert.match(drawer, /const queued = takeQueuedToast\(\);/);
-  assert.match(drawer, /<Toast toast=\{toast\} onHide=\{hideToast\} \/>/);
+  const myPage = readFileSync("app/(tabs)/(home,notices,community,participation,council)/settings/index.tsx", "utf8");
+  assert.match(myPage, /const queued = takeQueuedToast\(\);/);
+  assert.match(myPage, /<Toast toast=\{toast\} onHide=\{hideToast\} \/>/);
 });
 
 // 2026-10-12 피그마 Screen/MyPage/PasswordChanged-ReloginModal: 비밀번호를 바꾸면 기본 알림창 대신 이 모달을 띄운다.

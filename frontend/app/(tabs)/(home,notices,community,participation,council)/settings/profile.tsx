@@ -1,6 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
@@ -11,7 +10,6 @@ import LoadingState from "../../../../components/LoadingState";
 import MediaImage from "../../../../components/MediaImage";
 import Toast from "../../../../components/Toast";
 import { useToast } from "../../../../hooks/useToast";
-import { useReturnToMyPageDrawer } from "../../../../hooks/useReturnToMyPageDrawer";
 import { registrationApi, userApi } from "../../../../services/api";
 import { pickAndUploadImage } from "../../../../utils/mediaPicker";
 import { apiErrorCode, phoneError } from "../../../../utils/authValidation";
@@ -19,6 +17,7 @@ import { buildProfileUpdatePayload } from "../../../../utils/profileUpdate";
 import { TOAST_ERROR_MESSAGES, TOAST_SUCCESS_MESSAGES, queueToastForNextScreen } from "../../../../utils/toast";
 
 import { BackIcon, DefaultAvatarIcon } from "../../../../components/icons";
+import { backToMyPage } from "../../../../utils/tabNavigation";
 const COLORS = {
   primary: "#2761FF",
   primary50: "#E6F1FB",
@@ -39,7 +38,6 @@ type FieldValues = {
 
 export default function ProfileSettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { returnToMyPageDrawer, onLayout } = useReturnToMyPageDrawer("/settings/profile");
   const { toast, showToast, hideToast } = useToast();
   const queryClient = useQueryClient();
   const registrationOptionsQuery = useQuery({
@@ -126,9 +124,9 @@ export default function ProfileSettingsScreen() {
         const refreshedProfile = await userApi.getMe();
         queryClient.setQueryData(["me"], refreshedProfile);
       }
-      // 이 화면은 곧 사라지므로 성공 토스트는 옮겨 간 화면이 띄운다.
+      // 이 화면은 곧 사라지므로 성공 토스트는 돌아간 마이페이지가 띄운다.
       queueToastForNextScreen(TOAST_SUCCESS_MESSAGES.profileSaved, "success");
-      router.replace("/(tabs)/settings");
+      backToMyPage();
     } catch (error) {
       setFieldError(
         apiErrorCode(error) === "VALIDATION_ERROR"
@@ -149,11 +147,11 @@ export default function ProfileSettingsScreen() {
   const saveDisabled = isSubmitting || isUploadingImage;
 
   return (
-    <View style={styles.screen} onLayout={onLayout}>
+    <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
         <Pressable
           accessibilityLabel="뒤로"
-          onPress={returnToMyPageDrawer}
+          onPress={backToMyPage}
           style={styles.iconButton}
         >
           <BackIcon size={24} color={COLORS.text} />

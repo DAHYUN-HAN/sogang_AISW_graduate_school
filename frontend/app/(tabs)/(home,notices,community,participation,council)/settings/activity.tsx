@@ -8,10 +8,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LoadingState from "../../../../components/LoadingState";
 import { BackIcon, BookmarkIcon } from "../../../../components/icons";
-import { useReturnToMyPageDrawer } from "../../../../hooks/useReturnToMyPageDrawer";
 import { userApi } from "../../../../services/api";
 import { postDetailRoute } from "../../../../utils/appRoutes";
 import { formatBoardDate } from "../../../../utils/dateFormat";
+import { backToMyPage } from "../../../../utils/tabNavigation";
 import {
   bookmarkActivityMeta,
   userActivityCategoryLabel,
@@ -52,7 +52,6 @@ function normalizeType(value?: string | string[]): FilterValue {
 export default function ActivityScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ type?: string }>();
-  const { returnToMyPageDrawer, onLayout } = useReturnToMyPageDrawer("/settings/activity");
   const [type, setType] = useState<FilterValue>(() => normalizeType(params.type));
   const { data, isLoading, isError, error, isRefetching, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
     queryKey: ["activity", type],
@@ -72,11 +71,11 @@ export default function ActivityScreen() {
   const title = FILTERS.find((item) => item.value === type)?.label ?? "내 활동";
 
   return (
-    <View style={styles.screen} onLayout={onLayout}>
+    <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
         <Pressable
           accessibilityLabel="뒤로"
-          onPress={returnToMyPageDrawer}
+          onPress={backToMyPage}
           style={styles.iconButton}
         >
           <BackIcon size={24} color={COLORS.text} />

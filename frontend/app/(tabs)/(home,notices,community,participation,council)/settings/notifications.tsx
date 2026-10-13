@@ -8,13 +8,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LoadingState from "../../../../components/LoadingState";
 import Toast from "../../../../components/Toast";
 import { useToast } from "../../../../hooks/useToast";
-import { useReturnToMyPageDrawer } from "../../../../hooks/useReturnToMyPageDrawer";
 import { notificationApi } from "../../../../services/api";
 import { useUserStore } from "../../../../stores/userStore";
 import type { NotificationSettings } from "../../../../types";
 import { TOAST_ERROR_MESSAGES } from "../../../../utils/toast";
 
 import { BackIcon } from "../../../../components/icons";
+import { backToMyPage } from "../../../../utils/tabNavigation";
 function Toggle({ value, disabled, onValueChange }: { value: boolean; disabled?: boolean; onValueChange: (next: boolean) => void }) {
   return (
     <Pressable
@@ -55,7 +55,6 @@ const SETTING_ROWS: { key: keyof NotificationSettings; label: string }[] = [
 
 export default function NotificationSettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { returnToMyPageDrawer, onLayout } = useReturnToMyPageDrawer("/settings/notifications");
   const { toast, showToast, hideToast } = useToast();
   const isAuthenticated = useUserStore((state) => state.isAuthenticated);
   const [settings, setSettings] = useState<NotificationSettings>(DEFAULT_SETTINGS);
@@ -103,11 +102,11 @@ export default function NotificationSettingsScreen() {
   };
 
   return (
-    <View style={styles.screen} onLayout={onLayout}>
+    <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
         <Pressable
           accessibilityLabel="뒤로"
-          onPress={returnToMyPageDrawer}
+          onPress={backToMyPage}
           style={styles.iconButton}
         >
           <BackIcon size={24} color={COLORS.text} />

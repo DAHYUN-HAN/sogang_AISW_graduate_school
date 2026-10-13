@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { BackIcon } from "../../../../components/icons";
 import PrivacyConsentSheet from "../../../../components/PrivacyConsentSheet";
-import { useReturnToMyPageDrawer } from "../../../../hooks/useReturnToMyPageDrawer";
+import { backToMyPage } from "../../../../utils/tabNavigation";
 const COLORS = {
   text: "#15171C",
   subtle: "#A6ACB7",
@@ -18,16 +18,15 @@ const COLORS = {
 
 export default function AccountSettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { returnToMyPageDrawer, onLayout } = useReturnToMyPageDrawer("/settings/account");
   const [privacySheetVisible, setPrivacySheetVisible] = useState(false);
 
   return (
-    <View style={styles.screen} onLayout={onLayout}>
+    <View style={styles.screen}>
       <View style={[styles.appBar, { paddingTop: Math.max(insets.top, 10) }]}>
         <Pressable
           accessibilityLabel="뒤로"
           accessibilityRole="button"
-          onPress={returnToMyPageDrawer}
+          onPress={backToMyPage}
           style={styles.iconButton}
         >
           <BackIcon size={24} color={COLORS.text} />

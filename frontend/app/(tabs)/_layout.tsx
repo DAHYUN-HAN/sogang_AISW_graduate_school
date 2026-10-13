@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { CommunityTabIcon, CouncilTabIcon, HomeTabIcon, NoticeTabIcon, ParticipationTabIcon } from "../../components/icons";
-import { MyPageDrawerProvider } from "../../components/MyPageDrawer";
+import { useAndroidTabBack } from "../../hooks/useAndroidTabBack";
 import { useTabHighlightStore } from "../../stores/tabHighlightStore";
 import {
   requestTabRootReset,
@@ -70,6 +70,8 @@ function CategoryHighlightTabBar(props: BottomTabBarProps) {
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  // 안드로이드 뒤로가기: 홈이 아닌 탭 첫 화면에서는 홈으로 간다.
+  useAndroidTabBack();
   // Keep the tab content height while reserving the system navigation area once.
   const tabBarStyle = {
     ...TAB_BAR_STYLE,
@@ -78,75 +80,73 @@ export default function TabsLayout() {
   };
 
   return (
-    <MyPageDrawerProvider>
-      <Tabs
-        initialRouteName="(home)"
-        backBehavior="initialRoute"
-        tabBar={(props) => <CategoryHighlightTabBar {...props} />}
-        screenOptions={{
-          tabBarActiveTintColor: "#2761FF",
-          tabBarInactiveTintColor: "#8A919C",
-          tabBarIconStyle: { marginTop: 0 },
-          // Figma: 라벨 11/13 Regular (react-navigation 기본 fontWeight 500 오버라이드)
-          tabBarLabelStyle: { fontSize: 11, fontFamily: "Pretendard_400Regular", fontWeight: "normal", lineHeight: 13, marginTop: 3, marginBottom: 0 },
-          tabBarItemStyle: { paddingVertical: 0 },
-          // 회원 탈퇴 화면도 다른 화면처럼 탭바를 유지한다(2026-10-07 결정, PLAN.md).
-          tabBarStyle,
-          tabBarHideOnKeyboard: true,
-          headerShown: false,
+    <Tabs
+      initialRouteName="(home)"
+      backBehavior="initialRoute"
+      tabBar={(props) => <CategoryHighlightTabBar {...props} />}
+      screenOptions={{
+        tabBarActiveTintColor: "#2761FF",
+        tabBarInactiveTintColor: "#8A919C",
+        tabBarIconStyle: { marginTop: 0 },
+        // Figma: 라벨 11/13 Regular (react-navigation 기본 fontWeight 500 오버라이드)
+        tabBarLabelStyle: { fontSize: 11, fontFamily: "Pretendard_400Regular", fontWeight: "normal", lineHeight: 13, marginTop: 3, marginBottom: 0 },
+        tabBarItemStyle: { paddingVertical: 0 },
+        // 회원 탈퇴 화면도 다른 화면처럼 탭바를 유지한다(2026-10-07 결정, PLAN.md).
+        tabBarStyle,
+        tabBarHideOnKeyboard: true,
+        headerShown: false,
+      }}
+    >
+      <Tabs.Screen
+        name="(home)"
+        listeners={() => ({
+          tabPress: (event) => handleTabRootPress("home", event),
+        })}
+        options={{
+          title: "홈",
+          tabBarIcon: ({ color }) => <HomeTabIcon color={color} size={22} />,
         }}
-      >
-        <Tabs.Screen
-          name="(home)"
-          listeners={() => ({
-            tabPress: (event) => handleTabRootPress("home", event),
-          })}
-          options={{
-            title: "홈",
-            tabBarIcon: ({ color }) => <HomeTabIcon color={color} size={22} />,
-          }}
-        />
-        <Tabs.Screen
-          name="(notices)"
-          listeners={() => ({
-            tabPress: (event) => handleTabRootPress("notices", event),
-          })}
-          options={{
-            title: "공지사항",
-            tabBarIcon: ({ color }) => <NoticeTabIcon color={color} size={22} />,
-          }}
-        />
-        <Tabs.Screen
-          name="(community)"
-          listeners={() => ({
-            tabPress: (event) => handleTabRootPress("community", event),
-          })}
-          options={{
-            title: "커뮤니티",
-            tabBarIcon: ({ color }) => <CommunityTabIcon color={color} size={22} />,
-          }}
-        />
-        <Tabs.Screen
-          name="(participation)"
-          listeners={() => ({
-            tabPress: (event) => handleTabRootPress("participation", event),
-          })}
-          options={{
-            title: "참여활동",
-            tabBarIcon: ({ color }) => <ParticipationTabIcon color={color} size={22} />,
-          }}
-        />
-        <Tabs.Screen
-          name="(council)"
-          listeners={() => ({
-            tabPress: (event) => handleTabRootPress("council", event),
-          })}
-          options={{
-            title: "원우회",
-            tabBarIcon: ({ color }) => <CouncilTabIcon color={color} size={22} />,
-          }}
-        />
-      </Tabs>
-    </MyPageDrawerProvider>
+      />
+      <Tabs.Screen
+        name="(notices)"
+        listeners={() => ({
+          tabPress: (event) => handleTabRootPress("notices", event),
+        })}
+        options={{
+          title: "공지사항",
+          tabBarIcon: ({ color }) => <NoticeTabIcon color={color} size={22} />,
+        }}
+      />
+      <Tabs.Screen
+        name="(community)"
+        listeners={() => ({
+          tabPress: (event) => handleTabRootPress("community", event),
+        })}
+        options={{
+          title: "커뮤니티",
+          tabBarIcon: ({ color }) => <CommunityTabIcon color={color} size={22} />,
+        }}
+      />
+      <Tabs.Screen
+        name="(participation)"
+        listeners={() => ({
+          tabPress: (event) => handleTabRootPress("participation", event),
+        })}
+        options={{
+          title: "참여활동",
+          tabBarIcon: ({ color }) => <ParticipationTabIcon color={color} size={22} />,
+        }}
+      />
+      <Tabs.Screen
+        name="(council)"
+        listeners={() => ({
+          tabPress: (event) => handleTabRootPress("council", event),
+        })}
+        options={{
+          title: "원우회",
+          tabBarIcon: ({ color }) => <CouncilTabIcon color={color} size={22} />,
+        }}
+      />
+    </Tabs>
   );
 }

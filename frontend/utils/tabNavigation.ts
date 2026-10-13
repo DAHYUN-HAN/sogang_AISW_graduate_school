@@ -91,3 +91,10 @@ export function openTabStack(tab: TabName, routes: { name: string; params?: Reco
   if (!containerRef?.isReady()) return;
   containerRef.dispatch(tabStackAction(tab, routes));
 }
+
+// 마이페이지 하위 화면(프로필·내가 쓴 글·알림 설정·계정 설정)의 뒤로가기. 마이페이지가
+// 바로 아래 쌓여 있으니 pop 한다. 아래 화면이 없으면(웹 새로고침·직접 링크) 마이페이지를 연다.
+export function backToMyPage() {
+  if (router.canGoBack()) router.back();
+  else router.replace("/settings" as never);
+}

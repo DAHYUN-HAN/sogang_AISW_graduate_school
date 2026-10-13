@@ -9,9 +9,9 @@ import { HOME_TAB_ROUTE } from "../utils/appRoutes";
 
 const source = ts.createSourceFile("tabBack.ts", readFileSync("hooks/useAndroidTabBack.ts", "utf8"), ts.ScriptTarget.Latest, true);
 const hook = source.statements.find(ts.isFunctionDeclaration)!;
-const code = ts.transpileModule(`(function(drawerOpen, closeDrawer) ${hook.body!.getText(source)})`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
+const code = ts.transpileModule(`(function() ${hook.body!.getText(source)})`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
 
-test("tab fallback retains lower priority after detail return, drawer close and callback changes", () => {
+test("tab fallback retains lower priority after detail return and rerenders", () => {
   const listeners: (() => boolean)[] = [];
   const actions: string[] = [];
   let path = "/board/post/42";
@@ -40,8 +40,7 @@ test("tab fallback retains lower priority after detail return, drawer close and 
     router: { canGoBack: () => true },
     navigateToTabRoot: () => actions.push("home"),
   });
-  const closeDrawer = () => actions.push("drawer");
-  render(false, closeDrawer);
+  render();
   // Returning screen focuses before the parent pathname update. A retained
   // search/sort handler must stay ahead of the tab's fallback subscription.
   const child = () => {
@@ -50,11 +49,8 @@ test("tab fallback retains lower priority after detail return, drawer close and 
   };
   listeners.push(child);
   path = "/community";
-  render(false, closeDrawer);
-  render(true, closeDrawer);
-  // Native Modal consumes drawer Back through onRequestClose, then updates
-  // the provider. No child refocus or overlay state change happens here.
-  render(false, () => actions.push("new drawer callback"));
+  render();
+  render();
   function hardwareBack() {
     for (const handler of [...listeners].reverse()) if (handler()) return;
   }
@@ -63,7 +59,7 @@ test("tab fallback retains lower priority after detail return, drawer close and 
   hardwareBack();
   assert.deepEqual(actions, ["overlay", "home"]);
   path = "/home";
-  render(false, closeDrawer);
+  render();
   hardwareBack();
   assert.deepEqual(actions, ["overlay", "home"], "latest Home path falls through to Android");
   cleanup?.();
