@@ -647,6 +647,24 @@ export function ClearSearchIcon({ size = 20, color = "#C5C8CE" }: IconProps) {
   );
 }
 
+// 회원가입 약관 동의 체크박스 안의 체크 — 디자인 원본 13x13, 선 1.8.
+export function CheckboxCheckIcon({ size = 13, color = "#FFFFFF" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 13 13" fill="none">
+      <Path d="M2.5 7L5.5 10L10.5 4" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+// 회원가입 약관 동의 줄 오른쪽 화살표 — 디자인 원본 16x16, 4x8 선 1.6.
+export function ConsentChevronIcon({ size = 16, color = "#A6ACB7" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <Path d="M6 4L10 8L6 12" stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // 선택 시트에서 고른 항목 오른쪽 체크 — 디자인 원본 16x16, 선 1.8, 끝 둥글게.
 export function SheetCheckIcon({ size = 16, color = "#2761FF" }: IconProps) {
   return (

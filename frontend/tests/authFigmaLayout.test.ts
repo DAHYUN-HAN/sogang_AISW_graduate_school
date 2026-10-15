@@ -50,7 +50,8 @@ test("signup typography, code input, steps, and action match the Figma signup fr
 
   const codeInput = styleBlock(source, "codeInput");
   assert.match(codeInput, /height: 48/);
-  assert.match(codeInput, /borderWidth: 1/);
+  // 테두리는 입력 칸 공통 원칙(FieldBorder)이 그린다.
+  assert.doesNotMatch(codeInput, /borderWidth/);
   assert.match(codeInput, /paddingHorizontal: 16/);
   assert.match(codeInput, /lineHeight: 22/);
 
@@ -77,10 +78,11 @@ test("auth controls do not add the browser default black focus outline", () => {
     assert.match(styleBlock(source, "primaryButton"), /outlineStyle: "none"/, screen);
   }
 
-  for (const screen of ["app/auth/register.tsx", "app/auth/password-reset.tsx"]) {
+  // 입력 칸은 FieldInput이 브라우저 기본 테두리를 끈다.
+  assert.match(readSource("components/FieldBorder.tsx"), /outlineStyle: "none"/);
+  for (const screen of ["app/auth/login.tsx", "app/auth/register.tsx", "app/auth/password-reset.tsx"]) {
     const source = readSource(screen);
-    assert.match(styleBlock(source, "input"), /outlineStyle: "none"/, screen);
+    assert.match(source, /<FieldInput/, screen);
+    assert.doesNotMatch(source, /<TextInput/, screen);
   }
-
-  assert.match(styleBlock(readSource("app/auth/register.tsx"), "codeInput"), /outlineStyle: "none"/);
 });

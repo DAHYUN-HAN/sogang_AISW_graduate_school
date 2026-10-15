@@ -335,7 +335,8 @@ const styles = StyleSheet.create({
   },
   modalTitle: { color: COLORS.text, fontSize: 17, fontWeight: "600", textAlign: "center" },
   modalBody: { color: COLORS.muted, fontSize: 13, fontWeight: "400", textAlign: "center" },
-  modalErrorRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  // Figma AccountDelete-PasswordModal-SubmitError: 두 줄로 넘어가도 아이콘은 첫 줄 옆
+  modalErrorRow: { flexDirection: "row", alignItems: "flex-start", gap: 4 },
   modalActions: { flexDirection: "row", gap: 8 },
   modalCancelButton: {
     flex: 1,
