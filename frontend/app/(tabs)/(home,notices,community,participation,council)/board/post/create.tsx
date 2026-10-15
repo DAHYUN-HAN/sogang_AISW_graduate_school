@@ -11,7 +11,7 @@ import { NetworkErrorFallback } from "../../../../../components/NetworkErrorStat
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
-import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, CloseIcon, NoticeAlertIcon, ParticipantAddIcon } from "../../../../../components/icons";
+import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, ClearSearchIcon, CloseIcon, NoticeAlertIcon, ParticipantAddIcon, SearchIcon } from "../../../../../components/icons";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import CalendarMonth from "../../../../../components/CalendarMonth";
@@ -1252,7 +1252,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   return (
                     <>
                       <View style={[styles.activityInputWithIcon, participantSearchFocused ? styles.activityInputWithIconFocused : null, fieldState.error ? styles.inputError : null]}>
-                        <Ionicons name="search-outline" size={16} color="#A6ACB7" />
+                        <SearchIcon size={16} color="#A6ACB7" />
                         <TextInput
                           onBlur={() => { setParticipantSearchFocused(false); revealTarget.current = null; }}
                           onChangeText={setParticipantQuery}
@@ -1262,6 +1262,12 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                           style={[styles.activityInlineInput, { outlineStyle: "none" } as never]}
                           value={participantQuery}
                         />
+                        {/* Figma Verify-Study-SearchResults: 검색어가 있으면 오른쪽에 지우기 버튼 */}
+                        {participantQuery ? (
+                          <Pressable accessibilityRole="button" accessibilityLabel="검색어 지우기" hitSlop={12} onPress={() => setParticipantQuery("")}>
+                            <ClearSearchIcon />
+                          </Pressable>
+                        ) : null}
                       </View>
                       {trimmedParticipantQuery.length > 0 && !participantSearch.isLoading && participantResults.length === 0 ? (
                         <Text style={styles.participantNoResultText}>검색 결과가 없어요</Text>

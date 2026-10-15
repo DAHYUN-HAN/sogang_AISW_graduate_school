@@ -1,4 +1,3 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { ActivityIndicator, BackHandler, FlatList, Keyboard, Platform, Pressable, StyleSheet, View } from "react-native";
@@ -13,12 +12,12 @@ import type { SearchResult } from "../../../types";
 import { formatBoardDate } from "../../../utils/dateFormat";
 import { navigateToTabRoot } from "../../../utils/tabNavigation";
 
-import { BackIcon, EmptyCalendarIcon } from "../../../components/icons";
+import { BackIcon, ClearSearchIcon, EmptyCalendarIcon, SearchIcon } from "../../../components/icons";
 const COLORS = {
   primary: "#2761FF",
-  text: "#111827",
+  text: "#15171C", // Figma Notice/Search 입력 글자
   muted: "#6B7280",
-  subtle: "#9AA3B2",
+  subtle: "#8A919C", // Figma Component — Search Bar 돋보기·안내 글자
   divider: "#EEF0F3",
   bg: "#FFFFFF",
   danger: "#DC2626",
@@ -125,7 +124,7 @@ export default function SearchScreen() {
 
   const searchInput = (
     <View style={styles.inputWrap}>
-      <Ionicons name="search-outline" size={18} color={COLORS.subtle} />
+      <SearchIcon size={18} color={COLORS.subtle} />
       <TextInput
         onChangeText={(value) => {
           setQuery(value);
@@ -140,8 +139,8 @@ export default function SearchScreen() {
         value={query}
       />
       {query ? (
-        <Pressable onPress={() => setQuery("")}>
-          <Ionicons name="close-circle" size={18} color={COLORS.subtle} />
+        <Pressable accessibilityRole="button" accessibilityLabel="검색어 지우기" hitSlop={12} onPress={() => setQuery("")}>
+          <ClearSearchIcon />
         </Pressable>
       ) : null}
     </View>
@@ -209,7 +208,7 @@ const styles = StyleSheet.create({
   iconButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center" },
   noticeSearchHeader: { minHeight: 66, flexDirection: "row", alignItems: "center", gap: 0, paddingLeft: 10, paddingRight: 16, paddingBottom: 14 },
   noticeBackButton: { width: 26, height: 44 },
-  inputWrap: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 22, backgroundColor: "#F7F8FA", paddingHorizontal: 13 },
+  inputWrap: { flex: 1, minHeight: 44, flexDirection: "row", alignItems: "center", gap: 8, borderRadius: 22, backgroundColor: "#F7F8FA", paddingHorizontal: 16 }, // Figma Component — Search Bar: 44h, 좌우 16, gap 8
   input: { flex: 1, color: COLORS.text, fontSize: 14, fontWeight: "400", lineHeight: 22 },
   noticeFilters: { flexDirection: "row", gap: 8, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 14 },
   noticeFilter: { alignItems: "center", justifyContent: "center", borderRadius: 999, borderWidth: 0.5, borderColor: "#E1E4E9", paddingHorizontal: 14, paddingVertical: 8 },

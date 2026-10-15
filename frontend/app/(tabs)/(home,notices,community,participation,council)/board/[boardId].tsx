@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import EdgeSwipeBack from "../../../../components/EdgeSwipeBack";
 import ImageViewerModal from "../../../../components/ImageViewerModal";
 import MediaImage, { MediaImageBackground } from "../../../../components/MediaImage";
-import { BackIcon, EmptyCalendarIcon, LedgerIcon, SearchBackIcon, SearchIcon } from "../../../../components/icons";
+import { BackIcon, ClearSearchIcon, EmptyCalendarIcon, LedgerIcon, SearchBackIcon, SearchIcon } from "../../../../components/icons";
 import LoadingState from "../../../../components/LoadingState";
 import Toast from "../../../../components/Toast";
 import PostCard from "../../../../components/PostCard";
@@ -1186,8 +1186,9 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
           <>
             <Pressable
               accessibilityLabel="검색 닫기"
+              hitSlop={12}
               onPress={closeSearch}
-              style={styles.iconButton}
+              style={styles.searchBackButton}
             >
               <SearchBackIcon size={16} />
             </Pressable>
@@ -1200,20 +1201,20 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
                 onSubmitEditing={() => setQuery(queryInput.trim())}
                 returnKeyType="search"
                 placeholder="검색어를 입력하세요"
-                placeholderTextColor="#A6ACB7"
+                placeholderTextColor="#8A919C"
                 style={[styles.searchBarInput, { outlineStyle: "none" } as never]}
               />
               {queryInput ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="검색어 지우기"
-                  hitSlop={8}
+                  hitSlop={12}
                   onPress={() => {
                     setQueryInput("");
                     setQuery("");
                   }}
                 >
-                  <Ionicons name="close-circle" size={18} color="#A6ACB7" />
+                  <ClearSearchIcon />
                 </Pressable>
               ) : null}
             </View>
@@ -1387,6 +1388,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "500",
   },
+  // Figma Community/Search: 뒤로 화살표(10x16)가 x16에서 시작하고 검색 칸이 x36에서 시작한다.
+  searchBackButton: {
+    width: 20,
+    height: 44,
+    justifyContent: "center",
+  },
   searchBar: {
     flex: 1,
     height: 44,
@@ -1396,7 +1403,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F7F8FA",
     borderRadius: 999,
     paddingHorizontal: 16,
-    marginLeft: 4,
   },
   searchBarInput: {
     flex: 1,

@@ -637,6 +637,15 @@ export function ParticipantAddIcon({ size = 28, color = "#2761FF" }: IconProps) 
 }
 
 // 목록 행 우측 셰브론 — 디자인 원본 15x15 (stroke 1.5, #A6ACB7).
+// 검색 칸 오른쪽 검색어 지우기 — 디자인 원본 20x20 원 #C5C8CE, 안의 X 6x6 선 1.5.
+export function ClearSearchIcon({ size = 20, color = "#C5C8CE" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+      <Circle cx={10} cy={10} r={10} fill={color} />
+      <Path d="M7 7L13 13M13 7L7 13" stroke="#FFFFFF" strokeWidth={1.5} strokeLinecap="round" />
+    </Svg>
+  );
+}
 
 // 선택 시트에서 고른 항목 오른쪽 체크 — 디자인 원본 16x16, 선 1.8, 끝 둥글게.
 export function SheetCheckIcon({ size = 16, color = "#2761FF" }: IconProps) {
