@@ -309,49 +309,59 @@ export function handleNestedBoardHardwareBack(
   return true;
 }
 
+// 완료 화면에서 "확인"을 누르면 갈 곳. 건의사항·상조회는 글 상세를 볼 일이 없어
+// 게시판 목록으로, 나머지는 방금 쓴 글 상세로 간다.
+function completionReturnsToList(boardType: string | undefined) {
+  return boardType === "mutual_aid" || boardType === "suggestion";
+}
+
+// 글 상세에서 뒤로 갈 곳. 활동 인증은 참여활동 탭에서 쓰므로 그곳으로 돌아간다.
+function completionDetailReturnTo(boardType: string | undefined, returnTo?: unknown) {
+  return boardType === "activity_certification" ? PARTICIPATION_TAB_ROUTE : postDetailReturnRoute(returnTo);
+}
+
 export function postCreateCompletionRoute(
   boardType: string | undefined,
   createdPostId: number,
   boardId: number,
   returnTo?: unknown,
 ) {
-  if (boardType === "activity_certification") {
-    return postDetailRoute(createdPostId, boardId, PARTICIPATION_TAB_ROUTE);
-  }
-  if (boardType === "mutual_aid" || boardType === "suggestion") {
-    return boardRoute(boardId);
-  }
-  return postDetailRoute(createdPostId, boardId, returnTo);
-}
-
-// 등록하면 완료 화면을 보여 주는 게시판.
-export function usesPostCompletionScreen(boardType: string | undefined) {
-  return boardType === "suggestion" || boardType === "mutual_aid" || boardType === "activity_certification";
+  if (completionReturnsToList(boardType)) return boardRoute(boardId);
+  return postDetailRoute(createdPostId, boardId, completionDetailReturnTo(boardType, returnTo));
 }
 
 type StackRouteInput = { name: string; params?: object };
 
-// 등록 직후 글쓰기 화면 자리에 놓을 스택. 완료 화면 바로 아래에 "확인"의 도착지
-// (postCreateCompletionRoute와 같은 곳)를 깔아 두어, 확인·안드로이드 뒤로가기·iOS
-// 스와이프가 모두 완료 화면만 빼서 같은 화면으로 돌아가게 한다.
+// 등록 직후 글쓰기 화면 자리에 놓을 스택. 모든 게시판이 완료 화면을 거친다.
+// 완료 화면 바로 아래에 "확인"의 도착지(postCreateCompletionRoute와 같은 곳)를 깔아
+// 두어, 확인·안드로이드 뒤로가기·iOS 스와이프가 모두 완료 화면만 빼서 같은 화면으로
+// 돌아가게 한다.
 // - 건의사항·상조회: 그 게시판 목록. 아래에 있으면 거기까지 비워 같은 목록이 두 번
 //   쌓이지 않게 하고, 없으면 목록을 깐다.
-// - 활동 인증: 방금 쓴 글 상세. 그 아래는 글쓰기 전 화면이다.
+// - 그 밖의 게시판: 방금 쓴 글 상세. 그 아래는 글쓰기 전 화면이다.
 export function postCompletionStack<R extends StackRouteInput>(
   routes: R[],
   boardType: string | undefined,
   createdPostId: number,
   boardId: number,
+  returnTo?: unknown,
 ): (R | StackRouteInput)[] {
   const below: (R | StackRouteInput)[] = routes.slice(0, -1);
+  const detailReturnTo = completionDetailReturnTo(boardType, returnTo);
   const complete = {
     name: "board/post/complete",
-    params: { boardType: boardType ?? "", boardId: String(boardId), postId: String(createdPostId) },
+    params: {
+      boardType: boardType ?? "",
+      boardId: String(boardId),
+      postId: String(createdPostId),
+      // 웹 새로고침처럼 아래 화면이 없을 때 같은 도착지를 다시 만들 수 있게 넘긴다.
+      ...(detailReturnTo && !completionReturnsToList(boardType) ? { returnTo: detailReturnTo } : {}),
+    },
   };
-  if (boardType === "activity_certification") {
+  if (!completionReturnsToList(boardType)) {
     const detail = {
       name: "board/post/[postId]",
-      params: { postId: String(createdPostId), fromBoardId: String(boardId), returnTo: PARTICIPATION_TAB_ROUTE },
+      params: { postId: String(createdPostId), fromBoardId: String(boardId), ...(detailReturnTo ? { returnTo: detailReturnTo } : {}) },
     };
     return [...below, detail, complete];
   }

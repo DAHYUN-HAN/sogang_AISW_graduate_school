@@ -48,10 +48,8 @@ import {
   navigateAfterPostEdit,
   postCompletionStack,
   postCreateFormBackDecision,
-  postCreateCompletionRoute,
   postCreateFormInstanceKey,
   postEditCompletionDecision,
-  usesPostCompletionScreen,
 } from "../../../../../utils/appRoutes";
 import { formatBoardDate } from "../../../../../utils/dateFormat";
 import {
@@ -687,16 +685,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     createMutation.mutate(payload, {
       onSuccess: (res) => {
         const createdPostId = res.data.id;
-        if (usesPostCompletionScreen(boardType)) {
-          // 글쓰기 자리에 확인의 도착지와 완료 화면을 한 번에 놓는다.
-          pendingSubmitNavigation.current = () => navigation.dispatch((state) => {
-            const routes = postCompletionStack(state.routes, boardType, createdPostId, boardId);
-            return CommonActions.reset({ ...state, routes, index: routes.length - 1 } as never);
-          });
-        } else {
-          const route = postCreateCompletionRoute(boardType, createdPostId, boardId, params.returnTo);
-          pendingSubmitNavigation.current = () => router.replace(route as never);
-        }
+        // 글쓰기 자리에 확인의 도착지와 완료 화면을 한 번에 놓는다(모든 게시판 공통).
+        pendingSubmitNavigation.current = () => navigation.dispatch((state) => {
+          const routes = postCompletionStack(state.routes, boardType, createdPostId, boardId, params.returnTo);
+          return CommonActions.reset({ ...state, routes, index: routes.length - 1 } as never);
+        });
         setSubmitted(true);
       },
       onError: handleMutationError,
