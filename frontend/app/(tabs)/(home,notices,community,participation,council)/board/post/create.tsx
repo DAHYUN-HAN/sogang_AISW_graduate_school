@@ -622,7 +622,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       requireField("eventDate", values.eventDate);
       requireField("relation", values.relation);
     }
-    if (isStudyRecruit) requireField("contact", values.contact);
+    // 스터디 모집 연락수단은 필수가 아니다(2026-10-11 결정).
     if (resourceFields?.professor) requireField("professor", values.professor);
     if (resourceFields?.difficulty) requireField("difficulty", values.difficulty);
     if (resourceFields?.satisfaction) requireField("satisfaction", values.satisfaction);
