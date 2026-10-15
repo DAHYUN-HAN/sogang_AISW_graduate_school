@@ -56,7 +56,10 @@ export default function PasswordChangeScreen() {
     router.replace("/auth/login");
   };
 
-  const canSubmit = Boolean(currentPassword && newPassword && confirmPassword) && !isSubmitting;
+  // Figma PasswordChange-Error: 오류가 떠 있으면 버튼을 끈다. 오류 칸은 고쳐 입력하는 순간
+  // 풀리므로, 빨간 칸이 모두 사라지고 세 칸이 다 차 있으면 다시 켜진다.
+  const hasFieldError = Boolean(currentError || newError || confirmError);
+  const canSubmit = Boolean(currentPassword && newPassword && confirmPassword) && !hasFieldError && !isSubmitting;
 
   const changePassword = async () => {
     setCurrentError(null);
