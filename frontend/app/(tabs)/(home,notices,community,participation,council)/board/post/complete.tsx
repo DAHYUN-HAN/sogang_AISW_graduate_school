@@ -7,7 +7,7 @@ import { replaceWithRoute } from "../../../../../utils/tabNavigation";
 function completionTitle(boardType?: string) {
   if (boardType === "suggestion") return "건의사항이 등록되었어요!";
   if (boardType === "mutual_aid") return "신청이 완료되었어요!";
-  return "활동 인증이 등록됐어요!";
+  return "활동 인증이 등록되었어요!";
 }
 
 // 건의사항·상조회·활동 인증 등록 완료 화면. 글쓰기 화면 자리에 "확인"의 도착지를
