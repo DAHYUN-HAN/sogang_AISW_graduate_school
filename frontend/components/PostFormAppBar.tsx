@@ -6,14 +6,15 @@ import { AppText as Text } from "./AppTypography";
 import { BackIcon, CloseIcon } from "./icons";
 
 // 글쓰기·글 수정 화면이 같이 쓰는 상단 바. 두 화면이 어긋나지 않게 한 곳에 둔다.
-// - default: 닫기 X, 아래 구분선 (일반 게시판 글쓰기·글 수정)
-// - activity: 뒤로가기 <, 구분선 없음 (Figma Verify-PhotoPreview)
-// - mutualAid: Figma 상조회 신청 TopBar. padding 18/16/14, 구분선 없음, 닫기 20×20, 제목 18/21, 우측 spacer 20.
+// 2026-10-15 피그마: 커뮤니티·스터디 모집·건의사항 글쓰기/수정도 제목 아래 구분선을 없앴다.
+// 이제 모든 모양이 구분선 없이 그린다.
+// - default: 닫기 X (일반 게시판 글쓰기·글 수정)
+// - activity: 뒤로가기 < (Figma Verify-PhotoPreview)
+// - mutualAid: Figma 상조회 신청 TopBar. padding 18/16/14, 닫기 20×20, 제목 18/21, 우측 spacer 20.
 type Variant = "default" | "activity" | "mutualAid";
 
 const COLORS = {
   text: "#15171C",
-  border: "#E1E4E9",
   bg: "#FFFFFF",
 };
 
@@ -21,7 +22,7 @@ export default function PostFormAppBar({ title, onClose, variant = "default" }: 
   const insets = useSafeAreaInsets();
   const isMutualAid = variant === "mutualAid";
   return (
-    <View style={[styles.appBar, variant === "activity" ? styles.appBarNoDivider : null, isMutualAid ? styles.appBarMutualAid : null, { paddingTop: Math.max(insets.top, 10) + (isMutualAid ? 18 : 0) }]}>
+    <View style={[styles.appBar, isMutualAid ? styles.appBarMutualAid : null, { paddingTop: Math.max(insets.top, 10) + (isMutualAid ? 18 : 0) }]}>
       <Pressable
         accessibilityLabel="닫기"
         hitSlop={isMutualAid ? 11 : undefined}
@@ -48,18 +49,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
     backgroundColor: COLORS.bg,
     paddingHorizontal: 16,
     paddingBottom: 10,
   },
-  appBarNoDivider: {
-    borderBottomWidth: 0,
-  },
   appBarMutualAid: {
     minHeight: 0,
-    borderBottomWidth: 0,
     paddingBottom: 14, // Figma TopBar padding 18/16/14
   },
   appBarIconMutualAid: {

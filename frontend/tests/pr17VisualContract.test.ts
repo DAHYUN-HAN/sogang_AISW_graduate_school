@@ -33,8 +33,8 @@ test("활동 인증 폼은 PR 원본 문구를 표시한다", () => {
   // 상단 바는 글쓰기·글 수정 공용 PostFormAppBar가 그린다.
   const appBar = readFileSync("components/PostFormAppBar.tsx", "utf8");
   assert.match(create, /variant=\{isMutualAid \? "mutualAid" : isActivity \? "activity" : "default"\}/);
-  assert.match(appBar, /variant === "activity" \? styles\.appBarNoDivider : null/);
-  assert.match(appBar, /appBarNoDivider:[\s\S]*borderBottomWidth: 0/);
+  // 2026-10-15 피그마: 글쓰기·글 수정 상단 바는 모양과 관계없이 제목 아래 구분선이 없다.
+  assert.doesNotMatch(appBar, /borderBottomWidth/);
   assert.match(appBar, /appBarTitle:[\s\S]*fontSize: 18,[\s\S]*fontWeight: "500",[\s\S]*lineHeight: 22/);
   assert.match(create, /placeholder="이름으로 검색"/);
   assert.doesNotMatch(create, /이름 또는 학번으로 검색/);
