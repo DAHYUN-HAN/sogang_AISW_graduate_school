@@ -13,6 +13,7 @@ import { apiErrorCode, apiErrorStatus } from "../../../../utils/authValidation";
 import { clearStoredPushToken } from "../../../../utils/pushTokenStorage";
 
 import { AlertCircleIcon, BackIcon, FieldErrorIcon, NoticeAlertIcon } from "../../../../components/icons";
+import { BUTTON_TEXT } from "../../../../utils/buttonText";
 const COLORS = {
   primary: "#2761FF",
   text: "#15171C",
@@ -312,7 +313,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   deleteButtonDisabled: { backgroundColor: COLORS.border }, // Figma: 비활성 #E1E4E9
-  deleteButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "500", lineHeight: 24 },
+  deleteButtonText: { ...BUTTON_TEXT, color: "#FFFFFF", fontWeight: "500" },
   deleteButtonTextDisabled: { color: "#8A919C" },
   modalBackdrop: {
     flex: 1,
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F4F5F7",
     paddingVertical: 13,
   },
-  modalCancelText: { color: COLORS.muted, fontSize: 15, fontWeight: "500" },
+  modalCancelText: { ...BUTTON_TEXT, color: COLORS.muted, fontWeight: "500" },
   modalDeleteButton: {
     flex: 1,
     alignItems: "center",
@@ -355,5 +356,5 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.danger,
     paddingVertical: 13,
   },
-  modalDeleteText: { color: "#FFFFFF", fontSize: 15, fontWeight: "600" },
+  modalDeleteText: { ...BUTTON_TEXT, color: "#FFFFFF", fontWeight: "600" },
 });

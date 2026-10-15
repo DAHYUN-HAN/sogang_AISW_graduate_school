@@ -56,20 +56,21 @@ test("signup typography, code input, steps, and action match the Figma signup fr
   assert.match(codeInput, /lineHeight: 22/);
 
   const actionText = styleBlock(source, "primaryButtonText");
-  assert.match(actionText, /fontSize: 16/);
-  assert.match(actionText, /lineHeight: 24/);
+  assert.match(actionText, /\.\.\.BUTTON_TEXT/);
+  assert.doesNotMatch(actionText, /lineHeight/);
   assert.match(source, /VERIFICATION_ATTEMPTS_EXCEEDED_MESSAGE/);
 });
 
 test("login and password reset keep the Figma primary action type scale", () => {
+  // 2026-10-15 피그마: 버튼 글자는 모두 16px, 줄 높이는 공통 19(utils/buttonText.ts).
+  assert.match(readSource("utils/buttonText.ts"), /fontSize: 16,/);
   const loginAction = styleBlock(readSource("app/auth/login.tsx"), "primaryButtonText");
-  assert.match(loginAction, /fontSize: 16/);
-  assert.match(loginAction, /lineHeight: 24/);
+  assert.match(loginAction, /\.\.\.BUTTON_TEXT/);
+  assert.doesNotMatch(loginAction, /lineHeight/);
 
-  // 비밀번호 찾기 최신 Figma: 인증코드 받기 버튼은 14/24.
   const resetAction = styleBlock(readSource("app/auth/password-reset.tsx"), "primaryButtonText");
-  assert.match(resetAction, /fontSize: 14/);
-  assert.match(resetAction, /lineHeight: 24/);
+  assert.match(resetAction, /\.\.\.BUTTON_TEXT/);
+  assert.doesNotMatch(resetAction, /lineHeight/);
 });
 
 test("auth controls do not add the browser default black focus outline", () => {

@@ -42,6 +42,7 @@ test("네트워크 오류 UI의 재시도 버튼은 전달된 화면 재요청�
       if (name === "react-native-svg") return { default: "Svg", Path: "Path", Circle: "Circle", Rect: "Rect" };
       if (name === "./AppTypography") return { AppText: "Text" };
       if (name === "../utils/networkError") return { isNetworkError, isServerLoadError };
+      if (name === "../utils/buttonText") return { BUTTON_TEXT: { fontSize: 16, lineHeight: 19 } };
       throw new Error(name);
     },
   });

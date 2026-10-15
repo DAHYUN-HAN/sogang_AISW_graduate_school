@@ -1,5 +1,6 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "./AppTypography";
+import { BUTTON_TEXT } from "../utils/buttonText";
 
 // Figma: Screen/Common/UploadFailModal (1136:57), Screen/Common/RateLimitModal (1142:45)
 // primary는 Screen/MyPage/PasswordChanged-ReloginModal(1904:64)처럼 확인 버튼이 가로로 꽉 찬 파란 버튼이다.
@@ -94,10 +95,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   confirmText: {
+    ...BUTTON_TEXT,
     color: COLORS.body,
-    fontSize: 16,
     fontWeight: "500",
-    lineHeight: 24,
   },
   confirmButtonPrimary: {
     flex: 1,

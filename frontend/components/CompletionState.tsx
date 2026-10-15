@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "./AppTypography";
 
 import { CheckCircleIcon } from "./icons";
+import { BUTTON_TEXT } from "../utils/buttonText";
 
 type Props = {
   title: string;
@@ -52,9 +53,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#2761FF",
   },
   buttonText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 16,
     fontWeight: "500",
-    lineHeight: 24,
   },
 });

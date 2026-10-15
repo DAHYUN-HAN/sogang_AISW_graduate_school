@@ -12,6 +12,7 @@ import MigrationNoticeModal from "../../components/MigrationNoticeModal";
 import SchoolEmailInput from "../../components/SchoolEmailInput";
 import { composeSchoolEmail, emailIdError } from "../../utils/authValidation";
 import { dismissMigrationNoticeForNow, hideMigrationNoticeForever, isMigrationNoticeHidden } from "../../utils/migrationNotice";
+import { BUTTON_TEXT } from "../../utils/buttonText";
 
 const COLORS = {
   primary: "#2761FF", // primary/500
@@ -229,9 +230,8 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   primaryButtonText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 16,
-    lineHeight: 24,
     fontWeight: "500", // Figma: Inter Medium
   },
   links: {

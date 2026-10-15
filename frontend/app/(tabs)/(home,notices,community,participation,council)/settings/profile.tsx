@@ -19,6 +19,7 @@ import { TOAST_ERROR_MESSAGES, TOAST_SUCCESS_MESSAGES, queueToastForNextScreen }
 
 import { BackIcon, DefaultAvatarIcon } from "../../../../components/icons";
 import { backToMyPage } from "../../../../utils/tabNavigation";
+import { BUTTON_TEXT } from "../../../../utils/buttonText";
 const COLORS = {
   primary: "#2761FF",
   primary50: "#E6F1FB",
@@ -485,8 +486,8 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   primaryButtonText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 15,
     fontWeight: "500",
   },
 });

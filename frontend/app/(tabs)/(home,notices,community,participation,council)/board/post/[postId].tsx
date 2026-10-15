@@ -79,6 +79,7 @@ import { resourceCategoryLabel, resourceDetailMeta } from "../../../../../utils/
 import { RESOURCE_SUBJECT_SEPARATOR, resourceSubjectSegments, type ResourceSubjectTone } from "../../../../../utils/resourcePostFields";
 import { adminPostRouter } from "../../../../../utils/adminPostRouter";
 import { useAdminAlert } from "../../../../../utils/adminAlert";
+import { BUTTON_TEXT } from "../../../../../utils/buttonText";
 
 const COLORS = {
   primary: "#2761FF",
@@ -1901,8 +1902,8 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   reportPrimaryButtonText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 15,
     fontWeight: "500",
   },
   buttonDisabled: {
@@ -1963,10 +1964,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   confirmCancelText: {
+    ...BUTTON_TEXT,
     color: "#4B5160",
-    fontSize: 16,
     fontWeight: "500",
-    lineHeight: 24,
   },
   confirmDeleteButton: {
     height: 40,
@@ -1977,10 +1977,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   confirmDeleteText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 16,
     fontWeight: "500",
-    lineHeight: 24,
   },
   postMenu: {
     position: "absolute",
@@ -2377,8 +2376,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   joinButtonText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 14,
     fontWeight: "500",
   },
   joinButtonClosed: {

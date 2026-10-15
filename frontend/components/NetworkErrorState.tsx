@@ -5,6 +5,7 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { AppText as Text } from "./AppTypography";
 import { isLoadFailure, isNetworkError, isServerLoadError } from "../utils/networkError";
 import { registerNetworkRetry, useNetworkStatusStore } from "../stores/networkStatusStore";
+import { BUTTON_TEXT } from "../utils/buttonText";
 
 export function NetworkErrorFallback({ error, onRetry, children }: { error: unknown; onRetry: () => void; children: ReactNode }) {
   const focused = useIsFocused();
@@ -74,5 +75,5 @@ const styles = StyleSheet.create({
   title: { marginTop: 16, color: "#15171C", fontWeight: "500", fontSize: 16, lineHeight: 19, textAlign: "center" },
   description: { marginTop: 6, color: "#6B7280", fontWeight: "400", fontSize: 13, lineHeight: 16, textAlign: "center" },
   retryButton: { marginTop: 24, minWidth: 100, minHeight: 48, paddingHorizontal: 24, paddingVertical: 12, alignItems: "center", justifyContent: "center", backgroundColor: "#2761FF", borderRadius: 8 },
-  retryText: { color: "#FFFFFF", fontWeight: "500", fontSize: 14, lineHeight: 17 },
+  retryText: { ...BUTTON_TEXT, color: "#FFFFFF", fontWeight: "500" },
 });

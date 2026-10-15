@@ -14,6 +14,7 @@ import { pollCacheKey, pollOptionLabel, validPollAnswers } from "../utils/notice
 import { pollQuestionAcceptsVote } from "../utils/noticePollUsability";
 import { formatMonthDayTime, parseApiDate } from "../utils/dateFormat";
 import { formatCohortName } from "../utils/userLabel";
+import { BUTTON_TEXT } from "../utils/buttonText";
 
 function Button({label, onPress, disabled = false}: {label: string; onPress: () => void | Promise<void>; disabled?: boolean}) {
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{disabled}}
@@ -245,9 +246,9 @@ const styles = StyleSheet.create({
   voteButtonDisabled: {backgroundColor: "#F4F5F7"},
   voteButtonActive: {backgroundColor: "#2761FF"},
   revoteButton: {backgroundColor: "#FFF", borderColor: "#E7E9EE"},
-  voteLabel: {fontSize: 14, lineHeight: 17, fontWeight: "500", color: "#A6ACB7"},
+  voteLabel: { ...BUTTON_TEXT, fontWeight: "500", color: "#A6ACB7" },
   voteLabelActive: {fontWeight: "600", color: "#FFF"},
-  revoteLabel: {fontSize: 14, lineHeight: 17, fontWeight: "500", color: "#000"},
+  revoteLabel: { ...BUTTON_TEXT, fontWeight: "500", color: "#000" },
   footer: {flexDirection: "row", justifyContent: "space-between", alignItems: "center"},
   participants: {fontSize: 13, lineHeight: 18, color: "#6B7280"},
   peopleButton: {minHeight: 32, justifyContent: "center", paddingLeft: 12},

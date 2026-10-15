@@ -18,6 +18,7 @@ import { navigateToTabRoot } from "../../../../utils/tabNavigation";
 import { takeQueuedToast } from "../../../../utils/toast";
 
 import { BackIcon, ChevronRightIcon } from "../../../../components/icons";
+import { BUTTON_TEXT } from "../../../../utils/buttonText";
 const COLORS = {
   primary: "#2761FF",
   primary50: "#EDF2FE",
@@ -262,8 +263,8 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   loginText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 16,
     fontWeight: "900",
   },
 });

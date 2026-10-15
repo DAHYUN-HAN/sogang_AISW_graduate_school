@@ -86,6 +86,7 @@ import {
 } from "../../../../../utils/resourcePostFields";
 import { resourcePostEditBoards } from "../../../../../utils/resourceBoards";
 import { adminPostRouter } from "../../../../../utils/adminPostRouter";
+import { BUTTON_TEXT } from "../../../../../utils/buttonText";
 
 const COLORS = {
   primary: "#2761FF",
@@ -2075,8 +2076,8 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   successButtonText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 16,
     fontWeight: "400",
   },
   screen: {
@@ -3041,7 +3042,7 @@ const styles = StyleSheet.create({
     marginTop: 14, // gap 14 + 14 = 본문 하단 16 + 래퍼 상단 12
   },
   activitySubmitButton: {
-    height: 45, // Figma: 인증버튼 45h
+    height: 47, // Figma Verify 인증 등록 버튼 47 (16px 글자 + 위아래 14)
     borderRadius: 8,
     marginTop: 2,
   },
@@ -3049,13 +3050,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#AABDFD",
   },
   submitText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 15, // Figma: Medium 15/18
     fontWeight: "500",
-    lineHeight: 18,
   },
   activitySubmitText: {
-    fontSize: 14,
-    lineHeight: 17,
+    ...BUTTON_TEXT,
   },
 });

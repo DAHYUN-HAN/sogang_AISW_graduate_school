@@ -16,6 +16,7 @@ import { clearStoredPushToken } from "../../../../utils/pushTokenStorage";
 import { TOAST_ERROR_MESSAGES } from "../../../../utils/toast";
 
 import { BackIcon } from "../../../../components/icons";
+import { BUTTON_TEXT } from "../../../../utils/buttonText";
 const COLORS = {
   primary: "#2761FF",
   text: "#15171C",
@@ -220,5 +221,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   primaryButtonDisabled: { backgroundColor: COLORS.disabled },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "500" },
+  primaryButtonText: { ...BUTTON_TEXT, color: "#FFFFFF", fontWeight: "500" },
 });

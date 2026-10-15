@@ -2,6 +2,7 @@ import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "./AppTypography";
 import { privacyConsentSheetSections } from "../utils/privacyPolicy";
+import { BUTTON_TEXT } from "../utils/buttonText";
 
 // 계정 설정의 "개인정보 수집 및 이용 동의"를 누르면 아래에서 올라오는 시트.
 // 피그마 Screen/MyPage/PrivacyConsentSheet.
@@ -72,5 +73,5 @@ const styles = StyleSheet.create({
   // Figma 닫기래퍼: 위 12, 버튼 46(r10), 아래 20
   footer: { paddingTop: 12, paddingHorizontal: 20 },
   closeButton: { height: 46, borderRadius: 10, alignItems: "center", justifyContent: "center", backgroundColor: COLORS.primary },
-  closeText: { color: "#FFFFFF", fontSize: 15, lineHeight: 18, fontWeight: "600" },
+  closeText: { ...BUTTON_TEXT, color: "#FFFFFF", fontWeight: "600" },
 });

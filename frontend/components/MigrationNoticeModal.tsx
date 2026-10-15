@@ -1,5 +1,6 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "./AppTypography";
+import { BUTTON_TEXT } from "../utils/buttonText";
 
 // Figma: Screen/Common/MigrationNoticeModal-TextOnly (1329:45)
 // 카드 300x196, 안쪽 여백 24/20/20, 블록 사이 10. ×는 카드 위 오른쪽,
@@ -106,10 +107,9 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
   },
   primaryButtonText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 15,
     fontWeight: "600",
-    lineHeight: 18,
   },
   hideForever: {
     color: "rgba(255, 255, 255, 0.85)",

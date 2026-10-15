@@ -1,5 +1,6 @@
 import { Modal, Pressable, StyleSheet, View } from "react-native";
 import { AppText as Text } from "./AppTypography";
+import { BUTTON_TEXT } from "../utils/buttonText";
 
 // Figma: Screen/Common/DiscardWriteModal (node 1344:45)
 //        Screen/Common/BoardChangeConfirmModal (node 1527:54)
@@ -118,10 +119,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   keepText: {
+    ...BUTTON_TEXT,
     color: COLORS.body,
-    fontSize: 16,
     fontWeight: "500",
-    lineHeight: 24,
   },
   discardButton: {
     height: 40,
@@ -132,9 +132,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   discardText: {
+    ...BUTTON_TEXT,
     color: COLORS.surface,
-    fontSize: 16,
     fontWeight: "500",
-    lineHeight: 24,
   },
 });

@@ -58,6 +58,7 @@ import {
 } from "../../../../utils/resourceBoards";
 import type { ResourceFilter } from "../../../../utils/resourceBoards";
 import { formatCohortName } from "../../../../utils/userLabel";
+import { BUTTON_TEXT } from "../../../../utils/buttonText";
 
 const COLORS = {
   primary: "#2761FF",
@@ -1766,10 +1767,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   accountingButtonText: {
+    ...BUTTON_TEXT,
     color: "#FFFFFF",
-    fontSize: 14,
     fontWeight: "500",
-    lineHeight: 17,
   },
   executiveScroller: {
     flex: 1,

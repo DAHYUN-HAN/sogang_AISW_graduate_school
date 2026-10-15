@@ -27,6 +27,7 @@ import { passwordResetProgressDotIndex, passwordResetResendControl } from "../..
 
 import { BackIcon } from "../../components/icons";
 import { resendCountdownLabel } from "../../utils/signupVerificationUi";
+import { BUTTON_TEXT } from "../../utils/buttonText";
 const COLORS = {
   primary: "#2761FF", // primary/500
   text: "#15171C", // gray/900 (Figma)
@@ -529,7 +530,7 @@ const styles = StyleSheet.create({
   submittingButton: { opacity: 0.55 },
   disabledButton: { backgroundColor: "#D1D5DB" },
   validationDisabledButton: { backgroundColor: COLORS.disabled },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 14, fontWeight: "500", lineHeight: 24 }, // Figma: Inter Medium 14/24
+  primaryButtonText: { ...BUTTON_TEXT, color: "#FFFFFF", fontWeight: "500" }, // Figma: Medium 16 (줄 높이는 버튼 공통 19)
   stepDots: { flexDirection: "row", gap: 6 }, // Figma: 36w = 8x3 + 6x2
   stepDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#E0E3E8" },
   stepDotActive: { backgroundColor: "#2661FF" },

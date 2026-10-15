@@ -41,6 +41,7 @@ import {
 import { BackIcon } from "../../components/icons";
 import PrivacyConsentSheet from "../../components/PrivacyConsentSheet";
 import { useLoadErrorOverlay } from "../../components/NetworkErrorState";
+import { BUTTON_TEXT } from "../../utils/buttonText";
 const COLORS = {
   primary: "#2761FF", // primary/500
   primary50: "#EDF2FE",
@@ -598,7 +599,7 @@ const styles = StyleSheet.create({
   primaryButton: { height: 48, outlineStyle: "none" as never, alignItems: "center", justifyContent: "center", borderRadius: 8, backgroundColor: COLORS.primary }, // Figma: 48h
   disabledButton: { opacity: 0.55 },
   validationDisabledButton: { backgroundColor: "#D1D5DB" },
-  primaryButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "500", lineHeight: 24 }, // Figma button: Inter Medium 16/24
+  primaryButtonText: { ...BUTTON_TEXT, color: "#FFFFFF", fontWeight: "500" }, // Figma: Medium 16 (줄 높이는 버튼 공통 19)
   resendButton: { alignSelf: "center", paddingVertical: 4, paddingHorizontal: 8 },
   resendText: { color: COLORS.primary, fontSize: 13, fontWeight: "400" }, // Figma: Regular 13, primary/500
   resendTextDisabled: { color: COLORS.subtle },
