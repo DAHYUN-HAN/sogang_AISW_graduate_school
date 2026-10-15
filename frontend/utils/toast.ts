@@ -39,6 +39,8 @@ export const TOAST_ERROR_MESSAGES = {
   passwordChange: TOAST_ERROR_FAILED,
   photoUpload: TOAST_ERROR_FAILED,
   pollVote: TOAST_ERROR_FAILED,
+  // 회원가입·비밀번호 찾기에서 인증 메일을 보내지 못했을 때. 입력 문제가 아니라 칸을 빨갛게 하지 않는다.
+  verificationEmail: TOAST_ERROR_FAILED,
 } as const;
 
 /** 성공 · Toast-Success 재사용 */

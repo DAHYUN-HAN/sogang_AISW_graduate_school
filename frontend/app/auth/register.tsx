@@ -7,6 +7,9 @@ import { FIELD_ERROR_COLOR, FieldInput, fieldBorder } from "../../components/Fie
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import SchoolEmailInput from "../../components/SchoolEmailInput";
+import Toast from "../../components/Toast";
+import { useToast } from "../../hooks/useToast";
+import { TOAST_ERROR_MESSAGES } from "../../utils/toast";
 import { CheckboxCheckIcon, ConsentChevronIcon, SheetCheckIcon } from "../../components/icons";
 import { useRegistrationOptionsQuery } from "../../hooks/useApi";
 import { authApi } from "../../services/api";
@@ -82,6 +85,7 @@ function FieldError({ message, style }: { message?: string; style?: StyleProp<Vi
 
 export default function RegisterScreen() {
   const insets = useSafeAreaInsets();
+  const { toast, showToast, hideToast } = useToast();
   const setSession = useUserStore((state) => state.setSession);
   const [step, setStep] = useState(0);
   const [emailId, setEmailId] = useState("");
@@ -152,12 +156,8 @@ export default function RegisterScreen() {
       setVerificationMessage(null);
       const response = await authApi.requestRegisterVerification({ email });
       if (!isEmailDeliveryConfirmed(response.data.email_sent)) {
-        const failure = registrationVerificationFailure(undefined, resend);
-        if (failure.placement === "verification") {
-          setVerificationMessage({ type: "error", text: failure.message });
-        } else {
-          setErrors({ email: failure.message });
-        }
+        // 메일을 보내지 못했다. 입력 문제가 아니라 칸을 빨갛게 하지 않고 오류 토스트만 띄운다.
+        showToast(TOAST_ERROR_MESSAGES.verificationEmail);
         return;
       }
       setCode("");
@@ -186,7 +186,9 @@ export default function RegisterScreen() {
         setResendCooldown(retryAfter);
       }
       const failure = registrationVerificationFailure(errorCode, resend);
-      if (failure.placement === "verification") {
+      if (!failure) {
+        showToast(TOAST_ERROR_MESSAGES.verificationEmail);
+      } else if (failure.placement === "verification") {
         setVerificationMessage({ type: "error", text: failure.message });
       } else {
         setErrors({ email: failure.message });
@@ -552,6 +554,7 @@ export default function RegisterScreen() {
 
       {/* 계정 설정과 같은 동의 시트(Figma PrivacyConsentSheet)를 쓴다. */}
       <PrivacyConsentSheet visible={privacyModalVisible} onClose={() => setPrivacyModalVisible(false)} />
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }

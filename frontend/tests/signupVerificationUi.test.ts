@@ -26,11 +26,9 @@ test("재전송 성공은 응답 수신 시각부터 5분을 다시 계산한다
   assert.equal(resendCountdownLabel(0, { timerOnly: true }), "재전송");
 });
 
-test("응답이 없는 최초 회원가입 인증 요청은 이메일 단계에 오류를 표시한다", () => {
-  assert.deepEqual(registrationVerificationFailure(undefined, false), {
-    placement: "email",
-    message: "인증 메일을 발송하지 못했어요. 잠시 후 다시 시도해주세요.",
-  });
+// 2026-10-15 사용자 결정: 메일을 보내지 못한 실패는 칸 아래 문구 대신 오류 토스트(null).
+test("메일을 보내지 못한 최초 요청은 칸 아래 문구 없이 오류 토스트로 넘긴다", () => {
+  assert.equal(registrationVerificationFailure(undefined, false), null);
 });
 
 test("이미 가입된 이메일은 코드 화면으로 이동하지 않고 가입 오류를 표시한다", () => {
@@ -40,11 +38,8 @@ test("이미 가입된 이메일은 코드 화면으로 이동하지 않고 가�
   });
 });
 
-test("인증코드 재전송 실패는 현재 코드 화면에 오류를 표시한다", () => {
-  assert.deepEqual(registrationVerificationFailure(undefined, true), {
-    placement: "verification",
-    message: "인증 메일을 발송하지 못했어요. 잠시 후 다시 시도해주세요.",
-  });
+test("메일을 보내지 못한 재전송도 오류 토스트로 넘긴다", () => {
+  assert.equal(registrationVerificationFailure(undefined, true), null);
 });
 
 test("재전송 제한과 요청 과다 오류 문구를 유지한다", () => {

@@ -8,10 +8,12 @@ type RegistrationVerificationFailure = {
 };
 
 
+// 사용자가 알아야 할 이유가 있는 실패만 칸 아래 문구로 돌려준다. 메일을 보내지 못한
+// 그 밖의 실패(서버·네트워크)는 null이고, 화면이 오류 토스트를 띄운다.
 export function registrationVerificationFailure(
   errorCode: string | undefined,
   resend: boolean,
-): RegistrationVerificationFailure {
+): RegistrationVerificationFailure | null {
   const message =
     errorCode === "CONFLICT"
       ? "이미 가입된 이메일이에요."
@@ -19,7 +21,8 @@ export function registrationVerificationFailure(
         ? "인증코드는 5분 후 다시 요청할 수 있어요."
         : errorCode === "RATE_LIMITED"
           ? "인증 요청이 너무 많아요. 잠시 후 다시 시도해주세요."
-          : "인증 메일을 발송하지 못했어요. 잠시 후 다시 시도해주세요.";
+          : null;
+  if (message === null) return null;
 
   return {
     placement: resend ? "verification" : "email",

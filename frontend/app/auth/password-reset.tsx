@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text } from "../../components/AppTypography";
 import { FIELD_ERROR_COLOR, FieldInput } from "../../components/FieldBorder";
+import Toast from "../../components/Toast";
+import { useToast } from "../../hooks/useToast";
+import { TOAST_ERROR_MESSAGES } from "../../utils/toast";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import SchoolEmailInput from "../../components/SchoolEmailInput";
@@ -72,6 +75,7 @@ function FieldError({ message }: { message?: string }) {
 
 export default function PasswordResetScreen() {
   const insets = useSafeAreaInsets();
+  const { toast, showToast, hideToast } = useToast();
   const [mode, setMode] = useState<Mode>("request");
   const [emailId, setEmailId] = useState("");
   const [code, setCode] = useState("");
@@ -142,9 +146,8 @@ export default function PasswordResetScreen() {
       setRateLimited(false);
       const response = await authApi.requestPasswordReset({ email });
       if (response.data.email_sent === false) {
-        const message = "인증 메일을 발송하지 못했어요. 잠시 후 다시 시도해주세요.";
-        if (resend) setVerificationMessage({ type: "error", text: message });
-        else setErrors({ email: message });
+        // 메일을 보내지 못했다. 입력 문제가 아니라 칸을 빨갛게 하지 않고 오류 토스트만 띄운다.
+        showToast(TOAST_ERROR_MESSAGES.verificationEmail);
         return;
       }
 
@@ -164,9 +167,15 @@ export default function PasswordResetScreen() {
     } catch (error) {
       const errorCode = apiErrorCode(error);
       const isRateLimited = errorCode === "RATE_LIMITED" || errorCode === "VERIFICATION_RESEND_COOLDOWN";
+      if (!isRateLimited && errorCode !== "ACCOUNT_NOT_FOUND") {
+        // 서버·네트워크 문제로 메일을 보내지 못했다. 칸 아래 문구 대신 오류 토스트.
+        showToast(TOAST_ERROR_MESSAGES.verificationEmail);
+        return;
+      }
       const message = isRateLimited
         ? "인증 시도 횟수를 초과했어요.\n잠시 후 다시 시도해주세요."
-        : "인증코드를 발송하지 못했어요. 이메일을 확인해주세요.";
+        // Figma Screen/Auth/FindPassword-NotFound. 색·크기는 다른 오류 문구와 같은 #D64545 12px.
+        : "가입된 이메일이 아닙니다. 다시 확인해 주세요.";
       if (resend) setVerificationMessage({ type: "error", text: message });
       else {
         setErrors({ email: message });
@@ -460,6 +469,7 @@ export default function PasswordResetScreen() {
           ) : null}
         </ScrollView>
       )}
+      <Toast toast={toast} onHide={hideToast} />
     </View>
   );
 }
