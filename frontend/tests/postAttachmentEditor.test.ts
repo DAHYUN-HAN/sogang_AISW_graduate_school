@@ -39,7 +39,7 @@ function editorHarness(isPrivate = false) {
       };
       if (id === "react-native") return { View: "View", Text: "Text", Pressable: "Pressable", Platform: { OS: "web" }, Keyboard: { dismiss: () => {} }, StyleSheet: { create: (x: unknown) => x } };
       if (id === "@expo/vector-icons") return { Ionicons: "Icon" };
-      if (id === "./icons") return { AttachFileIcon: "AttachFileIcon", CloseIcon: "CloseIcon" };
+      if (id === "./icons") return { AttachFileIcon: "AttachFileIcon", AttachmentDocumentIcon: "AttachmentDocumentIcon", AttachmentRemoveIcon: "AttachmentRemoveIcon", CloseIcon: "CloseIcon" };
       if (id.includes("mediaPicker")) return { pickAndUploadImages: picker, pickAndUploadDocuments: picker };
       if (id.includes("useMediaAccessUrl")) return { resolveMediaAccessUrl: async () => "/signed-file" };
       if (id.includes("mediaOpener")) return { openMediaUrl: async (url: string, options: any) => options.assignWebLocation(url) };
@@ -80,6 +80,7 @@ test("community attachment editor matches the approved single-button attachment 
   const addButton = renderedNodes.find((node) => node.props?.accessibilityLabel === "파일 첨부");
   const removeButton = renderedNodes.find((node) => node.props?.accessibilityLabel === "photo.png 삭제");
   const openDocumentButton = renderedNodes.find((node) => node.props?.accessibilityLabel === "notes.pdf 열기");
+  const removeDocumentButton = renderedNodes.find((node) => node.props?.accessibilityLabel === "notes.pdf 삭제");
 
   assert.equal(texts.filter((value) => value === "파일 첨부").length, 1);
   assert.ok(!texts.includes("이미지 첨부"));
@@ -91,7 +92,15 @@ test("community attachment editor matches the approved single-button attachment 
   assert.equal(addButton.props.style[0].minHeight, 44);
   assert.equal(removeButton.props.style[0].width, 44);
   assert.equal(removeButton.props.style[0].height, 44);
-  assert.equal(openDocumentButton.props.style.minHeight, 44);
+  // 피그마 Write-BoardPreselected '첨부파일미리보기': 문서 행에는 '변경'이 없고 파일 이름과 X만 있다.
+  // 행은 42px로 보이고, 열기·삭제는 보이는 크기는 그대로 둔 채 누르는 범위만 행 높이로 넓힌다.
+  assert.ok(!labels.includes("notes.pdf 변경"));
+  assert.ok(renderedNodes.some((node) => node.type === "AttachmentDocumentIcon"));
+  assert.ok(renderedNodes.some((node) => node.type === "AttachmentRemoveIcon"));
+  assert.equal(openDocumentButton.props.style.paddingVertical, 12);
+  assert.equal(openDocumentButton.props.style.marginVertical, -12);
+  assert.equal(removeDocumentButton.props.style[0].height, 42);
+  assert.equal(removeDocumentButton.props.style[0].margin, -12);
 });
 
 test("removing an existing photo preserves the existing document", async () => {
@@ -107,8 +116,9 @@ test("the single file button appends selected images and documents", async () =>
   assert.deepEqual(Array.from(h.items(), (item) => item.id), [1, 2, 3]);
 });
 
+// 문서 '변경'은 증빙파일(비공개) 편집기에만 남아 있다.
 test("document replacement preserves order and cancellation or failure preserves the old attachment", async () => {
-  const h = editorHarness();
+  const h = editorHarness(true);
   await h.press("notes.pdf 변경");
   assert.deepEqual(Array.from(h.items(), (item) => item.id), [1, 2]);
   h.select([replacementDocument]);

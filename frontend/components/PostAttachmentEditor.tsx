@@ -8,7 +8,7 @@ import type { MediaAsset } from "../types";
 import { openMediaUrl } from "../utils/mediaOpener";
 import { pickAndUploadDocuments } from "../utils/mediaPicker";
 import ImageViewerModal from "./ImageViewerModal";
-import { AttachFileIcon, CloseIcon } from "./icons";
+import { AttachFileIcon, AttachmentDocumentIcon, AttachmentRemoveIcon, CloseIcon } from "./icons";
 import MediaImage from "./MediaImage";
 
 type Props = {
@@ -153,14 +153,11 @@ export default function PostAttachmentEditor({ attachments, onChange, onUploadin
           {fileAttachments.map((item) => (
             <View key={item.id} style={styles.fileRow}>
               <Pressable accessibilityRole="button" accessibilityLabel={`${item.original_filename} 열기`} onPress={() => open(item)} style={styles.fileOpen}>
-                <Ionicons name="document-outline" size={16} color="#2F65F5" />
+                <AttachmentDocumentIcon />
                 <Text numberOfLines={1} style={styles.filename}>{item.original_filename}</Text>
               </Pressable>
-              <Pressable accessibilityRole="button" accessibilityLabel={`${item.original_filename} 변경`} disabled={unavailable} onPress={() => upload(item)} style={[styles.fileChange, unavailable && styles.disabled]}>
-                <Text style={styles.change}>변경</Text>
-              </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel={`${item.original_filename} 삭제`} disabled={unavailable} onPress={() => onChange((current) => current.filter((value) => value.id !== item.id))} style={[styles.fileRemove, unavailable && styles.disabled]}>
-                <CloseIcon size={18} color="#6B7280" />
+                <AttachmentRemoveIcon />
               </Pressable>
             </View>
           ))}
@@ -199,11 +196,14 @@ const styles = StyleSheet.create({
   imageRemove: { position: "absolute", top: 0, right: 0, width: 44, height: 44, alignItems: "flex-end", paddingTop: 4, paddingRight: 4 },
   imageRemoveVisual: { width: 22, height: 22, alignItems: "center", justifyContent: "center", borderRadius: 11, backgroundColor: "rgba(17,24,39,0.68)" },
   fileList: { width: "100%", gap: 8 },
-  fileRow: { minHeight: 44, flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 0.5, borderColor: "#E1E4E9", borderRadius: 8, backgroundColor: "#FFFFFF", paddingLeft: 14, paddingVertical: 0 },
-  fileOpen: { minHeight: 44, flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 8 },
-  filename: { flex: 1, color: "#15171C", fontSize: 13, fontWeight: "400", lineHeight: 16 },
-  fileChange: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
-  fileRemove: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
-  change: { color: "#6B7280", fontSize: 12, fontWeight: "600" },
+  // 피그마 '첨부파일미리보기': 320x42, 테두리 0.5 #E1E4E9, 둥글기 8, 여백 위아래 12·좌우 14, 바탕 없음.
+  // 아이콘·파일 이름·X 사이는 실제 배치 기준 5px. 피그마 테두리는 안쪽에 그려져 크기에 안 들어가므로
+  // 여백에서 테두리 두께 0.5를 빼 바깥 크기를 42로 맞춘다.
+  fileRow: { flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 0.5, borderColor: "#E1E4E9", borderRadius: 8, paddingVertical: 11.5, paddingHorizontal: 13.5 },
+  // 파일 열기도 누르는 범위만 행 높이만큼 넓힌다.
+  fileOpen: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 5, paddingVertical: 12, marginVertical: -12 },
+  filename: { flex: 1, color: "#15171C", fontSize: 13, fontWeight: "400", lineHeight: 18 },
+  // X는 18x18로 보이고, 누르는 범위만 행 높이만큼 넓힌다(배치에는 영향 없음).
+  fileRemove: { width: 42, height: 42, margin: -12, alignItems: "center", justifyContent: "center" },
   disabled: { opacity: 0.45 },
 });

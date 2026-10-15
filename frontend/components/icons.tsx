@@ -681,3 +681,27 @@ export function ChevronRightIcon({ size = 15, color = "#A6ACB7" }: IconProps) {
     </Svg>
   );
 }
+
+// 글쓰기 첨부파일 행의 문서 아이콘 — 피그마 Write-BoardPreselected '첨부파일미리보기' 원본 18x18, 선 1.3.
+export function AttachmentDocumentIcon({ size = 18, color = MUTED }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <Path
+        d="M5 2.5H11L14 5.5V13.5C14 13.8978 13.842 14.2794 13.5607 14.5607C13.2794 14.842 12.8978 15 12.5 15H5C4.6933 14.8921 4.4299 14.6875 4.2495 14.417C4.0692 14.1464 3.9816 13.8246 4 13.5V4C4 3.6022 4.158 3.2206 4.4393 2.9393C4.7206 2.658 5.1022 2.5 5.5 2.5H5Z"
+        stroke={color}
+        strokeWidth={1.3}
+        strokeLinejoin="round"
+      />
+      <Path d="M11 2.5V5.5H14" stroke={color} strokeWidth={1.3} strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+// 글쓰기 첨부파일 행의 삭제 X — 피그마 '첨부파일미리보기' 원본 18x18, 9x9 X, 선 1.7.
+export function AttachmentRemoveIcon({ size = 18, color = MUTED }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 18 18" fill="none">
+      <Path d="M13.5 4.5L4.5 13.5M4.5 4.5L13.5 13.5" stroke={color} strokeWidth={1.7} strokeLinecap="round" />
+    </Svg>
+  );
+}
