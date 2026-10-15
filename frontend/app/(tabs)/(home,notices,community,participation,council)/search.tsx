@@ -20,7 +20,6 @@ const COLORS = {
   subtle: "#8A919C", // Figma Component — Search Bar 돋보기·안내 글자
   divider: "#EEF0F3",
   bg: "#FFFFFF",
-  danger: "#DC2626",
 };
 
 type NoticeFilter = "all" | "academic" | "event" | "other";
@@ -62,7 +61,6 @@ export default function SearchScreen() {
   const [totalPages, setTotalPages] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [error, setError] = useState("");
   const [requestError, setRequestError] = useState<unknown>(null);
   const retryPage = useRef(1);
   // 검색 결과를 받지 못하면(4xx 포함) 앱 전체 LoadError로 덮고, 다시 시도는 같은 검색을 다시 보낸다.
@@ -84,16 +82,15 @@ export default function SearchScreen() {
   }, [handleBack]));
 
   const runSearch = async (nextPage = 1, keyword = query.trim(), noticeFilter = selectedNoticeFilter) => {
-    if (keyword.length < 2) {
+    // 한 글자부터 검색한다(2026-10-16 사용자 결정). 빈 검색어만 보내지 않는다.
+    if (!keyword) {
       setRequestError(null);
-      setError("검색어를 두 글자 이상 입력해주세요.");
       return;
     }
     retryPage.current = nextPage;
     try {
       if (nextPage === 1) setIsLoading(true);
       else setIsLoadingMore(true);
-      setError("");
       setRequestError(null);
       const response = await searchApi.search({
         q: keyword,
@@ -128,7 +125,6 @@ export default function SearchScreen() {
       <TextInput
         onChangeText={(value) => {
           setQuery(value);
-          setError("");
           setRequestError(null);
         }}
         onSubmitEditing={() => void runSearch()}
@@ -166,7 +162,6 @@ export default function SearchScreen() {
         })}
       </View>
 
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {!hasSearched && !isLoading ? <NoticeEmptyState /> : null}
       {isLoading ? (
@@ -215,7 +210,6 @@ const styles = StyleSheet.create({
   noticeFilterActive: { borderColor: "#15171C", backgroundColor: "#15171C" },
   noticeFilterText: { color: COLORS.muted, fontSize: 13, fontWeight: "400" },
   noticeFilterTextActive: { color: "#FFFFFF" },
-  errorText: { color: COLORS.danger, fontSize: 12, fontWeight: "800", paddingHorizontal: 20, paddingBottom: 8 },
   noticeEmptyState: { flex: 1, minHeight: 300, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, paddingBottom: 70 },
   noticeEmptyTitle: { color: "#2C3038", fontSize: 18, fontWeight: "500", lineHeight: 26, marginTop: 8 },
   noticeEmptyDescription: { color: "#8A919C", fontSize: 13, fontWeight: "400", lineHeight: 18, marginTop: 8 },

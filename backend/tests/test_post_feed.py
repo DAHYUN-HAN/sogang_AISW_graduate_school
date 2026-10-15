@@ -760,3 +760,8 @@ def test_search_ignores_spaces_and_line_breaks_and_skips_blank_queries(api) -> N
     blank = api.client.get("/api/search", params={"q": "  "}, headers=api.headers["owner"])
     assert blank.status_code == 200
     assert blank.json()["data"] == []
+
+    # 한 글자 검색도 받는다(2026-10-16).
+    one = api.client.get("/api/search", params={"q": "두", "scope": "resources"}, headers=api.headers["owner"])
+    assert one.status_code == 200
+    assert [item["title"] for item in one.json()["data"]] == ["두 번째"]

@@ -1385,7 +1385,7 @@ Auth: user
 
 Query:
 
-- `q`: required, min length 2
+- `q`: required, min length 1 (one-character searches are allowed; the app no longer shows a two-character hint — 2026-10-16 decision)
 - `scope`: `all`, `board`, `notices`, `community`, `participation`, `council`
 - `board_id`: required when `scope = board`
 - `notice_category`: optional when `scope = notices`; one of `academic`, `event`, `other`

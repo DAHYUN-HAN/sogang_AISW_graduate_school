@@ -22,7 +22,7 @@ router = APIRouter()
 
 @router.get("")
 def search(
-    q: str = Query(..., min_length=2),
+    q: str = Query(..., min_length=1),
     scope: str = Query("all", pattern="^(all|board|notices|community|participation|council|resources)$"),
     board_id: int | None = None,
     notice_category: str | None = Query(None, pattern="^(academic|event|other)$"),
