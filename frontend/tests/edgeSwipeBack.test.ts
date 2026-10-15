@@ -79,8 +79,8 @@ test("화면 안에 열린 것을 닫는 화면들은 안드로이드 뒤로가�
     // 검색: 검색어를 지우고 원래 목록을 보여 주며 검색창을 닫는다(closeSearch).
     ["board/[boardId].tsx", /<EdgeSwipeBack active=\{sortMenuOpen \|\| showSearch\} onBack=\{closeBoardOverlay\} style=\{styles\.screen\}>/],
     ["board/post/[postId].tsx", /<EdgeSwipeBack active=\{hasOpenOverlay\} onBack=\{handlePostBack\} style=\{styles\.screen\}>/],
+    // 글 수정도 글쓰기 화면(create.tsx)의 수정 모드라 같은 처리기를 쓴다.
     ["board/post/create.tsx", /<EdgeSwipeBack active=\{swipeHandledInScreen\} onBack=\{handleCreateBack\} style=\{styles\.screen\}>/],
-    ["board/post/edit/[postId].tsx", /<EdgeSwipeBack active=\{swipeHandledInScreen\} onBack=\{requestClose\} style=\{styles\.screen\}>/],
   ];
   for (const [path, pattern] of cases) assert.match(read(path), pattern, path);
 
@@ -89,7 +89,6 @@ test("화면 안에 열린 것을 닫는 화면들은 안드로이드 뒤로가�
   assert.match(board, /setShowSearch\(false\);\s+setQuery\(""\);\s+setQueryInput\(""\);/);
   assert.match(read("board/post/[postId].tsx"), /const hasOpenOverlay = pendingDeleteCommentId !== null \|\| showDeleteConfirm \|\| Boolean\(reportTarget\) \|\| showPostMenu;/);
   assert.match(read("board/post/create.tsx"), /const swipeHandledInScreen = datePickerOpen \|\| blocksLeaving;/);
-  assert.match(read("board/post/edit/[postId].tsx"), /const swipeHandledInScreen = isBoardMenuOpen \|\| blocksLeaving;/);
 });
 
 test("튕김을 만들던 스와이프 가로채기 훅은 없다", () => {

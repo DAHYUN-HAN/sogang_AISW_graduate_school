@@ -7,9 +7,9 @@ import { activityParticipantsFromMetadata, activitySourcePostIdFromMetadata, wit
 import { operationStatus } from "../utils/participationGuide";
 import { mutualAidEventTypeLabel, mutualAidRelationLabel, normalizeMutualAidEventDate } from "../utils/mutualAid";
 
-import { resourcePostMetadata } from "../utils/resourcePostFields";
+import { withResourcePostMetadata } from "../utils/resourcePostFields";
 
-const edit = ts.createSourceFile("edit.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+// 글 수정은 글쓰기 화면(create.tsx)의 수정 모드(postId 있음)에서 한다.
 const create = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const mediaPickerSource = readFileSync("utils/mediaPicker.ts", "utf8");
 function expression(source: ts.SourceFile, find: (node: ts.Node) => boolean) {
@@ -51,11 +51,13 @@ test("activity edit restores its saved account once and does not overwrite an in
 
 test("resource edit exposes existing mixed attachments and writes the user's removal back to form state", () => {
   let attachments = [{ id: 12, content_type: "image/png" }, { id: 34, content_type: "application/pdf" }];
-  const code = expression(edit, (node) => ts.isConditionalExpression(node) && node.condition.getText(edit) === "isAdminParticipationPost || isAlbum");
+  const code = expression(create, (node) => ts.isConditionalExpression(node) && node.condition.getText(create) === "isStudyRecruit || isSuggestion || isMutualAid");
   const rendered = runInNewContext(code, {
-    isAdminParticipationPost: false, isAlbum: false, isResourceEdit: true, isStudyRecruit: false,
-    board: { board_type: "resource", category: "resources", write_permission: "user" },
-    attachments, PostAttachmentEditor: "AttachmentEditor", updateMutation: { isPending: false },
+    isStudyRecruit: false, isSuggestion: false, isMutualAid: false,
+    compactCreate: true, isAlbum: false, isAdminParticipationPost: false,
+    attachments, PostAttachmentEditor: "AttachmentEditor",
+    createMutation: { isPending: false }, updateMutation: { isPending: false },
+    attachSectionTop: { current: 0 }, attachActionsBottom: { current: 0 },
     setAttachments: (next: typeof attachments) => { attachments = next; }, setIsUploading: () => {},
     showUploadFailure: () => {},
     element: (type: string, props: Record<string, unknown>) => ({ type, props }),
@@ -171,7 +173,10 @@ test("mutual-aid saves explicit replacement with remaining file IDs and clears a
     isAlbum: false, isSuggestion: false, evidenceMode: "file", evidenceLink: "https://example.com/old-proof",
     clean: (value?: string) => value?.trim() || undefined,
     // 상조회는 자료공유 추가 입력이 없는 게시판이라 resourceFields가 null이다.
-    resourceFields: null, resourcePostMetadata,
+    resourceFields: null, withResourcePostMetadata,
+    // 수정 모드: 저장된 글의 metadata 위에 덮어쓴다(옛 링크가 남아 있는 글).
+    existingPost: { board_id: 16, is_anonymous: false, metadata: { proof_url: "https://example.com/old-proof", event_date: "2026.09.01" } },
+    boardId: 16,
   };
   const buildMetadata = runInNewContext(metadataCode, context);
   const payload = runInNewContext(payloadCode, {
@@ -181,6 +186,10 @@ test("mutual-aid saves explicit replacement with remaining file IDs and clears a
   assert.equal(payload.replace_evidence, true);
   assert.deepEqual(Array.from(payload.attachment_ids), [21]);
   assert.equal(payload.metadata.proof_url, "");
+  assert.equal(payload.metadata.event_date, "2026.09.17");
+  // 게시판을 옮기지 않았으면 board_id를 보내지 않고, 저장된 익명 여부를 그대로 둔다.
+  assert.equal(payload.board_id, undefined);
+  assert.equal(payload.is_anonymous, false);
   const linked = runInNewContext(metadataCode, { ...context, evidenceMode: "link", evidenceLink: " https://example.com/new-proof " });
   assert.equal(linked({}).proof_url, "https://example.com/new-proof");
 });

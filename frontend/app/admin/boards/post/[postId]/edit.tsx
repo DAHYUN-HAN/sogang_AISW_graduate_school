@@ -3,7 +3,8 @@ import { Platform } from "react-native";
 import { usePostDetail } from "../../../../../hooks/usePosts";
 import { useAdminWorkspace } from "../../../../../components/admin/AdminWorkspace";
 import AdminPostRouteState from "../../../../../components/admin/AdminPostRouteState";
-import PostEditScreen from "../../../../(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId]";
+// 글 수정은 글쓰기 화면의 수정 모드를 쓴다(주소의 postId로 수정 모드가 된다).
+import PostEditScreen from "../../../../(tabs)/(home,notices,community,participation,council)/board/post/create";
 
 export default function AdminPostEditRoute() {
   const {postId} = useLocalSearchParams<{postId: string}>();

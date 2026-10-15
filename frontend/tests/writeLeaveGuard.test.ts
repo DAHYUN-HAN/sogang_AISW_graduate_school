@@ -8,7 +8,6 @@ import { requestWriteLeave, setWriteLeaveGuard, writeLeaveGuard } from "../store
 
 const layoutSource = readFileSync("app/(tabs)/_layout.tsx", "utf8");
 const createSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8");
-const editSource = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
 
 test("가로채기가 없으면 부르는 쪽이 평소대로 이동한다", () => {
   setWriteLeaveGuard(null);
@@ -73,21 +72,17 @@ test("글쓰기 중이면 탭을 눌러도 확인 전에는 옮기지 않는다"
   assert.deepEqual(h.reset, ["community"]);
 });
 
+// 글 수정도 글쓰기 화면(create.tsx)의 수정 모드라 같은 코드가 작성·수정 모두를 맡는다.
 test("작성·수정 화면이 확인창을 거쳐 누른 탭으로 옮긴다", () => {
-  for (const [name, source] of [["작성", createSource], ["수정", editSource]] as const) {
-    assert.match(source, /setWriteLeaveGuard\(\(proceed\) => \{\s*pendingTabLeave\.current = proceed;\s*setDiscardPromptOpen\(true\);/, name);
-    // 화면을 떠날 때 반드시 풀어야 다른 화면에서 확인창이 샌다.
-    assert.match(source, /return \(\) => setWriteLeaveGuard\(null\);/, name);
-    // 확인 후에는 헤더·스와이프 경로보다 탭 이동을 먼저 본다.
-    assert.match(source, /if \(tabLeave\) tabLeave\(\);\s*else if \(action\)/, name);
-  }
+  assert.match(createSource, /setWriteLeaveGuard\(\(proceed\) => \{\s*pendingTabLeave\.current = proceed;\s*setDiscardPromptOpen\(true\);/);
+  // 화면을 떠날 때 반드시 풀어야 다른 화면에서 확인창이 샌다.
+  assert.match(createSource, /return \(\) => setWriteLeaveGuard\(null\);/);
+  // 확인 후에는 헤더·스와이프 경로보다 탭 이동을 먼저 본다.
+  assert.match(createSource, /if \(tabLeave\) tabLeave\(\);\s*else if \(action\)/);
 });
 
 test("바꿀 내용이 없으면 가로채기를 걸지 않는다", () => {
-  assert.match(createSource, /const blocksLeaving = hasUnsavedChanges && !submitted && !removeConfirmed;/);
   // 저장에 성공하면 폼은 기준선과 다른 채로 남으므로 submitted로 잠금을 먼저 푼다.
-  assert.match(editSource, /const blocksLeaving = hasUnsavedChanges && !submitted && !removeConfirmed;/);
-  for (const source of [createSource, editSource]) {
-    assert.match(source, /if \(!blocksLeaving\) return undefined;/);
-  }
+  assert.match(createSource, /const blocksLeaving = hasUnsavedChanges && !submitted && !removeConfirmed;/);
+  assert.match(createSource, /if \(!blocksLeaving\) return undefined;/);
 });

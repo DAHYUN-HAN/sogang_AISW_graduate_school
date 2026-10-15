@@ -46,7 +46,8 @@ function loadAdminNavigation() {
   const code = ts.transpileModule(readFileSync("utils/adminNavigation.ts", "utf8"), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  runInNewContext(code, { exports });
+  // 수정 주소(글쓰기 화면 + postId)를 읽느라 URLSearchParams를 쓴다.
+  runInNewContext(code, { exports, URLSearchParams });
   return exports;
 }
 
@@ -144,11 +145,11 @@ test("관리자 콘솔 안에서는 탭 이동 대신 관리자 화면 경로로
   const nav = loadTabNavigation("admin");
   nav.navigateToRoute("/(tabs)/community");
   nav.navigateToRoute("/board/post/5");
-  nav.replaceWithRoute("/board/post/edit/5");
+  nav.replaceWithRoute("/board/post/create?postId=5");
   nav.replaceWithRoute("/board/7");
   assert.equal(nav.dispatched.length, 0);
   assert.deepEqual(nav.navigated, ["/admin/boards", "/admin/boards/post/5"]);
-  assert.deepEqual(nav.replaced, ["/admin/boards/post/5/edit", "/admin/boards"]);
+  assert.deepEqual(nav.replaced, ["/admin/boards/post/5/edit?postId=5", "/admin/boards"]);
 });
 
 // <Stack.Screen>으로 화면을 나열하면 expo-router가 그 화면들을 목록 맨 앞에 두어 탭 스택의

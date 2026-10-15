@@ -42,8 +42,10 @@ export function adminDestination<T extends string | { pathname: string; params?:
   const original = typeof href === "string" ? href : href.pathname;
   const [path, ...query] = original.split("?");
   let target = path;
-  if (path === "/board/post/create") target = "/admin/boards/create";
-  else if (/^\/board\/post\/edit\/\d+$/.test(path)) target = `/admin/boards/post/${path.split("/").pop()}/edit`;
+  // 글 수정도 글쓰기 화면(postId 있음)으로 열린다. 관리자 웹에서는 수정 주소로 보낸다(공지는 거기서 공지 편집기로 넘어간다).
+  const editPostId = path === "/board/post/create" ? new URLSearchParams(query.join("?")).get("postId") : null;
+  if (editPostId) target = `/admin/boards/post/${editPostId}/edit`;
+  else if (path === "/board/post/create") target = "/admin/boards/create";
   else if (/^\/board\/post\/\d+$/.test(path)) target = `/admin/boards/post/${path.split("/").pop()}`;
   else if (/^\/board\/\d+$/.test(path) || path === "/board" || path === "/(tabs)/board") target = "/admin/boards";
   else if (/^\/(?:\(tabs\)\/)?(?:home|notices|community|participation|council|notifications|search|settings(?:\/activity)?)(?:\/|$)/.test(path)) target = "/admin/boards";

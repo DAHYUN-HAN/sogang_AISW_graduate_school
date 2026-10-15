@@ -167,7 +167,8 @@ test("토스트 종류마다 아이콘이 다르고 안내는 아이콘·그림�
 
 test("일반 회원 화면에는 바꾼 알림창이 남아 있지 않다", () => {
   const root = "app/(tabs)/(home,notices,community,participation,council)/";
-  const screens = ["board/post/[postId].tsx", "board/post/edit/[postId].tsx", "board/[boardId].tsx", "home.tsx", "settings/notifications.tsx", "settings/profile.tsx", "settings/password.tsx"];
+  // 글 수정은 글쓰기 화면(create.tsx)의 수정 모드다.
+  const screens = ["board/post/[postId].tsx", "board/post/create.tsx", "board/[boardId].tsx", "home.tsx", "settings/notifications.tsx", "settings/profile.tsx", "settings/password.tsx"];
   const replaced = /Alert\.alert\("(신고 실패|좋아요 실패|북마크 실패|삭제 실패|댓글 등록 실패|댓글 수정 실패|파일 열기 실패|저장 실패|회계장부 링크|동문회 주소록|비밀번호 변경 실패|이미지 업로드 실패|저장 완료)"/;
   for (const screen of screens) assert.doesNotMatch(readFileSync(root + screen, "utf8"), replaced, screen);
 });
@@ -192,10 +193,9 @@ test("비밀번호 변경 성공은 다시 로그인 안내 모달을 띄운다"
   assert.match(modal, /confirmButtonPrimary: \{\r?\n\s+flex: 1,\r?\n\s+borderWidth: 0,\r?\n\s+backgroundColor: COLORS\.primary,/);
 });
 
+// 글 수정도 글쓰기 화면(create.tsx)의 수정 모드라 같은 코드가 등록·수정 모두에서 안내한다.
 test("사진첩 20장 안내는 등록·수정 화면 모두 안내 토스트로 띄운다", () => {
-  const edit = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
-  assert.match(createSource, /showToast\(TOAST_INFO_MESSAGES\.albumPhotoLimit, "info"\)/);
-  assert.match(edit, /nextToastState\(current, TOAST_INFO_MESSAGES\.albumPhotoLimit, "info"\)/);
+  assert.match(createSource, /if \(isAlbumImageLimitReached\) \{\s*showToast\(TOAST_INFO_MESSAGES\.albumPhotoLimit, "info"\);/);
 });
 
 test("댓글 삭제 실패는 확인창을 닫고 오류 토스트로 알린다", () => {

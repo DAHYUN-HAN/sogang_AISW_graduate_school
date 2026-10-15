@@ -38,29 +38,24 @@ function getPostCreateFormInstanceKey() {
   return helper as PostCreateFormInstanceKey;
 }
 
-function getActivityPostEditRouteFromDetail() {
-  const helper = Reflect.get(appRoutes, "activityPostEditRouteFromDetail");
-  assert.equal(typeof helper, "function", "활동인증 상세 전용 수정 경로 생성기가 필요합니다");
-  return helper as (boardId: number, postId: number, fromBoardId?: unknown, returnTo?: unknown) => string;
-}
-
-function getPostEditRouteFromDetail() {
-  const helper = Reflect.get(appRoutes, "postEditRouteFromDetail");
-  assert.equal(typeof helper, "function", "일반 상세 전용 수정 경로 생성기가 필요합니다");
-  return helper as (postId: number, fromBoardId?: unknown, returnTo?: unknown) => string;
-}
-
-function getMutualAidPostEditRouteFromDetail() {
-  const helper = Reflect.get(appRoutes, "mutualAidPostEditRouteFromDetail");
-  assert.equal(typeof helper, "function", "상조회 상세 전용 수정 경로 생성기가 필요합니다");
-  return helper as (boardId: number, postId: number, fromBoardId?: unknown, returnTo?: unknown) => string;
+// 모든 게시판의 글 수정은 글쓰기 화면(create.tsx)의 수정 모드로 연다.
+function getPostEditRoute() {
+  const helper = Reflect.get(appRoutes, "postEditRoute");
+  assert.equal(typeof helper, "function", "글쓰기 화면 수정 모드 경로 생성기가 필요합니다");
+  return helper as (
+    boardId: number | null,
+    postId: number,
+    fromBoardId?: unknown,
+    returnTo?: unknown,
+    editOrigin?: string,
+  ) => string;
 }
 
 function getPostEditRouteForPostDetail() {
   const helper = Reflect.get(appRoutes, "postEditRouteForPostDetail");
   assert.equal(typeof helper, "function", "상세 게시글의 회원·관리자 수정 경로 판정기가 필요합니다");
   return helper as (
-    board: { board_type: string; write_permission: string },
+    board: { board_type: string; write_permission: string } | null,
     boardId: number,
     postId: number,
     fromBoardId?: unknown,
@@ -228,13 +223,13 @@ test("같은 게시판에서도 작성·수정·카테고리별 폼 인스턴스
 });
 
 test("스터디와 동아리 활동인증 상세의 수정 경로는 상세 출발 조건을 기록한다", () => {
-  const editRoute = getActivityPostEditRouteFromDetail();
+  const editRoute = getPostEditRoute();
   assert.equal(
-    editRoute(10, 204),
+    editRoute(10, 204, undefined, undefined, "activity-post-detail"),
     "/board/post/create?boardId=10&postId=204&editOrigin=activity-post-detail",
   );
   assert.equal(
-    editRoute(11, 205),
+    editRoute(11, 205, undefined, undefined, "activity-post-detail"),
     "/board/post/create?boardId=11&postId=205&editOrigin=activity-post-detail",
   );
 });
@@ -248,31 +243,32 @@ test("활동인증에서 참여활동 그룹을 바꾸면 각 그룹의 첫 화�
 });
 
 test("활동인증 상세 수정 경로는 원래 목록 복귀 정보를 안전하게 전달한다", () => {
-  const editRoute = getActivityPostEditRouteFromDetail();
+  const editRoute = getPostEditRoute();
 
   assert.equal(
-    editRoute(13, 205, "13", PARTICIPATION_TAB_ROUTE),
+    editRoute(13, 205, "13", PARTICIPATION_TAB_ROUTE, "activity-post-detail"),
     "/board/post/create?boardId=13&postId=205&editOrigin=activity-post-detail&fromBoardId=13&returnTo=%2F(tabs)%2Fparticipation",
   );
   assert.equal(
-    editRoute(13, 205, "13", "https://example.com"),
+    editRoute(13, 205, "13", "https://example.com", "activity-post-detail"),
     "/board/post/create?boardId=13&postId=205&editOrigin=activity-post-detail&fromBoardId=13",
   );
 });
 
 test("자료글과 상조회 상세 수정 경로는 상세 출발 조건과 목록 복귀 정보를 전달한다", () => {
-  const postEditRoute = getPostEditRouteFromDetail();
-  const mutualAidEditRoute = getMutualAidPostEditRouteFromDetail();
+  const editRoute = getPostEditRoute();
 
   assert.equal(
-    postEditRoute(302, "8", COMMUNITY_TAB_ROUTE),
-    "/board/post/edit/302?editOrigin=post-detail&fromBoardId=8&returnTo=%2F(tabs)%2Fcommunity",
+    editRoute(8, 302, "8", COMMUNITY_TAB_ROUTE),
+    "/board/post/create?boardId=8&postId=302&editOrigin=post-detail&fromBoardId=8&returnTo=%2F(tabs)%2Fcommunity",
   );
   assert.equal(
-    mutualAidEditRoute(18, 301, "18", "/(tabs)/council"),
+    editRoute(18, 301, "18", "/(tabs)/council"),
     "/board/post/create?boardId=18&postId=301&editOrigin=post-detail&fromBoardId=18&returnTo=%2F(tabs)%2Fcouncil",
   );
-  assert.equal(postEditRoute(302, "bad", "https://example.com"), "/board/post/edit/302?editOrigin=post-detail");
+  assert.equal(editRoute(8, 302, "bad", "https://example.com"), "/board/post/create?boardId=8&postId=302&editOrigin=post-detail");
+  // 게시판을 모르면(관리자 버튼 등) boardId 없이 연다. 글쓰기 화면이 불러온 글의 게시판을 쓴다.
+  assert.equal(editRoute(null, 302), "/board/post/create?postId=302&editOrigin=post-detail");
 });
 
 test("회원 작성 게시글은 종류에 맞는 수정 화면으로 이동하면서 원래 목록을 보존한다", () => {
@@ -288,24 +284,30 @@ test("회원 작성 게시글은 종류에 맞는 수정 화면으로 이동하�
   );
   assert.equal(
     editRoute({ board_type: "post", write_permission: "user" }, 25, 205, "25", PARTICIPATION_TAB_ROUTE),
-    "/board/post/edit/205?editOrigin=post-detail&fromBoardId=25&returnTo=%2F(tabs)%2Fparticipation",
+    "/board/post/create?boardId=25&postId=205&editOrigin=post-detail&fromBoardId=25&returnTo=%2F(tabs)%2Fparticipation",
   );
   assert.equal(
     editRoute({ board_type: "suggestion", write_permission: "user" }, 17, 302, "17", COUNCIL_TAB_ROUTE),
-    "/board/post/edit/302?editOrigin=post-detail&fromBoardId=17&returnTo=%2F(tabs)%2Fcouncil",
+    "/board/post/create?boardId=17&postId=302&editOrigin=post-detail&fromBoardId=17&returnTo=%2F(tabs)%2Fcouncil",
   );
 });
 
-test("관리자 작성 게시판과 사진첩은 회원 목록 복귀 규칙을 적용하지 않는다", () => {
+// 관리자 작성 게시판과 사진첩도 이제 같은 글쓰기 화면 수정 모드로 열고 원래 목록 정보를 넘긴다.
+test("관리자 작성 게시판과 사진첩도 글쓰기 화면 수정 모드로 연다", () => {
   const editRoute = getPostEditRouteForPostDetail();
 
   assert.equal(
     editRoute({ board_type: "post", write_permission: "admin" }, 22, 401, "22", PARTICIPATION_TAB_ROUTE),
-    "/board/post/edit/401",
+    "/board/post/create?boardId=22&postId=401&editOrigin=post-detail&fromBoardId=22&returnTo=%2F(tabs)%2Fparticipation",
   );
   assert.equal(
     editRoute({ board_type: "album", write_permission: "user" }, 6, 402, "6", COMMUNITY_TAB_ROUTE),
-    "/board/post/edit/402",
+    "/board/post/create?boardId=6&postId=402&editOrigin=post-detail&fromBoardId=6&returnTo=%2F(tabs)%2Fcommunity",
+  );
+  // 게시판 정보를 아직 모르면 boardId를 빼고 연다.
+  assert.equal(
+    editRoute(null, 22, 403, "22"),
+    "/board/post/create?postId=403&editOrigin=post-detail&fromBoardId=22",
   );
 });
 
@@ -389,10 +391,15 @@ test("일반 글쓰기와 일반 수정 화면은 기존 공통 뒤로가기를 
   );
 });
 
-test("직접 진입한 활동인증 수정은 관계없는 탐색 기록으로 돌아가지 않는다", () => {
+// 수정은 늘 글 상세에서 들어오므로 editOrigin과 관계없이 아래 화면이 있으면 pop, 없으면 상세로 교체한다.
+test("직접 진입한 활동인증 수정은 아래 화면이 없으면 상세로 교체한다", () => {
   const completionDecision = getPostEditCompletionDecision();
   assert.deepEqual(
     completionDecision("activity_certification", undefined, true, 204),
+    { action: "back" },
+  );
+  assert.deepEqual(
+    completionDecision("activity_certification", undefined, false, 204),
     { action: "replace", route: "/board/post/204" },
   );
   assert.deepEqual(
@@ -464,10 +471,10 @@ test("수정 완료 복귀 실행기는 기존 상세 복원과 직접 진입 �
   assert.deepEqual(calls, ["replace:/board/post/204"]);
 });
 
-test("직접 진입한 상조회와 자료글 수정은 관계없는 탐색 기록 대신 상세로 교체한다", () => {
+test("직접 진입한 상조회와 자료글 수정은 아래 화면이 없으면 상세로 교체한다", () => {
   const completionDecision = getPostEditCompletionDecision();
   assert.deepEqual(
-    completionDecision("mutual_aid", undefined, true, 301, "18", "/(tabs)/council"),
+    completionDecision("mutual_aid", undefined, false, 301, "18", "/(tabs)/council"),
     { action: "replace", route: "/board/post/301?fromBoardId=18&returnTo=%2F(tabs)%2Fcouncil" },
   );
   assert.deepEqual(

@@ -12,8 +12,19 @@ function screenSource(path: string) {
   return ts.createSourceFile(path, readFileSync(`app/(tabs)/(home,notices,community,participation,council)/${path}.tsx`, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 }
 
+// 글쓰기 화면(create.tsx)은 기본 내보내기가 폼을 감싸기만 하고 실제 처리는 PostCreateForm에 있다.
+// 글 수정도 이 화면의 수정 모드(postId 있음)에서 한다.
+const SCREEN_BODY_FUNCTION: Record<string, string> = { "board/post/create": "PostCreateForm" };
+
+function screenFunction(source: ts.SourceFile) {
+  const name = SCREEN_BODY_FUNCTION[source.fileName];
+  return source.statements.find((n): n is ts.FunctionDeclaration => ts.isFunctionDeclaration(n) && (name
+    ? n.name?.text === name
+    : n.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) === true))!;
+}
+
 function declarations(source: ts.SourceFile, names: string[]) {
-  const screen = source.statements.find((n): n is ts.FunctionDeclaration => ts.isFunctionDeclaration(n) && n.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) === true)!;
+  const screen = screenFunction(source);
   return screen.body!.statements.filter((node) => ts.isVariableStatement(node) && node.declarationList.declarations.some((d) => names.includes(d.name.getText(source)))).map((node) => node.getText(source)).join("\n");
 }
 
@@ -66,6 +77,12 @@ function harness(path: string, options: Record<string, unknown> = {}) {
     setQuery: (value: string) => { state.query = value; },
     setQueryInput: (value: string) => { state.queryInput = value; },
     setIsBoardMenuOpen: (value: boolean) => { state.isBoardMenuOpen = value; },
+    selectionSheet: null as string | null,
+    datePickerOpen: false,
+    setSelectionSheet: (value: string | null) => { (state as Record<string, unknown>).selectionSheet = value; },
+    setDatePickerOpen: (value: boolean) => { (state as Record<string, unknown>).datePickerOpen = value; },
+    boardType: undefined,
+    boardId: 7,
     ...options,
   };
   const focusStatements: string[] = [];
@@ -74,7 +91,7 @@ function harness(path: string, options: Record<string, unknown> = {}) {
     ts.forEachChild(node, visit);
   }
   visit(source);
-  const code = declarations(source, ["closeSearch", "exitBoardDepth", "goBack", "leaveScreen", "requestClose", "handleBack", "handlePostBack"]) + "\n" + focusStatements.join("\n") + '\nheader = typeof handleBack !== "undefined" ? handleBack : typeof requestClose !== "undefined" ? requestClose : typeof goBack !== "undefined" ? goBack : typeof handlePostBack !== "undefined" ? handlePostBack : undefined;';
+  const code = declarations(source, ["closeSearch", "exitBoardDepth", "goBack", "leaveScreen", "requestClose", "handleBack", "handlePostBack", "leaveCreateScreen", "handleCreateBack"]) + "\n" + focusStatements.join("\n") + '\nheader = typeof handleBack !== "undefined" ? handleBack : typeof requestClose !== "undefined" ? requestClose : typeof goBack !== "undefined" ? goBack : typeof handlePostBack !== "undefined" ? handlePostBack : typeof handleCreateBack !== "undefined" ? handleCreateBack : undefined;';
   const js = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText;
   let context: typeof bindings & { header?: () => void };
   function render() {
@@ -100,7 +117,11 @@ for (const [path, options, expected] of [
   ["search", { isNoticeSearch: true, canGoBack: false }, "navigate:/(tabs)/notices"],
   ["board/post/[postId]", { params: { returnTo: "/(tabs)/community" } }, "back"],
   ["board/post/[postId]", { params: { returnTo: "/(tabs)/community" }, canGoBack: false }, "navigate:/(tabs)/community"],
-  ["board/post/edit/[postId]", { params: {} }, "back"],
+  // 글 수정(글쓰기 화면의 수정 모드)은 아래 화면이 있으면 상세로 pop, 없으면 상세로 교체한다.
+  ["board/post/create", { params: { postId: "42", editOrigin: "post-detail" } }, "back"],
+  ["board/post/create", { params: { postId: "42", editOrigin: "post-detail" }, canGoBack: false }, "replace:/board/post/42"],
+  // 관리자 웹처럼 editOrigin 없이 열려도 같다.
+  ["board/post/create", { params: { postId: "42", fromBoardId: "7" }, canGoBack: false }, "replace:/board/post/42?fromBoardId=7"],
 ] as const) {
   test(`${path}${"canGoBack" in options ? " (no history)" : ""}: header and Android Back share the origin even before data loads`, () => {
     const h = harness(path, options);
@@ -153,10 +174,10 @@ test("nested board: search closes before leaving the board", () => {
 });
 
 test("edit board menu closes before navigating to the post", () => {
-  const h = harness("board/post/edit/[postId]", { params: {}, isBoardMenuOpen: true });
+  const h = harness("board/post/create", { params: { postId: "42", editOrigin: "post-detail" }, selectionSheet: "board" });
   const blur = h.focus();
   h.back();
-  assert.equal(h.state.isBoardMenuOpen, false);
+  assert.equal((h.state as Record<string, unknown>).selectionSheet, null);
   assert.deepEqual(h.navigation, []);
   blur(); h.focus(); h.back();
   assert.deepEqual(h.navigation, ["back"]);
@@ -164,28 +185,33 @@ test("edit board menu closes before navigating to the post", () => {
 
 // Render real early-return JSX with lightweight host elements. These states
 // previously returned only a spinner/error, hiding every header control.
-for (const path of ["board/post/[postId]", "board/post/edit/[postId]"]) {
+for (const path of ["board/post/[postId]", "board/post/create"]) {
   for (const isLoading of [true, false]) {
     test(`${path}: ${isLoading ? "loading" : "error"} keeps an actionable header`, () => {
       const source = screenSource(path);
-      const screen = source.statements.find((n): n is ts.FunctionDeclaration => ts.isFunctionDeclaration(n) && n.modifiers?.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword) === true)!;
-      const guards = screen.body!.statements.filter((n) => ts.isIfStatement(n) && /^(isLoading|isError)/.test(n.expression.getText(source)));
+      const screen = screenFunction(source);
+      // 글쓰기 화면은 수정 모드(postId 있음)에서만 글을 불러오며 로딩·오류를 그린다.
+      const guards = screen.body!.statements.filter((n) => ts.isIfStatement(n) && /^(isLoading|isError|postId && \(editPostQuery\.is(?:Loading|Error))/.test(n.expression.getText(source)));
       const code = `(function(){ ${declarations(source, ["navigationHeader"])}\n${guards.map((n) => n.getText(source)).join("\n")} })()`;
       const jsx = ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React } }).outputText;
       let backs = 0;
       const result = runInNewContext(jsx, {
         React: { createElement: (type: unknown, props: unknown, ...children: unknown[]) => ({ type, props, children }) },
-        View: "View", Text: "Text", Pressable: "Pressable", BackButton: "BackButton", LoadingState: "LoadingState", NetworkErrorFallback: "NetworkErrorFallback", BackIcon: "BackIcon", CloseIcon: "CloseIcon",
+        View: "View", Text: "Text", Pressable: "Pressable", BackButton: "BackButton", LoadingState: "LoadingState", NetworkErrorFallback: "NetworkErrorFallback", BackIcon: "BackIcon", CloseIcon: "CloseIcon", PostFormAppBar: "PostFormAppBar",
         styles: {}, COLORS: {}, insets: { top: 0 }, board: undefined, isStudyRecruit: false, isSuggestion: false,
         deletedBoardId: undefined, postDetailTitle: () => "게시글", EmptyCalendarIcon: "EmptyCalendarIcon",
         isLoading, isError: true, error: undefined, post: undefined, event: undefined,
-        handleBack: () => backs++, handlePostBack: () => backs++, goBack: () => backs++, requestClose: () => backs++,
+        handleBack: () => backs++, handlePostBack: () => backs++, goBack: () => backs++, requestClose: () => backs++, handleCreateBack: () => backs++,
+        postId: 42, editPostQuery: { isLoading, isError: true, error: undefined, refetch: () => {} }, isBoardsLoading: false, isBoardsError: false,
+        boardsLoadError: undefined, refetchBoards: () => {}, existingPost: undefined, labels: { screenTitle: "글 수정" },
       });
       const controls: { onPress?: () => void }[] = [];
       function visit(node: any) {
         if (!node || typeof node !== "object") return;
         // BackButton은 라벨을 안쪽 Pressable에 들고 있어 겉에서는 보이지 않는다.
         if (node.type === "BackButton" || ["뒤로", "닫기"].includes(node.props?.accessibilityLabel ?? node.props?.label)) controls.push(node.props);
+        // 글 수정 화면은 글쓰기와 같은 PostFormAppBar(닫기 = onClose)를 쓴다.
+        if (node.type === "PostFormAppBar") controls.push({ onPress: node.props.onClose });
         node.children?.flat(Infinity).forEach(visit);
       }
       visit(result);

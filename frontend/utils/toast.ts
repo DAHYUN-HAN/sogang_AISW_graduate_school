@@ -27,7 +27,7 @@ export const TOAST_MESSAGES = {
 const TOAST_ERROR_FAILED = "오류가 발생했어요. 다시 시도해주세요.";
 
 export const TOAST_ERROR_MESSAGES = {
-  postEditForbidden: TOAST_ERROR_FAILED,
+  postEdit: TOAST_ERROR_FAILED,
   report: TOAST_ERROR_FAILED,
   like: TOAST_ERROR_FAILED,
   bookmark: TOAST_ERROR_FAILED,

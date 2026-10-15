@@ -17,7 +17,6 @@ const noticeListSource = source("app/(tabs)/(home,notices,community,participatio
 const boardSource = source("app/(tabs)/(home,notices,community,participation,council)/board/[boardId].tsx");
 const postDetailSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx");
 const postCreateSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx");
-const postEditSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx");
 const postCompleteSource = source("app/(tabs)/(home,notices,community,participation,council)/board/post/complete.tsx");
 const searchSource = source("app/(tabs)/(home,notices,community,participation,council)/search.tsx");
 const loginSource = source("app/auth/login.tsx");
@@ -136,14 +135,15 @@ test("#64·65 상세 더보기와 북마크는 디자인 아이콘과 하단 시
   assert.doesNotMatch(postDetailSource, /작성자 차단/);
 });
 
-test("#71 게시글 수정 화면은 제목과 내용 입력을 게시판 종류와 관계없이 노출한다", () => {
-  assert.match(postEditSource, /accessibilityLabel="제목"/);
-  assert.match(postEditSource, /accessibilityLabel="내용"/);
-  assert.doesNotMatch(postEditSource, /isStudyRecruit \? <Text style=\{styles\.fieldLabel\}>(?:제목|내용)<\/Text>/);
+// 글 수정은 글쓰기 화면(create.tsx)의 수정 모드라 작성 화면과 같은 입력 칸을 같은 조건으로 그린다.
+test("#71 게시글 수정 화면은 작성 화면과 같은 제목·내용 입력을 노출한다", () => {
+  assert.match(postCreateSource, /\{!isMutualAid \? \(\s*<Controller\s+control=\{control\}\s+name="title"/);
+  assert.match(postCreateSource, /\{!isAlbum && !isMutualAid \? \(\s*<Controller\s+control=\{control\}\s+name="content"/);
+  // 수정 모드만 따로 입력 칸을 숨기는 갈래가 없다.
+  assert.doesNotMatch(postCreateSource, /postId \? null : <Controller/);
 
-  for (const label of ["모집 상태", "스터디장 연락수단"]) {
-    assert.match(postEditSource, new RegExp(`>${label}<`));
-  }
+  assert.match(postCreateSource, />모집 상태</);
+  assert.match(postCreateSource, /label="스터디장 연락수단"/);
 });
 
 test("#73 운영진 화면은 임의 기본 프로필 없이 실제 데이터만 사용한다", () => {

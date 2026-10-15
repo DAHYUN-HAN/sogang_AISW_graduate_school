@@ -47,10 +47,6 @@ type PostEditRouteBoardInfo = {
   write_permission: string;
 };
 
-function isPostDetailEditOrigin(value: unknown) {
-  const candidate = Array.isArray(value) ? value[0] : value;
-  return candidate === ACTIVITY_POST_DETAIL_EDIT_ORIGIN || candidate === POST_DETAIL_EDIT_ORIGIN;
-}
 
 type PostDetailNavigator = {
   canGoBack: () => boolean;
@@ -166,40 +162,17 @@ export function participationGroupDefaultSlug(group: ParticipationGroupKey) {
   return "networking-programs" as const;
 }
 
-export function activityPostEditRouteFromDetail(
-  boardId: number,
+// 모든 게시판의 글 수정은 글쓰기 화면(create.tsx)의 수정 모드에서 한다.
+// boardId를 모르면 빼도 된다(글쓰기 화면이 불러온 글의 게시판을 쓴다).
+export function postEditRoute(
+  boardId: number | null,
   postId: number,
   fromBoardId?: unknown,
   returnTo?: unknown,
+  editOrigin: string = POST_DETAIL_EDIT_ORIGIN,
 ) {
-  const params = [`boardId=${boardId}`, `postId=${postId}`, `editOrigin=${ACTIVITY_POST_DETAIL_EDIT_ORIGIN}`];
-  const sourceBoardId = routeBoardId(fromBoardId);
-  if (sourceBoardId) params.push(`fromBoardId=${sourceBoardId}`);
-  const safeReturnTo = postDetailReturnRoute(returnTo);
-  if (safeReturnTo) params.push(`returnTo=${encodeURIComponent(safeReturnTo)}`);
-  return `/board/post/create?${params.join("&")}` as const;
-}
-
-export function postEditRouteFromDetail(
-  postId: number,
-  fromBoardId?: unknown,
-  returnTo?: unknown,
-) {
-  const params = [`editOrigin=${POST_DETAIL_EDIT_ORIGIN}`];
-  const sourceBoardId = routeBoardId(fromBoardId);
-  if (sourceBoardId) params.push(`fromBoardId=${sourceBoardId}`);
-  const safeReturnTo = postDetailReturnRoute(returnTo);
-  if (safeReturnTo) params.push(`returnTo=${encodeURIComponent(safeReturnTo)}`);
-  return `/board/post/edit/${postId}?${params.join("&")}` as const;
-}
-
-export function mutualAidPostEditRouteFromDetail(
-  boardId: number,
-  postId: number,
-  fromBoardId?: unknown,
-  returnTo?: unknown,
-) {
-  const params = [`boardId=${boardId}`, `postId=${postId}`, `editOrigin=${POST_DETAIL_EDIT_ORIGIN}`];
+  const params = [`postId=${postId}`, `editOrigin=${editOrigin}`];
+  if (boardId !== null && boardId > 0) params.unshift(`boardId=${boardId}`);
   const sourceBoardId = routeBoardId(fromBoardId);
   if (sourceBoardId) params.push(`fromBoardId=${sourceBoardId}`);
   const safeReturnTo = postDetailReturnRoute(returnTo);
@@ -214,27 +187,20 @@ export function postEditRouteForPostDetail(
   fromBoardId?: unknown,
   returnTo?: unknown,
 ) {
-  if (!board) return `/board/post/edit/${postId}` as const;
-  const usesMemberNavigation = board.write_permission !== "admin" && board.board_type !== "album";
-  if (!usesMemberNavigation) return `/board/post/edit/${postId}` as const;
-  if (board.board_type === "activity_certification") {
-    return activityPostEditRouteFromDetail(boardId, postId, fromBoardId, returnTo);
-  }
-  if (board.board_type === "mutual_aid") {
-    return mutualAidPostEditRouteFromDetail(boardId, postId, fromBoardId, returnTo);
-  }
-  return postEditRouteFromDetail(postId, fromBoardId, returnTo);
+  const origin = board?.board_type === "activity_certification" ? ACTIVITY_POST_DETAIL_EDIT_ORIGIN : POST_DETAIL_EDIT_ORIGIN;
+  return postEditRoute(board ? boardId : null, postId, fromBoardId, returnTo, origin);
 }
 
 export function postEditCompletionDecision(
   _boardType: string | undefined,
-  editOrigin: unknown,
+  _editOrigin: unknown,
   canGoBack: boolean,
   postId: number,
   fromBoardId?: unknown,
   returnTo?: unknown,
 ): PostEditCompletionDecision {
-  if (isPostDetailEditOrigin(editOrigin) && canGoBack) {
+  // 수정은 글 상세에서 들어온다. 아래 화면이 있으면 그 상세로 pop 한다.
+  if (canGoBack) {
     return { action: "back" };
   }
   return {
@@ -277,7 +243,8 @@ export function postCreateFormBackDecision(params: {
   fromBoardId?: unknown;
 }): PostCreateBackDecision | PostEditCompletionDecision {
   const postId = routeBoardId(params.postId);
-  if (postId && isPostDetailEditOrigin(params.editOrigin)) {
+  // 수정 화면(postId 있음)은 늘 글 상세로 돌아간다. 관리자 웹처럼 editOrigin 없이 열려도 같다.
+  if (postId) {
     if (params.canGoBack) return { action: "back" };
     return {
       action: "replace",

@@ -127,7 +127,7 @@ My Page/Settings opens from the profile action rather than a sixth bottom tab. D
 | `S_001` | `/board/[boardId]` | Board post list | user |
 | `S_002` | `/board/post/[postId]` | Post detail | user |
 | `S_003` | `/board/post/create?boardId=` | Create post | user/admin |
-| `S_003` | `/board/post/edit/[postId]` | Edit post | owner/admin |
+| `S_003` | `/board/post/create?boardId=&postId=&editOrigin=` | Edit post (same screen as create, edit mode; separate edit route removed 2026-10-15) | owner/admin |
 | `S_011` | `/faq` | FAQ accordion | user |
 | `S_013` | `/settings/profile` | Profile edit | user |
 | `S_014` | `/settings/notifications` | Notification settings | user |

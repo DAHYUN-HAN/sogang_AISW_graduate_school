@@ -6,7 +6,9 @@ import * as navigation from "../utils/adminNavigation";
 
 test("administrator post navigation retains query parameters and stays in the workspace", () => {
   assert.equal(adminDestination("/board/post/12?fromBoardId=3"), "/admin/boards/post/12?fromBoardId=3");
-  assert.equal(adminDestination("/board/post/edit/12"), "/admin/boards/post/12/edit");
+  assert.equal(adminDestination("/board/post/create?boardId=3&postId=12&editOrigin=post-detail"), "/admin/boards/post/12/edit?boardId=3&postId=12&editOrigin=post-detail");
+  assert.equal(adminDestination("/board/post/create?postId=12"), "/admin/boards/post/12/edit?postId=12");
+  assert.equal(adminDestination("/board/post/create?boardId=3"), "/admin/boards/create?boardId=3");
   assert.deepEqual(adminDestination({ pathname: "/board/post/create", params: { boardId: "3", postId: "12" } }), { pathname: "/admin/boards/create", params: { boardId: "3", postId: "12" } });
   assert.equal(adminDestination("/board/3"), "/admin/boards");
   assert.equal(adminDestination("/auth/login"), "/auth/login");

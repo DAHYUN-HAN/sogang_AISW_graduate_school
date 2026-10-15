@@ -60,7 +60,7 @@ import {
   maximumActivityCertificationDate,
   minimumMutualAidEventDate,
 } from "../../../../../utils/dateSelection";
-import { TOAST_INFO_MESSAGES, TOAST_MESSAGES, nextToastState, type ToastState, type ToastVariant } from "../../../../../utils/toast";
+import { TOAST_ERROR_MESSAGES, TOAST_INFO_MESSAGES, TOAST_MESSAGES, nextToastState, type ToastState, type ToastVariant } from "../../../../../utils/toast";
 import { uploadFailureFeedback } from "../../../../../utils/uploadFeedback";
 import { pickAndUploadDocuments, pickAndUploadImages } from "../../../../../utils/mediaPicker";
 import {
@@ -82,8 +82,9 @@ import {
   RESOURCE_RATING_LEVELS,
   resourcePostFieldValues,
   resourcePostFields,
-  resourcePostMetadata,
+  withResourcePostMetadata,
 } from "../../../../../utils/resourcePostFields";
+import { resourcePostEditBoards } from "../../../../../utils/resourceBoards";
 import { adminPostRouter } from "../../../../../utils/adminPostRouter";
 
 const COLORS = {
@@ -117,6 +118,25 @@ const schema = z.object({
 });
 
 type FormValues = z.infer<typeof schema>;
+
+// 빈 폼. 처음 열 때와 게시판을 옮겨 비울 때 같은 값을 쓴다.
+function blankFormValues(): FormValues {
+  return {
+    title: "",
+    category: "",
+    content: "",
+    activityDate: maximumActivityCertificationDate(),
+    participants: "",
+    bankAccount: "",
+    eventDate: "",
+    relation: "",
+    contact: "",
+    professor: "",
+    difficulty: "",
+    satisfaction: "",
+    operationStatus: "active",
+  };
+}
 
 type FormFieldProps = {
   label: string;
@@ -247,7 +267,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const postId = Number.isFinite(parsedPostId) && parsedPostId > 0 ? parsedPostId : null;
   const editPostQuery = usePostDetail(postId ?? 0, postId !== null, true);
   const existingPost = editPostQuery.data?.data;
-  const boardId = existingPost?.board_id ?? selectedBoardId;
+  // 수정할 때도 자료공유 게시판끼리는 옮길 수 있어서, 고른 게시판이 있으면 그쪽을 본다.
+  const boardId = selectedBoardId || existingPost?.board_id || 0;
 
   const { data: boardsRes, isError: isBoardsError, error: boardsLoadError, isLoading: isBoardsLoading, refetch: refetchBoards } = useBoardsQuery();
   const [attachments, setAttachments] = useState<MediaAsset[]>([]);
@@ -318,8 +339,13 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     () => boards.find((item) => item.id === boardId),
     [boardId, boards]
   );
+  // 수정 중 옮기기 전의 원래 게시판. 저장 후 캐시 갱신과 옮길 수 있는 게시판 목록의 기준이다.
+  const originalBoard = useMemo(
+    () => boards.find((item) => item.id === existingPost?.board_id),
+    [boards, existingPost?.board_id]
+  );
   const createMutation = useCreatePost(boardId, board);
-  const updateMutation = useUpdatePost(postId ?? 0, boardId, board);
+  const updateMutation = useUpdatePost(postId ?? 0, existingPost?.board_id ?? boardId, originalBoard ?? board);
   const fallbackBoardType = [10, 11, 12].includes(boardId)
     ? "activity_certification"
     : boardId === 15
@@ -343,15 +369,19 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const bankAccountField = activityBankAccountFieldState(postId);
   const compactCreate = !isActivity && !isMutualAid;
   const requiresAttachment = isActivity || isMutualAid || isAlbum || isAdminParticipationPost;
-  const canPickBoard =
-    !postId && compactCreate && !isAlbum && !isSuggestion && !isStudyRecruit && !isNetworkingProgram && !isAdminParticipationPost;
+  // 수정할 때는 자료공유 게시판끼리만 옮길 수 있다. 그 밖의 게시판은 수정 중에 옮길 수 없다.
+  const editMoveBoards = useMemo(() => resourcePostEditBoards(boards, originalBoard), [boards, originalBoard]);
+  const canPickBoard = postId
+    ? editMoveBoards.length > 0
+    : compactCreate && !isAlbum && !isSuggestion && !isStudyRecruit && !isNetworkingProgram && !isAdminParticipationPost;
   const selectableBoards = useMemo(() => {
+    if (postId) return editMoveBoards;
     const groups = boardsRes?.data ?? [];
     const owning = groups.find((entry) => entry.boards.some((item) => item.id === boardId));
     if (owning) return owning.boards;
     // 게시판을 아직 안 골랐으면 어느 묶음에서 왔는지로 후보를 좁힌다.
     return groups.find((entry) => entry.category === params.boardGroup)?.boards ?? [];
-  }, [boardsRes?.data, boardId, params.boardGroup]);
+  }, [boardsRes?.data, boardId, editMoveBoards, params.boardGroup, postId]);
   const trimmedParticipantQuery = participantQuery.trim();
   const participantSearch = useQuery({
     queryKey: activityParticipantSearchKey(boardId, trimmedParticipantQuery),
@@ -376,19 +406,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const { clearErrors, control, formState, handleSubmit, reset, setError, setValue } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: {
+      ...blankFormValues(),
       title: params.title ?? "",
       category: params.category ?? "",
       content: params.content ?? "",
-      activityDate: maximumActivityCertificationDate(),
-      participants: "",
-      bankAccount: "",
-      eventDate: "",
-      relation: "",
-      contact: "",
-      professor: "",
-      difficulty: "",
-      satisfaction: "",
-      operationStatus: "active",
     },
   });
 
@@ -446,23 +467,19 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     hydratedPostId.current = postId;
   }, [board, existingPost, postId, reset, resourceFields]);
 
+  // 새 글의 기본 상태. 수정할 때는 저장된 값을 덮으면 안 된다(마감된 글이 진행중으로 바뀜).
   useEffect(() => {
+    if (postId) return;
     if (isStudyRecruit && (!params.category || params.category === "모집")) {
       setValue("category", "진행중");
     }
-    if (board?.slug === "club-promo" && !params.category) {
+    if (isAdminParticipationPost && !params.category) {
       setValue("category", "모집중");
     }
     if (isActivity && (params.category === "활동 인증" || params.category === "안내")) {
       setValue("category", "");
     }
-  }, [isStudyRecruit, isActivity, board?.slug, params.category, setValue]);
-
-  useEffect(() => {
-    if (isAdminParticipationPost && !params.category) {
-      setValue("category", "모집중");
-    }
-  }, [isAdminParticipationPost, params.category, setValue]);
+  }, [isStudyRecruit, isActivity, isAdminParticipationPost, params.category, postId, setValue]);
 
   const attachmentIds = attachments.map((attachment) => attachment.id);
   const {
@@ -488,7 +505,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     syncParticipants(selectedParticipants.filter((item) => item.id !== participantId));
   };
   const labels = {
-    screenTitle: postId ? (isMutualAid ? "상조회 신청 수정" : isActivity ? "활동 인증 수정" : isAlbum ? "사진 수정" : "게시글 수정") : isAlbum ? "사진 등록" : isMutualAid ? "상조회 신청" : isActivity ? "활동 인증" : isSuggestion ? "건의사항 작성" : isStudyRecruit ? "스터디 모집" : isNetworkingProgram ? "네트워킹 등록" : isAdminParticipationPost ? "동아리 등록" : "글쓰기",
+    // 수정 화면 제목은 피그마 수정 화면(MutualAidApply-Edit·Verify-Study-Edit·SuggestionEdit·StudyRecruitEdit·Community/Edit)을 따른다.
+    screenTitle: postId ? (isMutualAid ? "상조회 신청 수정" : isActivity ? "활동 인증 수정" : isSuggestion ? "건의사항 수정" : isStudyRecruit ? "스터디 모집" : "글 수정") : isAlbum ? "사진 등록" : isMutualAid ? "상조회 신청" : isActivity ? "활동 인증" : isSuggestion ? "건의사항 작성" : isStudyRecruit ? "스터디 모집" : isNetworkingProgram ? "네트워킹 등록" : isAdminParticipationPost ? "동아리 등록" : "글쓰기",
     title: isAlbum ? "행사명" : isMutualAid ? "신청 제목" : isActivity ? "인증 제목" : isSuggestion ? "건의 제목" : "제목",
     titlePlaceholder: isMutualAid
       ? "신청 내용을 한 줄로 입력하세요"
@@ -549,8 +567,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             body: "경조사 일자와 관계를 입력하고 증빙서류를 첨부하세요.",
           }
         : null;
+  // 피그마 수정 화면은 모두 "완료"다.
   const submitLabel = postId
-    ? (isMutualAid || isActivity ? "수정 완료" : "변경사항 저장")
+    ? "완료"
     : isAlbum
       ? "사진 등록"
     : isSuggestion
@@ -575,7 +594,9 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         activitySourcePostId,
       });
     }
-    const metadata: Record<string, unknown> = {};
+    // 수정할 때는 저장된 정보 위에 덮어쓴다. 서버가 metadata를 통째로 바꿔서, 새로 만들면
+    // 화면에 없는 값(공지 설정 등)이 지워진다. 자료공유 과목정보는 고른 게시판 기준으로 다시 쓴다.
+    const metadata = withResourcePostMetadata(existingPost?.metadata, resourceFields, values);
     if (isMutualAid) {
       if (clean(values.eventDate)) metadata.event_date = clean(values.eventDate) as string;
       if (clean(values.relation)) metadata.relation = clean(values.relation) as string;
@@ -583,18 +604,19 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     }
     if (isStudyRecruit) {
       metadata.recruitment_status = values.category === "마감" ? "closed" : "open";
-      if (clean(values.contact)) metadata.contact = clean(values.contact) as string;
+      const contact = clean(values.contact);
+      if (contact) metadata.contact = contact;
+      else delete metadata.contact;
     }
     if (isAdminParticipationPost) {
-      Object.assign(metadata, existingPost?.metadata);
       metadata.operation_status = values.operationStatus;
     }
-    Object.assign(metadata, resourcePostMetadata(resourceFields, values));
-    return Object.keys(metadata).length > 0 ? metadata : undefined;
+    // 수정은 빈 값도 보내야 저장된 정보가 그대로 남는다(서버는 안 보내면 비운다).
+    return existingPost || Object.keys(metadata).length > 0 ? metadata : undefined;
   };
 
   const handleMutationError = () => {
-    showToast(TOAST_MESSAGES.error);
+    showToast(postId ? TOAST_ERROR_MESSAGES.postEdit : TOAST_MESSAGES.error);
   };
 
   const onSubmit = (values: FormValues) => {
@@ -657,8 +679,11 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
       category: isAlbum ? undefined : clean(values.category),
       metadata: buildMetadata(values),
       attachment_ids: attachmentIds,
+      // 자료공유 게시판을 옮겼을 때만 보낸다.
+      board_id: existingPost && boardId !== existingPost.board_id ? boardId : undefined,
       replace_evidence: Boolean(postId && isMutualAid),
-      is_anonymous: isSuggestion,
+      // 수정은 저장된 익명 여부를 그대로 둔다.
+      is_anonymous: existingPost?.is_anonymous ?? isSuggestion,
     };
     if (postId) {
       updateMutation.mutate(payload, {
@@ -668,7 +693,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             params.editOrigin,
             router.canGoBack(),
             postId,
-            params.fromBoardId,
+            // 게시판을 옮겼으면 상세의 출발 게시판도 옮긴 게시판이다.
+            existingPost && boardId !== existingPost.board_id ? boardId : params.fromBoardId,
             params.returnTo,
           );
           pendingSubmitNavigation.current = () => navigateAfterPostEdit(decision, {
@@ -831,13 +857,16 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     formState.isDirty ||
     attachments.map((attachment) => attachment.id).join(",") !== unsavedBaseline.current.attachmentIds ||
     selectedParticipants.map((participant) => participant.id).join(",") !== unsavedBaseline.current.participantIds ||
-    evidenceLink !== unsavedBaseline.current.evidenceLink;
+    evidenceLink !== unsavedBaseline.current.evidenceLink ||
+    // 수정 중 자료공유 게시판을 옮긴 것도 변경이다.
+    Boolean(existingPost && boardId !== existingPost.board_id);
 
   // 게시판마다 받는 항목이 달라서 쓰던 값을 그대로 옮기면 엉뚱한 칸에 남는다.
   // 디자인(BoardChangeConfirmModal)대로 확인을 받은 뒤 처음 상태로 되돌린다.
   const applyBoardChange = useCallback((nextBoardId: number) => {
     setBoardId(nextBoardId);
-    reset();
+    // 수정 중에도 저장된 글로 되돌리지 않고 비운다(2026-10-15 결정).
+    reset(blankFormValues());
     setAttachments([]);
     setSelectedParticipants([]);
     setParticipantQuery("");
@@ -852,13 +881,13 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const selectBoard = useCallback((nextBoardId: number) => {
     setSelectionSheet(null);
     if (nextBoardId === boardId) return;
-    // 아직 아무것도 안 썼으면 물어볼 것이 없다.
-    if (!hasUnsavedChanges) {
+    // 아직 아무것도 안 썼으면 물어볼 것이 없다. 수정은 저장된 글이 채워져 있어 늘 묻는다.
+    if (!hasUnsavedChanges && !existingPost) {
       applyBoardChange(nextBoardId);
       return;
     }
     setPendingBoardId(nextBoardId);
-  }, [applyBoardChange, boardId, hasUnsavedChanges]);
+  }, [applyBoardChange, boardId, existingPost, hasUnsavedChanges]);
 
   const leaveCreateScreen = useCallback(() => {
     const decision = postCreateFormBackDecision({
@@ -974,23 +1003,27 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   );
 
   if (postId && (editPostQuery.isLoading || isBoardsLoading)) {
-    return <LoadingState message="활동인증 정보를 불러오는 중이에요" />;
+    return <View style={styles.screen}><PostFormAppBar title={labels.screenTitle} onClose={handleCreateBack} /><LoadingState /></View>;
   }
 
   if (postId && (editPostQuery.isError || isBoardsError || !existingPost || !board)) {
+    // 상단 바를 남겨 웹·iOS에서도 닫을 수 있게 한다.
     return (
-      <NetworkErrorFallback error={editPostQuery.error ?? boardsLoadError} onRetry={() => void Promise.all([editPostQuery.refetch(), refetchBoards()])}>
-        <View style={styles.editStateScreen}>
-          <Text style={styles.editStateText}>수정할 활동인증을 불러오지 못했습니다.</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => void Promise.all([editPostQuery.refetch(), refetchBoards()])}
-            style={styles.editRetryButton}
-          >
-            <Text style={styles.editRetryButtonText}>다시 시도</Text>
-          </Pressable>
-        </View>
-      </NetworkErrorFallback>
+      <View style={styles.screen}>
+        <PostFormAppBar title={labels.screenTitle} onClose={handleCreateBack} />
+        <NetworkErrorFallback error={editPostQuery.error ?? boardsLoadError} onRetry={() => void Promise.all([editPostQuery.refetch(), refetchBoards()])}>
+          <View style={styles.editStateScreen}>
+            <Text style={styles.editStateText}>게시글을 불러오지 못했습니다.</Text>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void Promise.all([editPostQuery.refetch(), refetchBoards()])}
+              style={styles.editRetryButton}
+            >
+              <Text style={styles.editRetryButtonText}>다시 시도</Text>
+            </Pressable>
+          </View>
+        </NetworkErrorFallback>
+      </View>
     );
   }
 

@@ -28,12 +28,15 @@ test("활동 인증 저장에 기존 회원 기반 참가자 토스트가 없다
 });
 
 // 2026-10-12 사용자 요청: 피그마 Council/SuggestionEdit와 같게 건의사항 수정 화면을 맞춘다.
-test("건의사항 수정은 익명 안내·한 줄 제목·수정 완료 버튼을 쓴다", () => {
-  const edit = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/edit/[postId].tsx", "utf8");
-  assert.match(edit, /isSuggestion \? "건의사항 수정" : "글 수정"/);
-  assert.match(edit, /해당 건의사항은 익명으로 등록되며, 작성자는 노출되지 않아요/);
-  assert.match(edit, /multiline=\{!isStudyRecruit && !isSuggestion\}/);
-  assert.match(edit, /isSuggestion \? "수정 완료" : "완료"/);
+// 글 수정은 글쓰기 화면(create.tsx)의 수정 모드에서 한다. 피그마 수정 화면 버튼은 모두 "완료"다.
+test("건의사항 수정은 익명 안내·한 줄 제목·완료 버튼을 쓴다", () => {
+  assert.match(create, /isSuggestion \? "건의사항 수정" : isStudyRecruit \? "스터디 모집" : "글 수정"/);
+  assert.match(create, /해당 건의사항은 익명으로 등록되며, 작성자는 노출되지 않아요/);
+  // 2026-10-15: 제목 칸은 모든 게시판에서 작성 화면처럼 한 줄이다.
+  assert.match(create, /<FormTextInput\s*\n\s*onChangeText=\{clearOnChange\("title", field\.onChange\)\}/);
+  const titleInput = create.slice(create.indexOf('onChangeText={clearOnChange("title"'), create.indexOf("</FormField>", create.indexOf('onChangeText={clearOnChange("title"')));
+  assert.doesNotMatch(titleInput, /multiline/);
+  assert.match(create, /const submitLabel = postId\s*\? "완료"/);
 });
 
 // 2026-10-12 사용자 요청: 피그마 MyPage/ProfilePhotoSelect처럼 마지막 항목 아래 구분선이 없다.

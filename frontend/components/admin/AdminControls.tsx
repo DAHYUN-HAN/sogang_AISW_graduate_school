@@ -17,6 +17,7 @@ import { toAbsoluteMediaUrl } from "../../utils/mediaAccess";
 import { formatCohortName } from "../../utils/userLabel";
 
 import { adminPostRouter } from "../../utils/adminPostRouter";
+import { postEditRoute } from "../../utils/appRoutes";
 import { BOARD_WEB_COLORS, BOARD_WEB_STYLES, useAdminBoardWebTheme } from "./AdminBoardTheme";
 const router = adminPostRouter(expoRouter, Platform.OS === "web");
 
@@ -1307,7 +1308,7 @@ export function AdminPostCard({
       ) : null}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
         <ActionButton icon="open-outline" label="열기" onPress={() => router.push(`/board/post/${item.id}` as never)} tone="outline" />
-        <ActionButton icon="create-outline" label="수정" onPress={() => router.push(`/board/post/edit/${item.id}` as never)} tone="outline" />
+        <ActionButton icon="create-outline" label="수정" onPress={() => router.push(postEditRoute(null, item.id) as never)} tone="outline" />
         {canManageRepresentativeImage ? (
           <ActionButton
             icon="image-outline"
