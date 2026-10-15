@@ -22,19 +22,23 @@ export const TOAST_MESSAGES = {
 
 // 피그마 Spec/앱 알림 → 토스트 전환. 휴대폰 기본 알림창을 쓰던 곳을 토스트로 바꿨다.
 /** 실패 · Toast-Error 재사용 */
+// 2026-10-15 사용자 결정: 어떤 동작이 실패했는지 따로 알리지 않고 모두 피그마
+// Component/Toast-Error 문구 하나로 보인다. 화면 코드는 키로 부르므로 키는 그대로 둔다.
+const TOAST_ERROR_FAILED = "오류가 발생했어요. 다시 시도해주세요.";
+
 export const TOAST_ERROR_MESSAGES = {
-  postEditForbidden: "작성자·관리자만 수정할 수 있어요.",
-  report: "신고를 전송하지 못했어요. 잠시 후 다시 시도해주세요.",
-  like: "좋아요를 반영하지 못했어요. 잠시 후 다시 시도해주세요.",
-  bookmark: "스크랩하지 못했어요. 잠시 후 다시 시도해주세요.",
-  postDelete: "글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.",
-  commentCreate: "댓글을 등록하지 못했어요. 잠시 후 다시 시도해주세요.",
-  commentEdit: "댓글을 수정하지 못했어요. 잠시 후 다시 시도해주세요.",
-  commentDelete: "댓글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.",
-  notificationSettings: "설정을 저장하지 못했어요. 잠시 후 다시 시도해주세요.",
-  passwordChange: "비밀번호를 변경하지 못했어요. 잠시 후 다시 시도해주세요.",
-  photoUpload: "사진을 업로드하지 못했어요. 잠시 후 다시 시도해주세요.",
-  pollVote: "투표를 저장하지 못했어요. 잠시 후 다시 시도해주세요.",
+  postEditForbidden: TOAST_ERROR_FAILED,
+  report: TOAST_ERROR_FAILED,
+  like: TOAST_ERROR_FAILED,
+  bookmark: TOAST_ERROR_FAILED,
+  postDelete: TOAST_ERROR_FAILED,
+  commentCreate: TOAST_ERROR_FAILED,
+  commentEdit: TOAST_ERROR_FAILED,
+  commentDelete: TOAST_ERROR_FAILED,
+  notificationSettings: TOAST_ERROR_FAILED,
+  passwordChange: TOAST_ERROR_FAILED,
+  photoUpload: TOAST_ERROR_FAILED,
+  pollVote: TOAST_ERROR_FAILED,
 } as const;
 
 /** 성공 · Toast-Success 재사용 */

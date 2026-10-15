@@ -146,8 +146,10 @@ test("오류 테두리는 1px #D64545 이고 포커스보다 우선한다", () =
 
 // 2026-10-12 피그마 Spec/앱 알림 → 토스트 전환: 휴대폰 기본 알림창 대신 토스트를 쓴다.
 test("앱 알림창을 바꾼 토스트는 피그마 스펙 문구를 쓴다", () => {
-  assert.equal(TOAST_ERROR_MESSAGES.postEditForbidden, "작성자·관리자만 수정할 수 있어요.");
-  assert.equal(TOAST_ERROR_MESSAGES.like, "좋아요를 반영하지 못했어요. 잠시 후 다시 시도해주세요.");
+  // 2026-10-15 사용자 결정: 실패 토스트는 모두 피그마 Component/Toast-Error 문구 하나로 보인다.
+  for (const message of Object.values(TOAST_ERROR_MESSAGES)) {
+    assert.equal(message, "오류가 발생했어요. 다시 시도해주세요.");
+  }
   assert.equal(TOAST_SUCCESS_MESSAGES.reportSubmitted, "신고가 접수됐어요.");
   assert.equal(TOAST_SUCCESS_MESSAGES.profileSaved, "프로필을 저장했어요.");
   assert.equal(TOAST_INFO_MESSAGES.alreadyReported, "이미 신고한 글이에요.");
@@ -197,7 +199,7 @@ test("사진첩 20장 안내는 등록·수정 화면 모두 안내 토스트로
 
 test("댓글 삭제 실패는 확인창을 닫고 오류 토스트로 알린다", () => {
   const detail = readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/[postId].tsx", "utf8");
-  assert.equal(TOAST_ERROR_MESSAGES.commentDelete, "댓글을 삭제하지 못했어요. 잠시 후 다시 시도해주세요.");
+  assert.equal(TOAST_ERROR_MESSAGES.commentDelete, "오류가 발생했어요. 다시 시도해주세요.");
   assert.match(detail, /setPendingDeleteCommentId\(null\);\r?\n\s+showToast\(TOAST_ERROR_MESSAGES\.commentDelete\);/);
   assert.doesNotMatch(detail, /commentDeleteError/);
 });
