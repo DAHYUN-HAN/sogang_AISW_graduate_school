@@ -318,10 +318,22 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const bankGroupBottom = useRef(0);
   const attachSectionTop = useRef(0);
   const attachActionsBottom = useRef(0);
-  const revealTarget = useRef<"end" | "bank" | "attach" | null>(null);
+  // 참가자 검색 칸의 위치(스크롤 안쪽 기준)와 스크롤 내용 전체 높이.
+  const participantGroupTop = useRef(0);
+  const participantInputTop = useRef(0);
+  const formContentHeight = useRef(0);
+  const revealTarget = useRef<"end" | "bank" | "attach" | "participants" | null>(null);
   const revealFocusedBlock = () => {
     const target = revealTarget.current;
     if (!target) return;
+    if (target === "participants" && formScrollHeight.current > 0 && formContentHeight.current > 0) {
+      // 평소에는 완료 버튼까지 내린다. 참가자가 많아 칩이 길어지면 끝까지 내릴 때 검색 칸이
+      // 화면 위로 사라지므로, 검색 칸이 보이는 영역 맨 위(여백 16)에 오는 데서 멈춘다.
+      const endY = formContentHeight.current - formScrollHeight.current;
+      const inputY = participantGroupTop.current + participantInputTop.current - 16;
+      formScrollRef.current?.scrollTo({ y: Math.max(0, Math.min(endY, inputY)), animated: true });
+      return;
+    }
     const bottom = target === "bank"
       ? bankGroupBottom.current
       : target === "attach"
@@ -1056,6 +1068,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
           formScrollHeight.current = event.nativeEvent.layout.height;
           revealFocusedBlock();
         }}
+        onContentSizeChange={(_width, height) => { formContentHeight.current = height; }}
       >
         {isActivity ? (
           <>
@@ -1187,7 +1200,10 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               </View>
             </View>
 
-            <View style={[styles.activityFieldGroup, styles.activityParticipantGroup]}>
+            <View
+              style={[styles.activityFieldGroup, styles.activityParticipantGroup]}
+              onLayout={(event) => { participantGroupTop.current = event.nativeEvent.layout.y; }}
+            >
               <Text style={styles.activityFieldTitle}>참가자</Text>
               <Controller
                 control={control}
@@ -1195,12 +1211,15 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 render={({ fieldState }) => {
                   return (
                     <>
-                      <View style={[styles.activityInputWithIcon, participantSearchFocused ? styles.activityInputWithIconFocused : null, fieldState.error ? styles.inputError : null]}>
+                      <View
+                        style={[styles.activityInputWithIcon, participantSearchFocused ? styles.activityInputWithIconFocused : null, fieldState.error ? styles.inputError : null]}
+                        onLayout={(event) => { participantInputTop.current = event.nativeEvent.layout.y; }}
+                      >
                         <SearchIcon size={16} color="#A6ACB7" />
                         <TextInput
                           onBlur={() => { setParticipantSearchFocused(false); revealTarget.current = null; }}
                           onChangeText={setParticipantQuery}
-                          onFocus={() => { setParticipantSearchFocused(true); revealTarget.current = "end"; revealFocusedBlock(); }}
+                          onFocus={() => { setParticipantSearchFocused(true); revealTarget.current = "participants"; revealFocusedBlock(); }}
                           placeholder="이름으로 검색"
                           placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                           style={[styles.activityInlineInput, { outlineStyle: "none" } as never]}
