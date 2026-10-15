@@ -12,6 +12,11 @@ const source = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/(home,
 const form = source.statements.find((node): node is ts.FunctionDeclaration => ts.isFunctionDeclaration(node) && node.name?.text === "PostCreateForm")!;
 let headerBack: ts.Expression | undefined;
 function findHeader(node: ts.Node) {
+  // 상단 바는 공용 PostFormAppBar다. 닫기 버튼은 onClose로 넘긴다.
+  if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(source) === "PostFormAppBar") {
+    const onClose = node.attributes.properties.filter(ts.isJsxAttribute).find((attr) => attr.name.getText(source) === "onClose")?.initializer;
+    if (onClose && ts.isJsxExpression(onClose)) headerBack = onClose.expression;
+  }
   if (ts.isJsxOpeningElement(node) && node.tagName.getText(source) === "Pressable") {
     const attributes = node.attributes.properties.filter(ts.isJsxAttribute);
     if (attributes.some((attr) => attr.name.getText(source) === "accessibilityLabel" && attr.initializer?.getText(source) === '"닫기"')) {

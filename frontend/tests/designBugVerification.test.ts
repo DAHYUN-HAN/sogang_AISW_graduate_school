@@ -80,7 +80,8 @@ test("#29·31 상조회 입력 안내는 일반 굵기이고 상세 비고는 �
   assert.ok(evidenceIndex >= 0, "상조회 상세의 증빙서류 부제를 찾을 수 없습니다.");
   assert.ok(noteIndex < evidenceIndex, "비고는 증빙서류보다 먼저 표시되어야 합니다.");
   assert.match(postDetailSource, /!isMutualAidRequest && post\.content\.trim\(\)/);
-  assert.match(postCreateSource, /placeholderTextColor="#A6ACB7"/);
+  assert.match(postCreateSource, /placeholderTextColor=\{FIELD_PLACEHOLDER_COLOR\}/);
+  assert.match(readFileSync("components/FieldBorder.tsx", "utf8"), /FIELD_PLACEHOLDER_COLOR = "#A6ACB7"/);
   assert.match(postCreateSource, /input:[\s\S]*fontWeight: "400"/);
 });
 

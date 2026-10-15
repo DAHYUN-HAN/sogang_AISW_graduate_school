@@ -6,7 +6,8 @@ import ts from "typescript";
 
 // Render the actual form field to check its layout/prop contract. Native gesture
 // ownership and caret visibility are verified separately in the Android APK.
-const source = ts.createSourceFile("create.tsx", readFileSync("app/(tabs)/(home,notices,community,participation,council)/board/post/create.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+// 글쓰기 화면(create.tsx)이 작성·수정 모드 모두에서 쓰는 입력 칸이다.
+const source = ts.createSourceFile("FormTextInput.tsx", readFileSync("components/FormTextInput.tsx", "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 const declarations = source.statements.filter((node) =>
   (ts.isFunctionDeclaration(node) && node.name?.text === "FormTextInput") ||
   (ts.isVariableStatement(node) && node.declarationList.declarations.some((declaration) => ["COLORS", "styles"].includes(declaration.name.getText(source)))),

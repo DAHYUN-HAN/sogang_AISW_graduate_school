@@ -3,15 +3,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery } from "@tanstack/react-query";
 import { CommonActions, useIsFocused, useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { router as expoRouter, usePathname, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, type TextStyle } from "react-native";
+import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../../components/AppTypography";
 import { NetworkErrorFallback } from "../../../../../components/NetworkErrorState";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { z } from "zod";
 
-import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, BackIcon, CalendarSmallIcon, CameraAddIcon, ClearSearchIcon, CloseIcon, NoticeAlertIcon, ParticipantAddIcon, SearchIcon } from "../../../../../components/icons";
+import { AttachFileIcon, AttachImageIcon, AttachLinkIcon, CalendarSmallIcon, CameraAddIcon, ClearSearchIcon, CloseIcon, NoticeAlertIcon, ParticipantAddIcon, SearchIcon } from "../../../../../components/icons";
 import { useBoardsQuery } from "../../../../../hooks/useApi";
 import { useCreatePost, usePostDetail, useUpdatePost } from "../../../../../hooks/usePosts";
 import CalendarMonth from "../../../../../components/CalendarMonth";
@@ -22,7 +21,9 @@ import { operationStatus } from "../../../../../utils/participationGuide";
 import LoadingState from "../../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../../components/PostAttachmentEditor";
 import SelectionSheet, { type SelectionOption } from "../../../../../components/SelectionSheet";
-import { FIELD_BORDER } from "../../../../../components/FieldBorder";
+import { FIELD_BORDER, FIELD_PLACEHOLDER_COLOR } from "../../../../../components/FieldBorder";
+import PostFormAppBar from "../../../../../components/PostFormAppBar";
+import FormTextInput from "../../../../../components/FormTextInput";
 import NoticeModal, { type NoticeModalContent } from "../../../../../components/NoticeModal";
 import Toast from "../../../../../components/Toast";
 import { MediaImageBackground } from "../../../../../components/MediaImage";
@@ -152,69 +153,6 @@ function FormField({ label, required, requiredStar, optional, helper, error, chi
   );
 }
 
-// Figma: 기본 0.5px #E1E4E9, 입력 중(포커스)과 오류는 1px 테두리
-function FormTextInput({ style, hasError, onBlur, onFocus, ...props }: ComponentProps<typeof TextInput> & { hasError?: boolean }) {
-  const [focused, setFocused] = useState(false);
-  // 오류 테두리가 포커스 테두리를 이긴다. 값을 채우기 전까지는 눌러도 빨간색을
-  // 유지해야 인증 화면과 감각이 같다.
-  const inputStyle: TextStyle = StyleSheet.flatten([
-    style,
-    focused ? styles.inputFocused : null,
-    hasError ? styles.inputError : null,
-  ]);
-  const scrollableBody = props.multiline && Platform.OS === "android";
-  const iosBody = props.multiline && Platform.OS === "ios";
-  const maximumBodyHeight = 240;
-  const borderWidth = inputStyle?.borderWidth ?? 0;
-  const input = (
-    <TextInput
-      {...props}
-      // Android uses a nested ScrollView for boundary handoff. iOS keeps its
-      // native scrolling UITextView so text selection and caret reveal stay native.
-      scrollEnabled={scrollableBody ? false : iosBody ? true : props.scrollEnabled}
-      onBlur={(event) => {
-        setFocused(false);
-        onBlur?.(event);
-      }}
-      onFocus={(event) => {
-        setFocused(true);
-        onFocus?.(event);
-      }}
-      style={[
-        inputStyle,
-        scrollableBody ? {
-          borderWidth: 0,
-          borderRadius: 0,
-          minHeight: typeof inputStyle?.minHeight === "number" ? Math.max(0, inputStyle.minHeight - borderWidth * 2) : inputStyle?.minHeight,
-        } : null,
-        iosBody ? { maxHeight: maximumBodyHeight } : null,
-        { outlineStyle: "none" } as never,
-      ]}
-    />
-  );
-  if (!scrollableBody) return input;
-
-  return (
-    <ScrollView
-      nestedScrollEnabled
-      keyboardShouldPersistTaps="handled"
-      bounces={false}
-      style={{
-        flexGrow: 0,
-        width: inputStyle?.width,
-        minHeight: inputStyle?.minHeight,
-        maxHeight: maximumBodyHeight,
-        borderWidth,
-        borderColor: inputStyle?.borderColor,
-        borderRadius: inputStyle?.borderRadius,
-        backgroundColor: inputStyle?.backgroundColor,
-      }}
-    >
-      {input}
-    </ScrollView>
-  );
-}
-
 function clean(value?: string) {
   const trimmed = value?.trim();
   return trimmed || undefined;
@@ -302,7 +240,6 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
   const adminPathname = usePathname();
   const adminWorkspace = adminPathname.startsWith("/admin/");
   const router = useMemo(() => adminPostRouter(expoRouter, adminWorkspace), [adminWorkspace]);
-  const insets = useSafeAreaInsets();
 
   const parsedInitialBoardId = Number(params.boardId);
   const [selectedBoardId, setBoardId] = useState(() =>
@@ -1081,26 +1018,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
 
   return (
     <EdgeSwipeBack active={swipeHandledInScreen} onBack={handleCreateBack} style={styles.screen}>
-      {/* Figma Verify-PhotoPreview: 활동 인증 상단바에는 구분선이 없다 */}
-      {/* Figma 상조회 신청 TopBar: padding 18/16/14, 구분선 없음, 닫기 20×20(stroke 1.8), 제목 18/21, 우측 spacer 20. */}
-      <View style={[styles.appBar, isActivity ? styles.appBarNoDivider : null, isMutualAid ? styles.appBarMutualAid : null, { paddingTop: Math.max(insets.top, 10) + (isMutualAid ? 18 : 0) }]}>
-        <Pressable
-          accessibilityLabel="닫기"
-          hitSlop={isMutualAid ? 11 : undefined}
-          onPress={handleCreateBack}
-          style={isMutualAid ? styles.appBarIconMutualAid : styles.iconButton}
-        >
-          {isMutualAid ? (
-            <CloseIcon size={20} color={COLORS.text} />
-          ) : isActivity ? (
-            <BackIcon size={24} color={COLORS.text} />
-          ) : (
-            <Ionicons name="close" size={24} color={COLORS.text} />
-          )}
-        </Pressable>
-        <Text style={[styles.appBarTitle, isMutualAid ? styles.appBarTitleMutualAid : null]}>{labels.screenTitle}</Text>
-        <View style={isMutualAid ? styles.appBarIconMutualAid : styles.iconButton} />
-      </View>
+      <PostFormAppBar title={labels.screenTitle} onClose={handleCreateBack} variant={isMutualAid ? "mutualAid" : isActivity ? "activity" : "default"} />
 
       <ScrollView
         ref={formScrollRef}
@@ -1170,7 +1088,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                     multiline
                     onChangeText={clearOnChange("content", field.onChange)}
                     placeholder="활동에 대한 소감을 남겨주세요"
-                    placeholderTextColor="#A6ACB7"
+                    placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                     hasError={Boolean(fieldState.error)}
                     style={[styles.input, styles.activityFeedbackInput]}
                     textAlignVertical="top"
@@ -1226,7 +1144,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                     onFocus={() => { revealTarget.current = "bank"; revealFocusedBlock(); }}
                     onChangeText={clearOnChange("bankAccount", field.onChange)}
                     placeholder={bankAccountField.placeholder}
-                    placeholderTextColor="#A6ACB7"
+                    placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                     hasError={Boolean(fieldState.error)}
                     style={styles.input}
                     value={field.value ?? ""}
@@ -1258,7 +1176,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                           onChangeText={setParticipantQuery}
                           onFocus={() => { setParticipantSearchFocused(true); revealTarget.current = "end"; revealFocusedBlock(); }}
                           placeholder="이름으로 검색"
-                          placeholderTextColor="#A6ACB7"
+                          placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                           style={[styles.activityInlineInput, { outlineStyle: "none" } as never]}
                           value={participantQuery}
                         />
@@ -1403,7 +1321,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
               <FormTextInput
                 onChangeText={clearOnChange("title", field.onChange)}
                 placeholder={labels.titlePlaceholder}
-                placeholderTextColor="#A6ACB7"
+                placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                 hasError={Boolean(fieldState.error)}
                 style={styles.input}
                 value={field.value}
@@ -1433,7 +1351,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   onChangeText={clearOnChange("professor", field.onChange)}
                   onFocus={() => setProfessorFocused(true)}
                   placeholder="교수명을 입력하세요"
-                  placeholderTextColor="#A6ACB7"
+                  placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                   style={[styles.suffixInput, { outlineStyle: "none" } as never]}
                   value={field.value}
                 />
@@ -1534,7 +1452,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 <FormTextInput
                   onChangeText={clearOnChange("category", field.onChange)}
                   placeholder={labels.categoryPlaceholder}
-                  placeholderTextColor="#A6ACB7"
+                  placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                   style={styles.input}
                   value={field.value}
                 />
@@ -1562,7 +1480,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 <FormTextInput
                   onChangeText={field.onChange}
                   placeholder="YYYY.MM.DD"
-                  placeholderTextColor="#A6ACB7"
+                  placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                   style={styles.input}
                   value={field.value}
                 />
@@ -1577,7 +1495,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 <FormTextInput
                   onChangeText={field.onChange}
                   placeholder="예: 홍길동, 김서강"
-                  placeholderTextColor="#A6ACB7"
+                  placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                   style={styles.input}
                   value={field.value}
                 />
@@ -1592,7 +1510,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 <FormTextInput
                   onChangeText={field.onChange}
                   placeholder="예: 신한 110-000-000000 홍길동"
-                  placeholderTextColor="#A6ACB7"
+                  placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                   style={styles.input}
                   value={field.value}
                 />
@@ -1746,7 +1664,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                   onFocus={() => { revealTarget.current = "end"; revealFocusedBlock(); }}
                   onChangeText={field.onChange}
                   placeholder="전달하고 싶은 내용이 있다면 적어주세요"
-                  placeholderTextColor="#A6ACB7"
+                  placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                   style={[styles.input, styles.textArea]}
                   textAlignVertical="top"
                   value={field.value ?? ""}
@@ -1769,7 +1687,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 onFocus={() => { revealTarget.current = "attach"; revealFocusedBlock(); }}
                 onChangeText={clearOnChange("content", field.onChange)}
                 placeholder={labels.contentPlaceholder}
-                placeholderTextColor="#A6ACB7"
+                placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                 hasError={Boolean(fieldState.error)}
                 style={[styles.input, styles.textArea, isSuggestion ? styles.suggestionContentInput : isStudyRecruit ? styles.studyContentInput : styles.generalContentInput]}
                 textAlignVertical="top"
@@ -1790,7 +1708,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
                 multiline
                 onChangeText={clearOnChange("contact", field.onChange)}
                 placeholder={"스터디원들과 연락할 수단을 입력해주세요.\n(이메일, 카카오톡 ID, 휴대폰번호 등)"}
-                placeholderTextColor="#A6ACB7"
+                placeholderTextColor={FIELD_PLACEHOLDER_COLOR}
                 style={[styles.input, styles.contactInput]}
                 textAlignVertical="top"
                 value={field.value}
@@ -2145,47 +2063,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 13,
     fontWeight: "400",
-  },
-  appBar: {
-    minHeight: 62,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-    backgroundColor: COLORS.bg,
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-  },
-  appBarNoDivider: {
-    borderBottomWidth: 0,
-  },
-  appBarMutualAid: {
-    minHeight: 0,
-    borderBottomWidth: 0,
-    paddingBottom: 14, // Figma TopBar padding 18/16/14
-  },
-  appBarIconMutualAid: {
-    width: 20,
-    height: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  appBarTitleMutualAid: {
-    lineHeight: 21, // Figma 18/21
-  },
-  iconButton: {
-    width: 42,
-    height: 42,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 21,
-  },
-  appBarTitle: {
-    color: COLORS.text,
-    fontSize: 18,
-    fontWeight: "500",
-    lineHeight: 22, // Figma: 글쓰기 18/22 Medium
   },
   formScroller: {
     flex: 1,

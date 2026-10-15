@@ -7,6 +7,8 @@ import { AppTextInput } from "./AppTypography";
 // 평소 0.5 #E1E4E9 · 선택(입력 중) 1 #21262E · 오류 1 #D64545. 오류가 선택보다 우선한다.
 // 0.5 → 1로 굵어져도 글자 위치는 보정하지 않는다(0.5px 차이라 눈에 띄지 않는다).
 export const FIELD_ERROR_COLOR = "#D64545";
+// 입력 칸 안내 문구(placeholder) 색. 피그마 글쓰기 화면 #A6ACB7.
+export const FIELD_PLACEHOLDER_COLOR = "#A6ACB7";
 
 export const FIELD_BORDER = StyleSheet.create({
   normal: { borderWidth: 0.5, borderColor: "#E1E4E9" },
