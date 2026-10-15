@@ -33,7 +33,7 @@ export type PostFilters = {
   q?: string;
   category?: string;
   status?: string;
-  sort?: "latest" | "popular" | "views";
+  sort?: "latest" | "popular" | "views" | "recruiting";
 };
 
 export type PostFeedScope = "notices" | "resources" | "council_activity";

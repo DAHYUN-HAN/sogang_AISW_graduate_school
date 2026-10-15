@@ -687,3 +687,46 @@ def test_popular_and_views_use_id_as_final_tie_breaker(api) -> None:
         assert single_board.status_code == 200
         assert [item["id"] for item in feed.json()["data"]] == expected
         assert [item["id"] for item in single_board.json()["data"]] == expected
+
+
+def test_board_recruiting_sort_puts_open_posts_first_across_pages(api) -> None:
+    with api.session() as db:
+        board = _board(name="Club Promo Sort", slug="club-promo-sort", category="participation", board_type="guide")
+        db.add(board)
+        db.flush()
+        base = datetime(2026, 8, 1, 9, 0)
+        specs = [
+            ("open-old", "모집중", False),
+            ("closed-new", "마감", False),
+            ("legacy-empty", None, False),
+            ("always", "상시", False),
+            ("open-new", " 모집중 ", False),
+            ("pinned-closed", "마감", True),
+        ]
+        posts = {
+            title: Post(
+                board_id=board.id,
+                author_id=1,
+                title=title,
+                content=title,
+                category=category,
+                is_pinned=pinned,
+                created_at=base + timedelta(minutes=index),
+            )
+            for index, (title, category, pinned) in enumerate(specs)
+        }
+        db.add_all(posts.values())
+        db.commit()
+        board_id = board.id
+
+    titles = []
+    for page in (1, 2, 3):
+        response = api.client.get(
+            f"/api/boards/{board_id}/posts",
+            params={"page": page, "size": 2, "sort": "recruiting"},
+            headers=api.headers["owner"],
+        )
+        assert response.status_code == 200
+        titles += [item["title"] for item in response.json()["data"]]
+
+    assert titles == ["pinned-closed", "open-new", "legacy-empty", "open-old", "always", "closed-new"]

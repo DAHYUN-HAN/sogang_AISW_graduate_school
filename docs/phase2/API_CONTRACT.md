@@ -1002,7 +1002,7 @@ Query:
 - `category`: optional type-specific category
 - `status`: optional, used by suggestions
 - `from_date`, `to_date`: optional date filter
-- `sort`: `latest`, `popular`, `views`
+- `sort`: `latest`, `popular`, `views`, `recruiting`. `recruiting` keeps pinned posts first, then posts whose trimmed category is `모집중` or empty, then all others (`상시`, `마감`, ...); each group is newest first with descending ID tie-break. The app uses it for the club-promo list.
 
 Response item:
 

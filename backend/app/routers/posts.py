@@ -492,6 +492,15 @@ def _post_list_order(sort: str, *, pin_priority: bool = True):
             Post.created_at.desc(),
             Post.id.desc(),
         )
+    if sort == "recruiting":
+        # 모집중(상태가 비어 있는 옛 글 포함)을 먼저, 상시·마감 등 나머지를 뒤에 둔다.
+        recruitment_category = func.coalesce(func.trim(Post.category), "")
+        return (
+            *pin_order,
+            case((recruitment_category.in_(("모집중", "")), 0), else_=1),
+            Post.created_at.desc(),
+            Post.id.desc(),
+        )
     return (*pin_order, Post.created_at.desc(), Post.id.desc())
 
 
@@ -792,7 +801,7 @@ def get_posts(
     category: str | None = None,
     status: str | None = None,
     operation_status: str | None = Query(None, pattern="^(active|ended)$"),
-    sort: str = Query("latest", pattern="^(latest|popular|views)$"),
+    sort: str = Query("latest", pattern="^(latest|popular|views|recruiting)$"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

@@ -966,7 +966,8 @@ export default function BoardPostsScreen({ initialBoardId, isTabRoot = initialBo
   const boardPostsQuery = useBoardPosts(boardId, {
     q: query || undefined,
     category: categoryForFilter(selectedFilter, board),
-    sort: isResourceBoard ? resourceSort : "latest",
+    // 동아리 안내는 모집중 글을 먼저 보여 준다.
+    sort: isResourceBoard ? resourceSort : board?.slug === "club-promo" ? "recruiting" : "latest",
   }, queryEnabled.board);
   const resourceAllQuery = useAggregatePosts("resources", {
     q: query || undefined,
