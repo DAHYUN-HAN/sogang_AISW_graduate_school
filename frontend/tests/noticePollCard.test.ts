@@ -68,7 +68,7 @@ function harness(initialPoll: NoticePoll, failures = 0, holdVote = false) {
     if (id.endsWith("/MediaImage")) return {__esModule: true, default: "MediaImage"};
     if (id.endsWith("/PersonListCard")) return {__esModule: true, default: "PersonListCard"};
     if (id.endsWith("/icons")) return {VoterAvatarIcon: "VoterAvatarIcon"};
-    if (id.endsWith("/NetworkErrorState")) return {useLoadErrorOverlay: () => {}};
+    if (id.endsWith("/NetworkErrorState")) return {__esModule: true, default: "NetworkErrorState", LoadErrorState: "LoadErrorState", useLoadErrorOverlay: () => {}};
     return nativeRequire(id);
   };
   new Function("module", "exports", "require", compiled)(module, module.exports, loader);

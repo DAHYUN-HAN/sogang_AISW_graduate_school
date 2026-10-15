@@ -60,6 +60,14 @@ import {
 } from "../utils/apiRuntime";
 import { mediaAccessEndpoint } from "../utils/mediaAccess";
 
+// 요청마다 앱 전체 실패 화면(LoadError·네트워크 오류)을 켜지 않게 할 수 있다.
+// 실패를 자기 자리에서 따로 보여 주는 곳(투표 참여자 시트)이 쓴다.
+declare module "axios" {
+  interface AxiosRequestConfig {
+    skipAppErrorOverlay?: boolean;
+  }
+}
+
 function getApiBaseUrl() {
   const expoConstants = Constants as any;
   const hostUri =
@@ -96,6 +104,7 @@ const publicApi = createAxiosClient({
 
 for (const client of [api, publicApi]) {
   client.interceptors.response.use(response => response, error => {
+    if ((error as { config?: { skipAppErrorOverlay?: boolean } } | null)?.config?.skipAppErrorOverlay) return Promise.reject(error);
     if (isNetworkError(error)) useNetworkStatusStore.getState().markDisconnected();
     else if (isServerLoadError(error)) useNetworkStatusStore.getState().markServerFailed();
     return Promise.reject(error);
@@ -388,7 +397,9 @@ export const pollApi = {
   vote: async (postId: number, revision: number, answers: NoticePoll["my_answers"]) =>
     (await api.put<ApiSuccess<NoticePoll>>(`/posts/${postId}/poll/vote`, {revision, answers})).data,
   participants: async (postId: number, page: number, optionId?: number, questionId?: number, participation: "voted" | "not_voted" = "voted") =>
-    (await api.get<ApiSuccess<NoticePollParticipant[]>>(`/posts/${postId}/poll/participants`, {params: {page, size: 20, option_id: optionId, question_id: questionId, participation}})).data,
+    (await api.get<ApiSuccess<NoticePollParticipant[]>>(`/posts/${postId}/poll/participants`, {params: {page, size: 20, option_id: optionId, question_id: questionId, participation},
+      // 참여자 시트는 실패를 시트 안에서만 보여 준다. 뒤의 공지 화면은 그대로 둔다.
+      skipAppErrorOverlay: true})).data,
   close: async (postId: number, questionId?: number) => (await api.post<ApiSuccess<NoticePoll>>(`/posts/${postId}/poll/close`, null, {params: {question_id: questionId}})).data,
 };
 

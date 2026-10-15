@@ -69,6 +69,9 @@ test("인증 API와 공통 API 모두 연결 오류를 보고하고 HTTP 오류�
     await assert.rejects(handler(new AxiosError("write failed", "ERR_BAD_RESPONSE", { method: "post" } as any, {}, { status: 500 } as any)));
     await assert.rejects(handler(new AxiosError("not found", "ERR_BAD_RESPONSE", { method: "get" } as any, {}, { status: 404 } as any)));
     await assert.rejects(handler(new CanceledError()));
+    // 2026-10-16: 실패를 자기 자리에서 보여 주는 요청(투표 참여자 시트)은 덮개를 켜지 않는다.
+    await assert.rejects(handler(new AxiosError("offline", "ERR_NETWORK", { method: "get", skipAppErrorOverlay: true } as any)));
+    await assert.rejects(handler(new AxiosError("server response", "ERR_BAD_RESPONSE", { method: "get", skipAppErrorOverlay: true } as any, {}, { status: 500 } as any)));
     assert.equal(useNetworkStatusStore.getState().revision, revision + 2);
   }
 });
