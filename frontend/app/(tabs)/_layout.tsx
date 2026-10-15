@@ -30,6 +30,18 @@ const TAB_BAR_STYLE = {
   backgroundColor: "#FFFFFF",
 };
 
+// 피그마: 꺼진 탭은 글자 #6B7280, 아이콘 #9CA3AF로 색이 다르다.
+// tint 색은 글자에 쓰고, 꺼진 아이콘만 따로 칠한다.
+const TAB_COLORS = {
+  active: "#2761FF",
+  inactiveLabel: "#6B7280",
+  inactiveIcon: "#9CA3AF",
+};
+
+function tabIconColor(focused: boolean, color: string) {
+  return focused ? color : TAB_COLORS.inactiveIcon;
+}
+
 function handleTabRootPress(
   tabName: VisibleTabRootName,
   event: { preventDefault: () => void },
@@ -85,8 +97,8 @@ export default function TabsLayout() {
       backBehavior="initialRoute"
       tabBar={(props) => <CategoryHighlightTabBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: "#2761FF",
-        tabBarInactiveTintColor: "#8A919C",
+        tabBarActiveTintColor: TAB_COLORS.active,
+        tabBarInactiveTintColor: TAB_COLORS.inactiveLabel,
         tabBarIconStyle: { marginTop: 0 },
         // Figma: 라벨 11/13 Regular (react-navigation 기본 fontWeight 500 오버라이드)
         tabBarLabelStyle: { fontSize: 11, fontFamily: "Pretendard_400Regular", fontWeight: "normal", lineHeight: 13, marginTop: 3, marginBottom: 0 },
@@ -104,7 +116,7 @@ export default function TabsLayout() {
         })}
         options={{
           title: "홈",
-          tabBarIcon: ({ color }) => <HomeTabIcon color={color} size={22} />,
+          tabBarIcon: ({ color, focused }) => <HomeTabIcon color={tabIconColor(focused, color)} size={22} />,
         }}
       />
       <Tabs.Screen
@@ -114,7 +126,7 @@ export default function TabsLayout() {
         })}
         options={{
           title: "공지사항",
-          tabBarIcon: ({ color }) => <NoticeTabIcon color={color} size={22} />,
+          tabBarIcon: ({ color, focused }) => <NoticeTabIcon color={tabIconColor(focused, color)} size={22} />,
         }}
       />
       <Tabs.Screen
@@ -124,7 +136,7 @@ export default function TabsLayout() {
         })}
         options={{
           title: "커뮤니티",
-          tabBarIcon: ({ color }) => <CommunityTabIcon color={color} size={22} />,
+          tabBarIcon: ({ color, focused }) => <CommunityTabIcon color={tabIconColor(focused, color)} size={22} />,
         }}
       />
       <Tabs.Screen
@@ -134,7 +146,7 @@ export default function TabsLayout() {
         })}
         options={{
           title: "참여활동",
-          tabBarIcon: ({ color }) => <ParticipationTabIcon color={color} size={22} />,
+          tabBarIcon: ({ color, focused }) => <ParticipationTabIcon color={tabIconColor(focused, color)} size={22} />,
         }}
       />
       <Tabs.Screen
@@ -144,7 +156,7 @@ export default function TabsLayout() {
         })}
         options={{
           title: "원우회",
-          tabBarIcon: ({ color }) => <CouncilTabIcon color={color} size={22} />,
+          tabBarIcon: ({ color, focused }) => <CouncilTabIcon color={tabIconColor(focused, color)} size={22} />,
         }}
       />
     </Tabs>

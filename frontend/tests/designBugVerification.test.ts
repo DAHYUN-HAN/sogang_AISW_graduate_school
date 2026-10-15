@@ -43,8 +43,8 @@ test("#2 메인 배너는 설정된 목적지로 직접 이동한다", () => {
 });
 
 test("#66·67·68 홈과 하단 탭은 디자인 기준 아이콘과 정렬을 사용한다", () => {
-  assert.match(tabLayoutSource, /<HomeTabIcon color=\{color\} size=\{22\} \/>/);
-  assert.match(tabLayoutSource, /<NoticeTabIcon color=\{color\} size=\{22\} \/>/);
+  assert.match(tabLayoutSource, /<HomeTabIcon color=\{tabIconColor\(focused, color\)\} size=\{22\} \/>/);
+  assert.match(tabLayoutSource, /<NoticeTabIcon color=\{tabIconColor\(focused, color\)\} size=\{22\} \/>/);
   assert.match(homeSource, /name="chatbubble-outline"/);
   assert.match(homeSource, /name="heart-outline"/);
   assert.match(calendarSource, /dayText:[\s\S]*lineHeight: r\(16\)/);
