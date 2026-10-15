@@ -637,6 +637,16 @@ export function ParticipantAddIcon({ size = 28, color = "#2761FF" }: IconProps) 
 }
 
 // 목록 행 우측 셰브론 — 디자인 원본 15x15 (stroke 1.5, #A6ACB7).
+
+// 선택 시트에서 고른 항목 오른쪽 체크 — 디자인 원본 16x16, 선 1.8, 끝 둥글게.
+export function SheetCheckIcon({ size = 16, color = "#2761FF" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <Path d="M3 8.5L6.2 11.7L13 4.5" stroke={color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 export function ChevronRightIcon({ size = 15, color = "#A6ACB7" }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 15 15" fill="none">

@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../components/AppTypography";
+import { SheetCheckIcon } from "../../components/icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import SchoolEmailInput from "../../components/SchoolEmailInput";
@@ -530,7 +531,7 @@ export default function RegisterScreen() {
             {majorOptions.map((option) => (
               <Pressable key={option.id} onPress={() => { setMajor(option.name); setErrors((current) => ({ ...current, major: undefined })); setMajorModalVisible(false); }} style={styles.modalOption}>
                 <Text style={[styles.modalOptionText, major === option.name ? styles.modalOptionTextSelected : null]}>{option.name}</Text>
-                {major === option.name ? <Ionicons name="checkmark" size={16} color={COLORS.primary} /> : null}
+                {major === option.name ? <SheetCheckIcon color={COLORS.primary} /> : null}
               </Pressable>
             ))}
             {registrationOptionsQuery.isLoading ? <Text style={styles.modalStateText}>전공 목록을 불러오는 중이에요.</Text> : null}

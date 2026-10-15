@@ -1,7 +1,7 @@
-import { Ionicons } from "@expo/vector-icons";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText as Text } from "./AppTypography";
+import { SheetCheckIcon } from "./icons";
 import LoadingState from "./LoadingState";
 
 // 아래에서 올라오는 선택 시트. 글쓰기의 게시판·동아리·경조사 선택과 글 수정의
@@ -56,7 +56,7 @@ export default function SelectionSheet({
               return (
                 <Pressable key={option.key} onPress={() => onSelect(option)} style={[styles.sheetOption, last ? styles.sheetOptionLast : null]}>
                   <Text style={[styles.sheetOptionText, active ? styles.sheetOptionTextActive : null]}>{option.label}</Text>
-                  {active ? <Ionicons name="checkmark" size={16} color={COLORS.primary} /> : null}
+                  {active ? <SheetCheckIcon color={COLORS.primary} /> : null}
                 </Pressable>
               );
             })}

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CommonActions, useIsFocused, useNavigation, usePreventRemove, type NavigationAction } from "@react-navigation/native";
 import { router as expoRouter, usePathname, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, useWatch } from "react-hook-form";
 import { BackHandler, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View, type TextStyle } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../../components/AppTypography";
 import { NetworkErrorFallback } from "../../../../../components/NetworkErrorState";
@@ -890,6 +890,8 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
     { key: "bereavement", label: "상(喪)" },
   ];
   const mutualAidRelationOptions: SelectionOption[] = ["본인", "배우자", "부모", "자녀"].map((label) => ({ key: label, label }));
+  // 시트를 다시 열면 고른 항목을 파란 글자와 체크로 보여 준다(Figma MutualAidApply-TypeSelect·RelationSelect).
+  const [selectedCategory, selectedRelation] = useWatch({ control, name: ["category", "relation"] });
   const imageAttachments = attachments.filter((attachment) => attachment.content_type.startsWith("image/"));
   const nonImageAttachments = attachments.filter((attachment) => !attachment.content_type.startsWith("image/"));
 
@@ -2026,6 +2028,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         title="경조사 종류"
         options={mutualAidTypeOptions}
         emptyText="선택 가능한 경조사 종류가 없습니다."
+        selectedKey={mutualAidTypeOptions.find((option) => option.label === selectedCategory)?.key}
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => {
           setValue("category", option.label, { shouldValidate: true });
@@ -2038,6 +2041,7 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
         title="관계"
         options={mutualAidRelationOptions}
         emptyText="선택 가능한 관계가 없습니다."
+        selectedKey={selectedRelation || undefined}
         onClose={() => setSelectionSheet(null)}
         onSelect={(option) => {
           setValue("relation", option.label, { shouldValidate: true });
