@@ -15,6 +15,7 @@ from app.models.user_block import UserBlock
 from app.post_access import post_read_filter
 from app.response import success_response
 from app.routers.posts import _highlight
+from app.text_search import contains, search_pattern
 
 router = APIRouter()
 
@@ -30,7 +31,9 @@ def search(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    keyword = f"%{q}%"
+    keyword = search_pattern(q)
+    if keyword is None:
+        return success_response([], pagination={"page": page, "size": size, "total": 0, "total_pages": 0})
     filters = [Post.deleted_at.is_(None), post_read_filter(current_user)]
     if scope == "board" and board_id is not None:
         filters.append(Post.board_id == board_id)
@@ -78,22 +81,22 @@ def search(
 
     if current_user.role == "admin":
         filters.append(
-            Post.title.ilike(keyword)
-            | Post.content.ilike(keyword)
-            | User.nickname.ilike(keyword)
-            | Post.author_nickname_snapshot.ilike(keyword)
+            contains(Post.title, keyword)
+            | contains(Post.content, keyword)
+            | contains(User.nickname, keyword)
+            | contains(Post.author_nickname_snapshot, keyword)
         )
     else:
         filters.append(
             or_(
-                Post.title.ilike(keyword),
-                Post.content.ilike(keyword),
+                contains(Post.title, keyword),
+                contains(Post.content, keyword),
                 and_(
                     Post.is_anonymous.is_(False),
                     Board.slug.not_in(ANONYMOUS_BOARD_SLUGS),
                     or_(
-                        User.nickname.ilike(keyword),
-                        Post.author_nickname_snapshot.ilike(keyword),
+                        contains(User.nickname, keyword),
+                        contains(Post.author_nickname_snapshot, keyword),
                     ),
                 ),
             )

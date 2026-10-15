@@ -730,3 +730,33 @@ def test_board_recruiting_sort_puts_open_posts_first_across_pages(api) -> None:
         titles += [item["title"] for item in response.json()["data"]]
 
     assert titles == ["pinned-closed", "open-new", "legacy-empty", "open-old", "always", "closed-new"]
+
+
+def test_search_ignores_spaces_and_line_breaks_and_skips_blank_queries(api) -> None:
+    with api.session() as db:
+        board = _board(name="Spaceless Search", slug="spaceless-search", category="resources", board_type="resource")
+        db.add(board)
+        db.flush()
+        db.add_all(
+            [
+                Post(board_id=board.id, author_id=1, title="서강 대학원 안내", content="본문"),
+                Post(board_id=board.id, author_id=1, title="두 번째", content="서강\n대학원 행사"),
+                Post(board_id=board.id, author_id=1, title="무관한 글", content="다른 내용"),
+            ]
+        )
+        db.commit()
+        board_id = board.id
+
+    def titles(q: str) -> list[str]:
+        response = api.client.get(f"/api/boards/{board_id}/posts", params={"q": q}, headers=api.headers["owner"])
+        assert response.status_code == 200
+        return sorted(item["title"] for item in response.json()["data"])
+
+    assert titles("서강대학원") == ["두 번째", "서강 대학원 안내"]
+    assert titles("서 강 대 학 원") == ["두 번째", "서강 대학원 안내"]
+    assert titles("대학원행사") == ["두 번째"]
+    assert titles("   ") == ["두 번째", "무관한 글", "서강 대학원 안내"]
+
+    blank = api.client.get("/api/search", params={"q": "  "}, headers=api.headers["owner"])
+    assert blank.status_code == 200
+    assert blank.json()["data"] == []

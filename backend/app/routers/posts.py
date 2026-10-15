@@ -22,6 +22,7 @@ from app.models.post_extension import PostMutualAid, PostSuggestion
 from app.models.student_roster import StudentRosterMember
 from app.models.user import User
 from app.models.user_block import UserBlock
+from app.text_search import contains, search_pattern
 from app.notifications import (
     ADMIN_REPLY_MESSAGE,
     MUTUAL_AID_MESSAGES,
@@ -291,14 +292,14 @@ def _club_activity_source_titles(db: Session, board: Board | None, posts: list[P
 
 
 def _activity_certification_search_filter(board: Board, keyword: str):
-    text_match = Post.title.ilike(keyword) | Post.content.ilike(keyword)
+    text_match = contains(Post.title, keyword) | contains(Post.content, keyword)
     # Study cards display a title without an activity badge.
     if board.slug == "study-activity":
         return text_match
 
     category = func.nullif(func.trim(Post.category), "")
     if board.slug != "club-activity":
-        return text_match | func.coalesce(category, "활동 인증").ilike(keyword)
+        return text_match | contains(func.coalesce(category, "활동 인증"), keyword)
 
     # Match the displayed club badge: current source title, category, legacy name.
     # Compare IDs as text so malformed legacy metadata cannot cause a SQL cast error.
@@ -321,7 +322,7 @@ def _activity_certification_search_filter(board: Board, keyword: str):
         case((legacy_name.not_in(generic_labels), legacy_name)),
         "동아리 활동 인증",
     )
-    return text_match | badge.ilike(keyword)
+    return text_match | contains(badge, keyword)
 
 
 def _canonical_activity_metadata(
@@ -566,22 +567,22 @@ def _post_feed_notice_filters(scope: str, notice_category: str | None):
 
 
 def _post_feed_search_filter(q: str | None, current_user: User):
-    if q is None:
+    keyword = search_pattern(q)
+    if keyword is None:
         return None
-    keyword = f"%{q}%"
     author_match = or_(
-        User.nickname.ilike(keyword),
-        Post.author_nickname_snapshot.ilike(keyword),
+        contains(User.nickname, keyword),
+        contains(Post.author_nickname_snapshot, keyword),
     )
     if current_user.role == "admin":
         return or_(
-            Post.title.ilike(keyword),
-            Post.content.ilike(keyword),
+            contains(Post.title, keyword),
+            contains(Post.content, keyword),
             author_match,
         )
     return or_(
-        Post.title.ilike(keyword),
-        Post.content.ilike(keyword),
+        contains(Post.title, keyword),
+        contains(Post.content, keyword),
         and_(
             Post.is_anonymous.is_(False),
             Board.slug.not_in(ANONYMOUS_BOARD_SLUGS),
@@ -813,20 +814,20 @@ def get_posts(
 
     filters = [Post.board_id == board_id, Post.deleted_at.is_(None)]
     filters.append(post_status_read_filter(current_user))
-    if q:
-        keyword = f"%{q}%"
+    keyword = search_pattern(q)
+    if keyword:
         if board.board_type == "activity_certification":
             filters.append(_activity_certification_search_filter(board, keyword))
         elif hides_author_identity(board) and current_user.role != "admin":
-            filters.append(Post.title.ilike(keyword) | Post.content.ilike(keyword))
+            filters.append(contains(Post.title, keyword) | contains(Post.content, keyword))
         else:
             author_match = or_(
-                User.nickname.ilike(keyword),
-                Post.author_nickname_snapshot.ilike(keyword),
+                contains(User.nickname, keyword),
+                contains(Post.author_nickname_snapshot, keyword),
             )
             if current_user.role != "admin":
                 author_match = and_(Post.is_anonymous.is_(False), author_match)
-            filters.append(Post.title.ilike(keyword) | Post.content.ilike(keyword) | author_match)
+            filters.append(contains(Post.title, keyword) | contains(Post.content, keyword) | author_match)
     if category:
         filters.append(Post.category == category)
     if status:
@@ -1289,14 +1290,14 @@ def get_admin_posts(
         filters.append(Post.is_pinned.is_(is_pinned))
     if is_notice is not None:
         filters.append(Post.is_notice.is_(is_notice))
-    if q:
-        keyword = f"%{q}%"
+    keyword = search_pattern(q)
+    if keyword:
         filters.append(
-            Post.title.ilike(keyword)
-            | Post.content.ilike(keyword)
-            | User.nickname.ilike(keyword)
-            | Post.author_nickname_snapshot.ilike(keyword)
-            | Board.name.ilike(keyword)
+            contains(Post.title, keyword)
+            | contains(Post.content, keyword)
+            | contains(User.nickname, keyword)
+            | contains(Post.author_nickname_snapshot, keyword)
+            | contains(Board.name, keyword)
         )
 
     total = (

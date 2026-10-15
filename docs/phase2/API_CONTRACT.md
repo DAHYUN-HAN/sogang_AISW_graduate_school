@@ -998,7 +998,7 @@ Auth: user
 Query:
 
 - `page`, `size`
-- `q`: optional search keyword; activity-certification boards search title, content, and the displayed activity badge for all roles, excluding author names and participant metadata. Club badges use the current linked club-promo title, then a specific stored category or legacy activity name; networking badges use their category. Study cards have no badge and search title/content only. Other board search behavior is unchanged.
+- `q`: optional search keyword. All text searches (board posts, feeds, `/search`, admin posts, user and dues-payer lookups) share `app/text_search.py`: spaces, line breaks, tabs, NBSP, and full-width spaces are ignored on both the keyword and the stored text, and a whitespace-only keyword is treated as no search. Activity-certification boards search title, content, and the displayed activity badge for all roles, excluding author names and participant metadata. Club badges use the current linked club-promo title, then a specific stored category or legacy activity name; networking badges use their category. Study cards have no badge and search title/content only. Other board search behavior is unchanged.
 - `category`: optional type-specific category
 - `status`: optional, used by suggestions
 - `from_date`, `to_date`: optional date filter

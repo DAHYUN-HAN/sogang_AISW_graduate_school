@@ -24,6 +24,7 @@ from app.models.user import User
 from app.response import success_response
 from app.schemas.dues_payer import DuesPaymentWriteRequest
 from app.student_roster_service import import_roster
+from app.text_search import contains, search_pattern
 
 
 router = APIRouter()
@@ -80,14 +81,14 @@ def _payment_payload(
 
 
 def _identity_filters(q: str | None):
-    if not q or not q.strip():
+    keyword = search_pattern(q)
+    if keyword is None:
         return []
-    keyword = f"%{q.strip()}%"
     return [
         or_(
-            StudentRosterMember.name.ilike(keyword),
-            StudentRosterMember.student_number.ilike(keyword),
-            StudentRosterMember.major.ilike(keyword),
+            contains(StudentRosterMember.name, keyword),
+            contains(StudentRosterMember.student_number, keyword),
+            contains(StudentRosterMember.major, keyword),
         )
     ]
 
@@ -107,15 +108,14 @@ def search_dues_payers(
             code="INVALID_DUES_BOARD",
         )
     board = require_activity_dues_board(db, board_id)
-    trimmed = q.strip()
-    if not trimmed:
+    keyword = search_pattern(q)
+    if keyword is None:
         return success_response([])
-    keyword = f"%{trimmed}%"
     rows = db.execute(
         select(StudentRosterMember, DuesPayment)
         .outerjoin(DuesPayment, DuesPayment.roster_member_id == StudentRosterMember.id)
         # 참가자 검색은 이름으로만 매칭한다. 학번 매칭은 다른 원우의 학번을 유추하는 통로가 된다.
-        .where(StudentRosterMember.name.ilike(keyword))
+        .where(contains(StudentRosterMember.name, keyword))
         .order_by(
             StudentRosterMember.name.asc(),
             StudentRosterMember.student_number.asc(),

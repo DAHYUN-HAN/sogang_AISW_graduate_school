@@ -22,6 +22,7 @@ from app.rate_limit import enforce_rate_limit
 from app.response import success_response
 from app.schemas.user import AdminUserPasswordReset, AdminUserUpdate, UserBlockCreate, UserDeleteRequest, UserMeUpdate, UserPasswordUpdate, UserPasswordVerify
 from app.security import ensure_password_policy, hash_password, utc_now, verify_password
+from app.text_search import contains, search_pattern
 from app.user_validation import normalize_nickname
 from app.audit import log_admin_action
 
@@ -74,17 +75,16 @@ def search_users(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    trimmed = q.strip()
-    if not trimmed:
+    keyword = search_pattern(q)
+    if keyword is None:
         return success_response([])
-    keyword = f"%{trimmed}%"
     users = db.scalars(
         select(User)
         .where(
             User.is_active.is_(True),
             User.enrollment_status == "active",
             User.dues_status.in_(["paid", "exempt"]),
-            User.nickname.ilike(keyword) | User.cohort.ilike(keyword) | User.major.ilike(keyword),
+            contains(User.nickname, keyword) | contains(User.cohort, keyword) | contains(User.major, keyword),
         )
         .order_by(User.cohort.desc().nullslast(), User.nickname.asc(), User.id.asc())
         .limit(size)
@@ -114,9 +114,9 @@ def get_admin_users(
     _: User = Depends(require_admin),
 ):
     filters = []
-    if q and q.strip():
-        keyword = f"%{q.strip()}%"
-        filters.append(User.email.ilike(keyword) | User.nickname.ilike(keyword) | User.cohort.ilike(keyword))
+    keyword = search_pattern(q)
+    if keyword:
+        filters.append(contains(User.email, keyword) | contains(User.nickname, keyword) | contains(User.cohort, keyword))
     if role:
         filters.append(User.role == role)
     if is_active is not None:
