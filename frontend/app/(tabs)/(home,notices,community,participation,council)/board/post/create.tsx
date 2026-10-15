@@ -1673,31 +1673,28 @@ function PostCreateForm({ params }: { params: PostCreateRouteParams }) {
             </View>
             {evidenceMode === "file" ? (
               <View style={styles.evidenceImageSection}>
-                <Text style={styles.evidenceImageHint}>※ 청첩장, 부고장 이미지를 첨부할 수 있어요 (JPG, PNG)</Text>
+                {/* Figma MutualAidApply-ImageAttached: 사진을 붙이면 안내문 자리에 80x80 썸네일이 온다. */}
                 {imageAttachments.length > 0 ? (
-                  <View style={styles.evidenceImageGrid}>
+                  <View style={styles.evidenceThumbArea}>
                     {imageAttachments.map((attachment) => (
-                      <MediaImageBackground
-                        key={attachment.id}
-                        media={attachment}
-                        imageStyle={styles.evidenceImageTileImage}
-                        style={styles.evidenceImageTile}
-                      >
+                      <View key={attachment.id} style={styles.evidenceThumbWrap}>
+                        <MediaImageBackground media={attachment} imageStyle={styles.evidenceThumbImage} style={styles.evidenceThumb} />
                         <Pressable
                           accessibilityLabel={`${attachment.original_filename} 삭제`}
                           accessibilityRole="button"
                           disabled={isSubmitting}
+                          hitSlop={11}
                           onPress={() => setAttachments((current) => current.filter((item) => item.id !== attachment.id))}
-                          style={styles.evidenceImageRemove}
+                          style={styles.evidenceThumbRemove}
                         >
-                          <View style={styles.evidenceImageRemoveVisual}>
-                            <CloseIcon size={10} color="#FFFFFF" />
-                          </View>
+                          <CloseIcon size={10} color="#FFFFFF" />
                         </Pressable>
-                      </MediaImageBackground>
+                      </View>
                     ))}
                   </View>
-                ) : null}
+                ) : (
+                  <Text style={styles.evidenceImageHint}>※ 청첩장, 부고장 이미지를 첨부할 수 있어요 (JPG, PNG)</Text>
+                )}
                 {nonImageAttachments.length > 0 ? (
                   <View style={styles.evidenceLegacyFiles}>
                     {nonImageAttachments.map((attachment) => (
@@ -2700,39 +2697,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
     lineHeight: 16,
   },
-  evidenceImageGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  evidenceImageTile: {
-    width: 56,
-    height: 56,
-    borderRadius: 8,
-    overflow: "hidden",
-    backgroundColor: "#E9ECF1",
-  },
-  evidenceImageTileImage: {
-    borderRadius: 8,
-  },
-  evidenceImageRemove: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    width: 44,
-    height: 44,
-    alignItems: "flex-end",
-    paddingTop: 4,
-    paddingRight: 4,
-  },
-  evidenceImageRemoveVisual: {
-    width: 18,
-    height: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 9,
-    backgroundColor: "rgba(17,24,39,0.68)",
-  },
   evidenceLegacyFiles: {
     gap: 8,
   },
@@ -2783,7 +2747,10 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    paddingTop: 12, // Figma 첨부영역 padding 12/0/0
+    // Figma 첨부영역은 탭 아래 8 + 위 패딩 12 = 탭 테두리에서 20 아래에 썸네일이 온다.
+    // 앱 탭은 누르는 영역(44)이 테두리(34)보다 아래로 5 더 나와 있고 field gap 8이
+    // 그 뒤에 붙으므로, 남은 7만 위 패딩으로 둔다.
+    paddingTop: 7,
   },
   evidenceThumbWrap: {
     width: 80,
