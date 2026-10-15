@@ -388,9 +388,21 @@ Response:
 }
 ```
 
+Error when the address has no active account:
+
+```json
+{
+  "status": "error",
+  "message": "No account is registered with this email.",
+  "code": "ACCOUNT_NOT_FOUND"
+}
+```
+
 Rule:
 
-- Always return `accepted: true` to avoid account enumeration.
+- 2026-10-15 meeting decision: usability takes priority over hiding account existence. An unregistered or deactivated address returns `404 ACCOUNT_NOT_FOUND`, and the app shows the Figma `Screen/Auth/FindPassword-NotFound` state ("가입된 이메일이 아닙니다. 다시 확인해 주세요."). This replaces the earlier "always return `accepted: true`" rule.
+- Account enumeration through this endpoint is accepted and limited by the existing rate limit (3 requests per address and 10 per IP per 15 minutes).
+- A registered, active address still returns `accepted: true`.
 - The six-digit code is delivered only by email and never included in the response.
 - The code expires after five minutes, and another code is not issued for the same address during that period.
 

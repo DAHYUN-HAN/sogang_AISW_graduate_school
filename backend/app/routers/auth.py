@@ -547,78 +547,78 @@ def request_password_reset(payload: PasswordResetRequest, request: Request, db: 
         "resend_in": settings.password_reset_resend_cooldown_seconds,
     }
 
-    # Serialize reset requests by address so concurrent requests cannot issue
-    # multiple valid codes. The same key is used even for unknown addresses to
-    # keep request behavior independent from account existence.
-    db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:email, 0))"), {"email": email})
+    # 2026-10-15 회의 결정: 편의성을 우선해 가입하지 않았거나 탈퇴한 이메일이면 알려 준다
+    # (Figma Screen/Auth/FindPassword-NotFound). 가입 여부가 드러나는 것은 위 요청 횟수 제한으로 줄인다.
     user = db.scalar(select(User).where(User.email == email))
-    if user is not None and user.is_active:
-        previous_tokens = db.scalars(
-            select(PasswordResetToken).where(
-                PasswordResetToken.user_id == user.id,
-                PasswordResetToken.consumed_at.is_(None),
-            ).order_by(PasswordResetToken.created_at.desc(), PasswordResetToken.id.desc())
-        ).all()
+    if user is None or not user.is_active:
+        raise AppException(status_code=404, message="No account is registered with this email.", code="ACCOUNT_NOT_FOUND")
 
-        now = utc_now()
-        latest_token = previous_tokens[0] if previous_tokens else None
-        if latest_token is not None:
-            elapsed_seconds = (now - latest_token.created_at).total_seconds()
-            if elapsed_seconds < settings.password_reset_resend_cooldown_seconds:
-                # Keep the response indistinguishable from an unknown account.
-                # The frontend prevents ordinary users from retrying before the
-                # cooldown, while the backend simply refuses to issue a new code.
-                # 개발(SMTP 미설정)에서는 직전 코드가 아직 유효하므로 흐름을 진행시킨다.
-                data["email_sent"] = True if not is_email_configured() else is_email_configured()
-                return success_response(data)
+    # Serialize reset requests by address so concurrent requests cannot issue
+    # multiple valid codes.
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:email, 0))"), {"email": email})
+    previous_tokens = db.scalars(
+        select(PasswordResetToken).where(
+            PasswordResetToken.user_id == user.id,
+            PasswordResetToken.consumed_at.is_(None),
+        ).order_by(PasswordResetToken.created_at.desc(), PasswordResetToken.id.desc())
+    ).all()
 
-        reset_token = generate_verification_code()
-        token = PasswordResetToken(
-            user_id=user.id,
-            token_hash=hash_token(reset_token),
-            expires_at=now + timedelta(minutes=settings.password_reset_expire_minutes),
-        )
-        db.add(token)
-        db.commit()
-
-        if not is_email_configured():
-            logger.warning("Password reset email was not sent because SMTP is not configured")
-            db.delete(token)
-            db.commit()
-            data["email_sent"] = False
-            data["dev_mode"] = False
+    now = utc_now()
+    latest_token = previous_tokens[0] if previous_tokens else None
+    if latest_token is not None:
+        elapsed_seconds = (now - latest_token.created_at).total_seconds()
+        if elapsed_seconds < settings.password_reset_resend_cooldown_seconds:
+            # The frontend prevents ordinary users from retrying before the
+            # cooldown, while the backend simply refuses to issue a new code.
+            # 개발(SMTP 미설정)에서는 직전 코드가 아직 유효하므로 흐름을 진행시킨다.
+            data["email_sent"] = True if not is_email_configured() else is_email_configured()
             return success_response(data)
 
-        plain_body, html_body = password_reset_email(
-            reset_token,
-            settings.password_reset_expire_minutes,
-            contact_email=settings.support_email,
-        )
-        try:
-            email_sent = send_email(
-                user.email,
-                "[AI·SW CAMPUS] 비밀번호 재설정 인증 코드",
-                plain_body,
-                html_body=html_body,
-            )
-        except Exception:
-            db.delete(token)
-            db.commit()
-            raise
+    reset_token = generate_verification_code()
+    token = PasswordResetToken(
+        user_id=user.id,
+        token_hash=hash_token(reset_token),
+        expires_at=now + timedelta(minutes=settings.password_reset_expire_minutes),
+    )
+    db.add(token)
+    db.commit()
 
-        if not email_sent:
-            db.delete(token)
-            db.commit()
-            data["email_sent"] = False
-            return success_response(data)
-
-        consumed_at = utc_now()
-        for previous in previous_tokens:
-            previous.consumed_at = consumed_at
+    if not is_email_configured():
+        logger.warning("Password reset email was not sent because SMTP is not configured")
+        db.delete(token)
         db.commit()
-        data["email_sent"] = email_sent
-    else:
-        data["email_sent"] = is_email_configured()
+        data["email_sent"] = False
+        data["dev_mode"] = False
+        return success_response(data)
+
+    plain_body, html_body = password_reset_email(
+        reset_token,
+        settings.password_reset_expire_minutes,
+        contact_email=settings.support_email,
+    )
+    try:
+        email_sent = send_email(
+            user.email,
+            "[AI·SW CAMPUS] 비밀번호 재설정 인증 코드",
+            plain_body,
+            html_body=html_body,
+        )
+    except Exception:
+        db.delete(token)
+        db.commit()
+        raise
+
+    if not email_sent:
+        db.delete(token)
+        db.commit()
+        data["email_sent"] = False
+        return success_response(data)
+
+    consumed_at = utc_now()
+    for previous in previous_tokens:
+        previous.consumed_at = consumed_at
+    db.commit()
+    data["email_sent"] = email_sent
     return success_response(data)
 
 
