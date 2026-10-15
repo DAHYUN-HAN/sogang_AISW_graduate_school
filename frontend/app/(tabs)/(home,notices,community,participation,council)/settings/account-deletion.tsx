@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
+import { AppText as Text } from "../../../../components/AppTypography";
+import { FieldInput } from "../../../../components/FieldBorder";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import KeyboardViewport from "../../../../components/KeyboardViewport";
 
@@ -173,7 +174,8 @@ export default function AccountDeletionScreen() {
             <Pressable onPress={(event) => event.stopPropagation()} style={styles.modalCard}>
               <Text accessibilityRole="header" style={styles.modalTitle}>비밀번호 확인</Text>
               <Text style={styles.modalBody}>본인 확인을 위해 비밀번호를 입력해주세요.</Text>
-              <TextInput
+              <FieldInput
+                hasError={Boolean(passwordError)}
                 accessibilityLabel="비밀번호"
                 autoCapitalize="none"
                 autoComplete="current-password"
@@ -189,7 +191,7 @@ export default function AccountDeletionScreen() {
                 placeholder="비밀번호 입력"
                 placeholderTextColor={COLORS.subtle}
                 secureTextEntry
-                style={[styles.input, passwordError ? styles.inputError : null]}
+                style={styles.input}
                 value={currentPassword}
               />
               {passwordError || requestError ? (
@@ -270,8 +272,7 @@ const styles = StyleSheet.create({
   // Figma PasswordModal 입력칸: 48h, 테두리 1px, 좌우 16, 14/22
   input: {
     height: 48,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    // 테두리는 FieldBorder 공통 원칙을 따른다.
     borderRadius: 8,
     color: COLORS.text,
     fontSize: 14,
@@ -280,7 +281,6 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   // 다른 오류 칸과 같이 배경 없이 빨간 테두리만 둔다.
-  inputError: { borderColor: COLORS.danger },
   errorText: { flexShrink: 1, color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 14 }, // Figma 에러행: Regular 12
   confirmRow: {
     flexDirection: "row",

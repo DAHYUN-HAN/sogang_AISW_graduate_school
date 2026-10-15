@@ -187,9 +187,11 @@ test("댓글 액션행과 저장·취소행은 padding 8/0, gap 16, 라벨 13/16
   assert.doesNotMatch(commentItem, /fontSize: depth > 0 \? 13 : 12/);
 });
 
-test("댓글 수정 입력은 1.3px 파란 테두리에 13\/16 본문과 8\/10 여백을 쓴다", () => {
+test("댓글 수정 입력은 입력 칸 공통 테두리에 13\/16 본문과 8\/10 여백을 쓴다", () => {
   const commentItem = source("components/CommentItem.tsx");
-  assert.match(commentItem, /borderWidth: 1\.3,\s*\n\s*borderColor: "#2761FF"/);
+  // Figma Detail2-CommentEdit·ReplyEdit: 입력 중 1px #21262E (FieldInput이 그린다).
+  assert.match(commentItem, /<FieldInput\s*\n\s*autoFocus/);
+  assert.doesNotMatch(commentItem, /borderColor: "#2761FF"/);
   // Figma 답글수정입력: padding 8px 10px.
   assert.match(commentItem, /fontSize: 13,\s*\n\s*lineHeight: 16,[\s\S]{0,120}paddingHorizontal: 10,\s*\n\s*paddingVertical: 8,/);
 });
@@ -227,7 +229,7 @@ test("활동 인증 날짜 필드는 '활동한 날짜' 소제목과 41h 날짜�
   assert.match(icons, /d="M10 1\.875V4\.375M5 1\.875V4\.375M1\.875 6\.25H13\.125"/);
   assert.match(icons, /export function CalendarSmallIcon[\s\S]{0,700}strokeWidth=\{1\.22\}/);
   assert.match(postCreateSource, /activityFieldGroup:\s*\{\s*\n\s*gap: 6,/);
-  assert.match(postCreateSource, /activityInputWithIcon:\s*\{\s*\n\s*minHeight: 41,/);
+  assert.match(postCreateSource, /activityInputWithIcon:\s*\{\s*\n\s*\.\.\.FIELD_BORDER\.normal,[^\n]*\n\s*minHeight: 41,/);
 });
 
 test("스터디 모집 댓글은 구분선 없이 12px 간격으로만 이어진다", () => {

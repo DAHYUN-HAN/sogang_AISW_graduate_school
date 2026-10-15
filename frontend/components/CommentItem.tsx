@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Pressable, View } from "react-native";
-import { AppText as Text, AppTextInput as TextInput } from "./AppTypography";
+import { AppText as Text } from "./AppTypography";
+import { FieldInput } from "./FieldBorder";
 
 import type { CommentNode } from "../types";
 import { commentEditSubmissionValue, getCommentActionState } from "../utils/commentPresentation";
@@ -125,7 +126,8 @@ export default function CommentItem({
       </View>
 
       {isEditing ? (
-        <TextInput
+        // 테두리는 FieldBorder 공통 원칙: 수정 중(입력 중)은 1px #21262E.
+        <FieldInput
           autoFocus
           maxLength={500}
           multiline
@@ -134,8 +136,6 @@ export default function CommentItem({
             {
               marginTop: 4,
               minHeight: depth > 0 ? 44 : 60,
-              borderWidth: 1.3,
-              borderColor: "#2761FF",
               borderRadius: 8,
               backgroundColor: "#FFFFFF",
               color: "#15171C",
@@ -146,7 +146,6 @@ export default function CommentItem({
               paddingVertical: 8,
               textAlignVertical: "top",
             },
-            { outlineStyle: "none" } as never,
           ]}
           value={draft}
         />

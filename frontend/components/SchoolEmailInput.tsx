@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "./AppTypography";
+import { fieldBorder } from "./FieldBorder";
 
 type Props = {
   value: string;
@@ -44,11 +45,7 @@ export default function SchoolEmailInput({ value, onChangeText, placeholder = "�
       */}
       <View
         pointerEvents="none"
-        style={[
-          styles.border,
-          isFocused && !hasError ? styles.borderFocused : null,
-          hasError ? styles.borderError : null,
-        ]}
+        style={[styles.border, fieldBorder(isFocused, hasError)]}
       />
     </View>
   );
@@ -63,17 +60,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#FFFFFF",
   },
+  // 두께·색은 입력 칸 공통 원칙(FieldBorder)을 따른다.
   border: {
     ...StyleSheet.absoluteFillObject,
-    borderWidth: 0.5, // Figma: 0.5px border
-    borderColor: "#E1E4E9",
     borderRadius: 8,
-  },
-  borderError: {
-    borderColor: "#D64545", // error/500 (Figma)
-  },
-  borderFocused: {
-    borderColor: "#2761FF",
   },
   input: {
     flex: 1,

@@ -29,6 +29,12 @@ function harness(platform: string, multiline = true, minHeight = 100) {
   const context = {
     Platform: { OS: platform }, TextInput: "TextInput", ScrollView: "ScrollView",
     StyleSheet: { create: (styles: unknown) => styles, flatten },
+    // components/FieldBorder.tsx의 입력 칸 공통 원칙과 같은 값.
+    FIELD_BORDER: {
+      normal: { borderWidth: 0.5, borderColor: "#E1E4E9" },
+      focused: { borderWidth: 1, borderColor: "#21262E" },
+      error: { borderWidth: 1, borderColor: "#D64545" },
+    },
     element: (type: string, attributes: Props, ...children: Element[]): Element => ({ type, props: attributes, children }),
     useState(initial: unknown) {
       const slot = hook++;

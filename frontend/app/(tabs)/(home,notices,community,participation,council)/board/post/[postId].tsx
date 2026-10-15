@@ -4,6 +4,7 @@ import { router as expoRouter, usePathname, useFocusEffect, useLocalSearchParams
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert as NativeAlert, BackHandler, Image, Keyboard, Linking, PanResponder, Platform, Pressable, ScrollView, StyleSheet, type TextInputKeyPressEvent, type TextStyle, View } from "react-native";
 import { AppText as Text, AppTextInput as TextInput } from "../../../../../components/AppTypography";
+import { FieldInput } from "../../../../../components/FieldBorder";
 import { NetworkErrorFallback } from "../../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -1463,7 +1464,7 @@ export default function PostDetailScreen() {
             </View>
           ) : null}
           <View style={styles.commentInputRow}>
-            <TextInput
+            <FieldInput
               ref={commentInputRef}
               blurOnSubmit={Platform.OS === "web" ? false : undefined}
               multiline
@@ -1478,7 +1479,7 @@ export default function PostDetailScreen() {
               placeholderTextColor="#A6ACB7"
               returnKeyType="send"
               scrollEnabled={commentInputHeight >= 88}
-              style={[styles.commentInput, { height: commentInputHeight }, { outlineStyle: "none" } as never]}
+              style={[styles.commentInput, { height: commentInputHeight }]}
               submitBehavior={Platform.OS === "web" ? "newline" : "submit"}
             />
             <Pressable accessibilityLabel="댓글 등록" disabled={createCommentMutation.isPending} onPress={handleCreateComment}>
@@ -1569,14 +1570,14 @@ export default function PostDetailScreen() {
                 })}
               </View>
               {reportReason === "other" ? (
-                <TextInput
+                <FieldInput
                   maxLength={1000}
                   multiline
                   value={reportDetail}
                   onChangeText={setReportDetail}
                   placeholder="구체적인 사유를 입력해주세요"
                   placeholderTextColor={COLORS.subtle}
-                  style={[styles.reportDetailInput, { outlineStyle: "none" } as never]}
+                  style={styles.reportDetailInput}
                   textAlignVertical="top"
                 />
               ) : null}
@@ -1883,8 +1884,7 @@ const styles = StyleSheet.create({
   },
   reportDetailInput: {
     minHeight: 88,
-    borderWidth: 1,
-    borderColor: COLORS.divider,
+    // 테두리는 FieldBorder 공통 원칙을 따른다(Figma ReasonSheet-OtherInput 평소 0.5).
     borderRadius: 8,
     color: COLORS.text,
     fontSize: 13,
@@ -2770,8 +2770,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 36,
     maxHeight: 88,
-    borderWidth: 0.5,
-    borderColor: "#E1E4E9",
+    // 테두리는 FieldBorder 공통 원칙을 따른다.
     borderRadius: 999,
     color: COLORS.text,
     fontSize: 13,

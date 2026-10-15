@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
+import { AppText as Text } from "../../../../components/AppTypography";
+import { FIELD_ERROR_COLOR, FieldInput } from "../../../../components/FieldBorder";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import NoticeModal from "../../../../components/NoticeModal";
@@ -20,9 +21,8 @@ const COLORS = {
   text: "#15171C",
   label: "#6B7280",
   placeholder: "#A6ACB7",
-  border: "#E1E4E9",
   bg: "#FFFFFF",
-  danger: "#D64545",
+  danger: FIELD_ERROR_COLOR,
   disabled: "#D1D5DB",
 };
 
@@ -116,7 +116,8 @@ export default function PasswordChangeScreen() {
       <ScrollView style={styles.scroller} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>현재 비밀번호</Text>
-          <TextInput
+          <FieldInput
+            hasError={Boolean(currentError)}
             onChangeText={(value) => {
               setCurrentPassword(value);
               if (currentError) setCurrentError(null);
@@ -124,14 +125,15 @@ export default function PasswordChangeScreen() {
             placeholder="현재 비밀번호를 입력하세요"
             placeholderTextColor={COLORS.placeholder}
             secureTextEntry
-            style={[styles.input, currentError ? styles.inputError : null]}
+            style={styles.input}
             value={currentPassword}
           />
           {currentError ? <ErrorRow message={currentError} /> : null}
         </View>
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>새 비밀번호</Text>
-          <TextInput
+          <FieldInput
+            hasError={Boolean(newError)}
             onChangeText={(value) => {
               setNewPassword(value);
               if (newError) setNewError(null);
@@ -139,14 +141,15 @@ export default function PasswordChangeScreen() {
             placeholder="영문, 숫자, 특수문자 포함 8자 이상"
             placeholderTextColor={COLORS.placeholder}
             secureTextEntry
-            style={[styles.input, newError ? styles.inputError : null]}
+            style={styles.input}
             value={newPassword}
           />
           {newError ? <ErrorRow message={newError} /> : null}
         </View>
         <View style={styles.fieldGroup}>
           <Text style={styles.label}>새 비밀번호 확인</Text>
-          <TextInput
+          <FieldInput
+            hasError={Boolean(confirmError)}
             onChangeText={(value) => {
               setConfirmPassword(value);
               if (confirmError) setConfirmError(null);
@@ -154,7 +157,7 @@ export default function PasswordChangeScreen() {
             placeholder="새 비밀번호를 다시 입력하세요"
             placeholderTextColor={COLORS.placeholder}
             secureTextEntry
-            style={[styles.input, confirmError ? styles.inputError : null]}
+            style={styles.input}
             value={confirmPassword}
           />
           {confirmError ? <ErrorRow message={confirmError} /> : null}
@@ -194,8 +197,7 @@ const styles = StyleSheet.create({
   label: { color: COLORS.text, fontSize: 13, fontWeight: "400", lineHeight: 16 }, // Figma: 13/16 #15171C
   input: {
     minHeight: 41,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    // 테두리는 FieldBorder 공통 원칙을 따른다.
     borderRadius: 8,
     color: COLORS.text,
     fontSize: 14,
@@ -205,7 +207,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   // 다른 오류 칸과 같이 배경 없이 빨간 테두리만 둔다. (피그마 PasswordChange-Error는 아직 분홍 배경)
-  inputError: { borderColor: COLORS.danger },
   errorRow: { flexDirection: "row", alignItems: "center", gap: 4 },
   errorText: { color: COLORS.danger, fontSize: 12, fontWeight: "400", lineHeight: 15 },
   primaryButton: {

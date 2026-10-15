@@ -2,7 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { AppText as Text, AppTextInput as TextInput } from "../../../../components/AppTypography";
+import { AppText as Text } from "../../../../components/AppTypography";
+import { FieldInput } from "../../../../components/FieldBorder";
 import { useLoadErrorOverlay } from "../../../../components/NetworkErrorState";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -216,7 +217,7 @@ export default function ProfileSettingsScreen() {
 
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>연락처</Text>
-            <TextInput
+            <FieldInput
               keyboardType="phone-pad"
               maxLength={11}
               onChangeText={(next) => {
@@ -382,8 +383,7 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 44,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
+    // 테두리는 FieldBorder 공통 원칙을 따른다.
     borderRadius: 8,
     color: COLORS.text,
     fontSize: 14,

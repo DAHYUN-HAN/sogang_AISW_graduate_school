@@ -22,6 +22,7 @@ import { operationStatus } from "../../../../../utils/participationGuide";
 import LoadingState from "../../../../../components/LoadingState";
 import PostAttachmentEditor from "../../../../../components/PostAttachmentEditor";
 import SelectionSheet, { type SelectionOption } from "../../../../../components/SelectionSheet";
+import { FIELD_BORDER } from "../../../../../components/FieldBorder";
 import NoticeModal, { type NoticeModalContent } from "../../../../../components/NoticeModal";
 import Toast from "../../../../../components/Toast";
 import { MediaImageBackground } from "../../../../../components/MediaImage";
@@ -2197,10 +2198,9 @@ const styles = StyleSheet.create({
     paddingTop: 18,
   },
   activitySelect: {
+    ...FIELD_BORDER.normal, // 입력 칸 공통 원칙(FieldBorder)
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.bg,
     paddingHorizontal: 14,
@@ -2225,13 +2225,12 @@ const styles = StyleSheet.create({
     color: "#A6ACB7",
   },
   selectionField: {
+    ...FIELD_BORDER.normal, // 입력 칸 공통 원칙(FieldBorder)
     minHeight: 41, // Figma: 41h, border 0.5, padding 12/14
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.bg,
     paddingHorizontal: 14,
@@ -2412,19 +2411,17 @@ const styles = StyleSheet.create({
     minHeight: 80, // Figma: 후기입력 80h
   },
   activityInputWithIcon: {
+    ...FIELD_BORDER.normal, // 입력 칸 공통 원칙(FieldBorder)
     minHeight: 41, // Figma: 41h, padding 12/14
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.bg,
     paddingHorizontal: 14,
   },
   activityInputWithIconFocused: {
-    borderWidth: 1, // Figma 참가자검색 focus: 1px #21262E
-    borderColor: "#21262E",
+    ...FIELD_BORDER.focused, // 입력 칸 공통 원칙(FieldBorder)
   },
   activityInlineInput: {
     flex: 1,
@@ -2559,12 +2556,11 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   selectLike: {
+    ...FIELD_BORDER.normal, // 입력 칸 공통 원칙(FieldBorder)
     height: 41, // Figma: 게시판 선택 41h
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.bg,
     paddingHorizontal: 14,
@@ -2814,13 +2810,12 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(33, 36, 41, 0.8)",
   },
   evidenceLinkField: {
+    ...FIELD_BORDER.normal, // 입력 칸 공통 원칙(FieldBorder)
     // Figma: 링크입력필드 36h, padding 10/12, gap 8
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
     height: 36,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.bg,
     paddingHorizontal: 12,
@@ -2834,8 +2829,7 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   evidenceLinkFieldFocused: {
-    borderWidth: 1, // Figma focus: 1px #21262E
-    borderColor: "#21262E",
+    ...FIELD_BORDER.focused, // 입력 칸 공통 원칙(FieldBorder)
   },
   optionalMark: {
     color: "#A6ACB7",
@@ -2845,20 +2839,18 @@ const styles = StyleSheet.create({
   },
   // Figma: 교수명 입력 — 우측에 "교수" 접미 라벨이 붙은 단일 입력 박스
   suffixInputRow: {
+    ...FIELD_BORDER.normal, // 입력 칸 공통 원칙(FieldBorder)
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.bg,
     paddingHorizontal: 14,
   },
   // 제목 칸(input)과 글자 시작 위치를 맞추려면 굵어진 테두리만큼 패딩을 줄인다.
   suffixInputRowFocused: {
-    borderWidth: 1, // Figma focus: 1px #21262E
-    borderColor: "#21262E",
+    ...FIELD_BORDER.focused, // 입력 칸 공통 원칙(FieldBorder)
   },
   suffixInput: {
     flex: 1,
@@ -2905,10 +2897,9 @@ const styles = StyleSheet.create({
     color: COLORS.primary,
   },
   input: {
+    ...FIELD_BORDER.normal, // 입력 칸 공통 원칙(FieldBorder)
     width: "100%",
     minHeight: 41, // Figma: 41h (textArea가 덮어씀)
-    borderWidth: 0.5,
-    borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.bg,
     color: COLORS.text,
@@ -2919,20 +2910,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   inputFocused: {
-    borderWidth: 1, // Figma 참가자검색 focus와 동일: 1px #21262E
-    borderColor: "#21262E",
+    ...FIELD_BORDER.focused, // 입력 칸 공통 원칙(FieldBorder)
   },
-  // Figma 오류 상태: 1px #D64545. 입력칸·등급 버튼 모두 같은 굵기다.
-  // 기본 0.5 -> 1로 0.5px만 굵어져 여백 보정 없이도 글자가 밀리지 않는다.
-  // 기본 테두리(0.5)보다 굵어지는 만큼 좌우 패딩을 줄여 글자 위치를 유지한다.
+  // 오류 > 선택 순서로 합친다. 등급 버튼도 같은 오류 테두리를 쓴다.
   inputError: {
-    borderWidth: 1,
-    borderColor: "#D64545",
+    ...FIELD_BORDER.error, // 입력 칸 공통 원칙(FieldBorder)
   },
   // 등급 버튼은 좌우 패딩이 없어 두께만 바꾼다.
   borderOnlyError: {
-    borderWidth: 1,
-    borderColor: "#D64545",
+    ...FIELD_BORDER.error, // 입력 칸 공통 원칙(FieldBorder)
   },
   textArea: {
     minHeight: 70, // Figma: 비고필드 70h
